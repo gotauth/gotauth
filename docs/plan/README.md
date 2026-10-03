@@ -208,6 +208,19 @@ That's about 7 weeks to v0.1 if you review steadily. **If you're part-time, keep
 
 You can also ask Claude to start a whole wave as parallel agents, each in its own isolated worktree. Say "run Wave 1" once M0 is merged.
 
+## Skills per work package
+Agents load these skills with the Skill tool before starting, and list them in the PR description.
+
+| Work packages | Skills |
+|---|---|
+| G1 landing, G4 example frontends | `modern-web-guidance:modern-web-guidance` (mandatory for any HTML, CSS or client JS), `design:ux-copy`, `design:accessibility-review` |
+| D2 UI registry | `modern-web-guidance:modern-web-guidance`, `design:design-system`, `design:ux-copy`, `design:accessibility-review` |
+| G2 docs site | `modern-web-guidance:modern-web-guidance`, `design:accessibility-review` |
+| O1 OAuth server, O2 MCP, Q2 agent-install test | `claude-api` (MCP, Claude Code and Agent SDK details); Q2 also uses the `run` skill to drive the example apps |
+| Integrator, on every branch before merging | `code-review` |
+| Integrator, on security-critical branches (C1-C4, P1-P3, P6, O1-O3, Q1) | `security-review` |
+| Integrator, at M2 and the MCP demo | `run`, to see the example apps working |
+
 ## Integrator routine (after every merge)
 1. `./dev.sh uv run poe check` is green on `main`.
 2. After M2: run the `fastapi-nextjs` scenario. After O2: run the `fastmcp-server` scenario.

@@ -69,6 +69,7 @@
 - **Rebase on `main` before you open the PR.** Resolve conflicts only inside your write scope.
 
 ## 4. Definition of done (every work package)
+- [ ] You loaded the skills listed for your work package in `docs/plan/README.md` ("Skills per work package") before starting, and the PR names them.
 - [ ] Every **acceptance test** in the brief passes.
 - [ ] `./dev.sh uv run poe check` is green: ruff format check, ruff lint, pyright strict and pytest, including the `spec/` vectors that apply.
 - [ ] All public functions, classes and methods have Google-style docstrings. Your module has a short `README.md` with a copy-paste example.
