@@ -26,7 +26,7 @@ It's an open-source Python library (MIT) that lives inside your FastAPI app, the
   - The MCP Python SDK's [authorization docs](https://py.sdk.modelcontextprotocol.io/run/authorization/) say of the authorization server: "You don't write this. It's your identity provider."
   - FastMCP's own OAuth provider "requires significant additional configuration for user management".
   - Every built-in FastMCP provider hands sign-in to a separate identity provider (hosted ones such as Auth0, WorkOS, Clerk and Descope, or a Keycloak server you run). None of them uses your app's own user table.
-- **The market is big.** FastAPI is used by 38% of Python web developers (JetBrains 2024) and gets about 358M downloads a month. SQLAlchemy is used by 39%, Postgres by 49%.
+- **The market is big.** In the JetBrains Python Developers Survey 2024, 38% of all respondents use FastAPI, 39% use SQLAlchemy and 49% use PostgreSQL. FastAPI gets about 358M downloads a month.
 
 ## Positioning
 **Lead with agent-era auth.** GotAuth is a full FastAPI auth library. Its headline and its edge are three things the alternatives don't offer:
