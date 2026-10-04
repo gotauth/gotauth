@@ -10,6 +10,11 @@ services:
     build:
       context: docker
       dockerfile: dev.Dockerfile
+      # Linux hosts whose user id is not 1000 set these, so files in the bind mount
+      # stay writable (see CONTRIBUTING.md).
+      args:
+        USER_UID: ${GOTAUTH_UID:-1000}
+        USER_GID: ${GOTAUTH_GID:-1000}
     init: true
     working_dir: /workspace
     volumes:
