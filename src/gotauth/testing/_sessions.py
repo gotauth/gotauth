@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from gotauth.contracts.adapter import Where
-from gotauth.contracts.core_schema import SESSION_MODEL, USER_MODEL, Session, User
+from gotauth.contracts.core_schema import Session, User
 from gotauth.contracts.endpoints import EndpointContext
 from gotauth.contracts.http import SetCookie
 from gotauth.contracts.primitives import Duration, to_timedelta
@@ -72,7 +72,7 @@ class FakeSessionService:
                 **(extra or {}),
             },
         )
-        session = Session.model_validate(returned_only(SESSION_MODEL, row))
+        session = Session.model_validate(returned_only(ctx.auth.schema["session"], row))
         self._set_cookie(ctx, token, session)
         return CreatedSession(session=session, token=token)
 
@@ -92,10 +92,12 @@ class FakeSessionService:
         if user_row is None:
             return None
         slid = await self._slide(ctx, row, now)
-        session = Session.model_validate(returned_only(SESSION_MODEL, slid or row))
+        session = Session.model_validate(
+            returned_only(ctx.auth.schema["session"], slid or row)
+        )
         if slid is not None:
             self._set_cookie(ctx, token, session)
-        user = User.model_validate(returned_only(USER_MODEL, user_row))
+        user = User.model_validate(returned_only(ctx.auth.schema["user"], user_row))
         return SessionWithUser(session=session, user=user)
 
     async def _slide(
@@ -117,7 +119,8 @@ class FakeSessionService:
         """Return the user's sessions."""
         rows = await ctx.adapter.find_many("session", [Where("user_id", user_id)])
         return [
-            Session.model_validate(returned_only(SESSION_MODEL, row)) for row in rows
+            Session.model_validate(returned_only(ctx.auth.schema["session"], row))
+            for row in rows
         ]
 
     async def revoke(self, ctx: EndpointContext, session_id: str) -> bool:

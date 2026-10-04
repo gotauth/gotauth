@@ -261,12 +261,8 @@ class RevokeOAuthTokensIn(_CallIn):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> RevokeOAuthTokensIn:
-        if not self.model_fields_set & {
-            "client_id",
-            "user_id",
-            "agent_id",
-            "family_id",
-        }:
+        given = (self.client_id, self.user_id, self.agent_id, self.family_id)
+        if all(value is None for value in given):
             msg = "give at least one of client_id, user_id, agent_id, family_id"
             raise ValueError(msg)
         return self

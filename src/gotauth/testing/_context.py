@@ -474,7 +474,13 @@ class FakeApi:
         else:
             msg = "the testing auth.api only accepts contexts from make_context()"
             raise TypeError(msg)
-        result, child = await run_endpoint(endpoint, body, caller)
+        try:
+            result, child = await run_endpoint(endpoint, body, caller)
+        except Exception:
+            # Failure events such as sign_in.failed survive a rollback (section 14).
+            if caller is not ctx and isinstance(ctx, FakeContext):
+                ctx.absorb(caller, committed=False)
+            raise
         if caller is not ctx and isinstance(ctx, FakeContext):
             ctx.absorb(caller, committed=True)
         if not as_response:

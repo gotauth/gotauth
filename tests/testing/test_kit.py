@@ -295,3 +295,56 @@ async def test_where_helper_in_kit_context(ctx: FakeContext) -> None:
     row = await ctx.adapter.find_one("user", [Where("email", "ada@example.com")])
     assert row is not None
     assert row["id"] == user.id
+
+
+# ------------------------------------------------------------------ review fixes
+
+
+async def test_session_get_hides_plugin_fields_marked_not_returned() -> None:
+    from gotauth.contracts import Field, ModelSchema
+
+    hidden = Plugin(
+        id="hidden",
+        schema={
+            "user": ModelSchema(
+                "user", {"secret_note": Field("string", required=False, returned=False)}
+            )
+        },
+    )
+    ctx = make_context(plugins=[hidden])
+    user = await ctx.auth.create_user_record(
+        ctx, {"email": "a@b.c", "secret_note": "do-not-return"}
+    )
+    created = await ctx.sign_in(user.id)
+    found = await ctx.sessions.get(ctx, created.token)
+    assert found is not None
+    assert "secret_note" not in found.user.model_dump()
+
+
+def test_revoke_oauth_tokens_needs_a_real_filter() -> None:
+    from pydantic import ValidationError
+
+    from gotauth.contracts import RevokeOAuthTokensIn
+
+    with pytest.raises(ValidationError):
+        RevokeOAuthTokensIn.model_validate({"client_id": None})
+    assert RevokeOAuthTokensIn.model_validate({"user_id": "usr_1"}).user_id == "usr_1"
+
+
+async def test_failure_events_survive_a_failed_call_with_path_params() -> None:
+    async def fail(ctx: EndpointContext, data: BaseModel | None) -> None:
+        await ctx.emit("sign_in.failed", user_id=None)
+        raise AuthError("INVALID_CREDENTIALS", 401)
+
+    plugin = Plugin(
+        id="failing",
+        endpoints=(
+            Endpoint[Any, Any](
+                id="fail_with_param", method="POST", path="/fail/{id}", handler=fail
+            ),
+        ),
+    )
+    ctx = make_context(plugins=[plugin])
+    with pytest.raises(AuthError):
+        await ctx.auth.api.call("fail_with_param", ctx=ctx, path_params={"id": "x"})
+    assert ctx.event_types() == ["sign_in.failed"]
