@@ -1,0 +1,148 @@
+# Lint, types and tests on every push to main and every pull request.
+# Actions are pinned by commit SHA; the comment names the release.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep equal to the uv image tag in docker/dev.Dockerfile.
+  UV_VERSION: "0.12.22"
+  FORCE_COLOR: "1"
+
+jobs:
+  lint:
+    name: Format, lint, types and plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked --all-extras
+      - name: Format check
+        run: uv run poe format-check
+      - name: Lint (ruff and text check)
+        run: uv run poe lint
+      - name: Types (pyright)
+        run: uv run poe types
+      - name: Plan check
+        run: uv run python docs/plan/tools/verify_plan.py
+      - name: News fragments render
+        run: uv run towncrier build --draft
+
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gotauth
+          POSTGRES_PASSWORD: gotauth
+          POSTGRES_DB: gotauth
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gotauth -d gotauth"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      GOTAUTH_TEST_POSTGRES_URL: postgresql://gotauth:gotauth@localhost:5432/gotauth
+      GOTAUTH_TEST_REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python }}
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked --all-extras
+      # Includes the spec/ vector tests (marker "vectors") and the postgres and redis
+      # tests; timing tests run in their own job (work package Q1).
+      - name: Tests
+        run: uv run poe test
+
+  no-extras:
+    name: Import without extras (Python 3.11)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.11"
+      - name: Install the core dependencies only
+        run: uv sync --locked --no-dev
+      - name: Import gotauth and the core modules
+        run: |
+          uv run --no-sync python - <<'EOF'
+          import importlib
+          import importlib.util
+
+          core = [
+              "gotauth", "gotauth.checkup", "gotauth.cli", "gotauth.contracts",
+              "gotauth.core", "gotauth.crypto", "gotauth.email", "gotauth.email_password",
+              "gotauth.importers", "gotauth.integrations", "gotauth.interop",
+              "gotauth.plugins", "gotauth.sessions", "gotauth.social", "gotauth.storage",
+              "gotauth.storage.memory", "gotauth.testing",
+          ]
+          extras = [
+              "aiosmtplib", "aiosqlite", "alembic", "argon2", "asyncpg", "bcrypt",
+              "fastapi", "fastmcp", "litestar", "mcp", "redis", "sqlalchemy",
+              "starlette", "webauthn",
+          ]
+          installed = [name for name in extras if importlib.util.find_spec(name)]
+          assert not installed, f"extras are installed: {installed}"
+          for name in core:
+              importlib.import_module(name)
+          print(f"imported {len(core)} modules without extras")
+          EOF
+
+  build:
+    name: Build wheel and sdist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Build
+        run: uv build
+      - name: Check that both include py.typed
+        run: |
+          unzip -l dist/*.whl | grep -q "gotauth/py.typed"
+          tar -tzf dist/*.tar.gz | grep -q "src/gotauth/py.typed"
