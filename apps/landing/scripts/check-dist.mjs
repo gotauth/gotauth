@@ -16,7 +16,25 @@ const SITE = "https://gotauth.dev";
 const STATIC_EXT = new Set([".html", ".xml", ".txt", ".js", ".css", ".png", ".svg", ".ico", ".webmanifest", ""]);
 // U+2013 en dash and U+2014 em dash, built from char codes so this file stays ASCII.
 const DASHES = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
-const FILLER = ["seamless", "robust", "leverage", "comprehensive", "unlock", "empower", "cutting-edge", "game-changer"];
+// Marketing filler and stock phrases the project's writing rules ban. Each
+// entry matches at a word start, so "leverage" also catches "leveraged".
+const FILLER = [
+  "seamless",
+  "robust",
+  "leverage",
+  "comprehensive",
+  "unlock",
+  "empower",
+  "cutting-edge",
+  "game-changer",
+  "delve",
+  "crucial",
+  "landscape",
+  "elevate",
+  "moreover",
+  "furthermore",
+  "it's worth noting",
+];
 
 const failures = [];
 const fail = (message) => failures.push(message);
@@ -185,7 +203,7 @@ for (const file of texts) {
   if (/\p{Extended_Pictographic}/u.test(text)) fail(`${name} contains an emoji or pictograph`);
   // The script's own word list is the only allowed mention.
   if (!name.endsWith("check-dist.mjs")) {
-    const words = FILLER.filter((word) => new RegExp(`\\b${word}`, "i").test(text));
+    const words = FILLER.filter((word) => fillerPattern(word).test(text));
     if (words.length) fail(`${name} uses filler words: ${words.join(", ")}`);
   }
 }
@@ -197,6 +215,17 @@ if (failures.length) {
   process.exit(1);
 }
 console.log("\nAll dist checks passed");
+
+function fillerPattern(phrase) {
+  // Escape regex characters, accept a curly apostrophe or an HTML entity for
+  // the ASCII one, and let any run of whitespace (including a line break)
+  // separate the words.
+  const escaped = phrase
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/'/g, `(?:'|${String.fromCharCode(0x2019)}|&#39;|&#x27;|&apos;)`)
+    .replace(/ /g, "\\s+");
+  return new RegExp(`\\b${escaped}`, "i");
+}
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
