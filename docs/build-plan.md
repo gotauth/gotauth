@@ -22,10 +22,10 @@ It's an open-source Python library (MIT) that lives inside your FastAPI app, the
 ## Why now
 - **The incumbent stopped adding features.** fastapi-users entered maintenance mode on 2025-10-25 and still gets about 1.27M downloads a month. Its maintainer wrote that Python has "no great, framework-agnostic and exhaustive solution" for auth.
 - **AI coding agents write Python auth from scratch.** In the Amplifying benchmark (2,430 prompts), Claude Code hand-rolled Python auth 100% of the time, using JWT, passlib and python-jose.
-- **MCP servers need an authorization server, and Python has no embeddable one.**
-  - The MCP Python SDK says of the authorization server: "You don't write this. It's your identity provider."
+- **MCP servers need an authorization server, and no Python library offers an embeddable one for FastAPI and ASGI apps, on your own user table, with CIMD.**
+  - The MCP Python SDK's [authorization docs](https://py.sdk.modelcontextprotocol.io/run/authorization/) say of the authorization server: "You don't write this. It's your identity provider."
   - FastMCP's own OAuth provider "requires significant additional configuration for user management".
-  - Every built-in FastMCP provider is a hosted service (Auth0, WorkOS, Clerk, Descope, ...).
+  - Every built-in FastMCP provider hands sign-in to a separate identity provider (hosted ones such as Auth0, WorkOS, Clerk and Descope, or a Keycloak server you run). None of them uses your app's own user table.
 - **The market is big.** FastAPI is used by 38% of Python web developers (JetBrains 2024) and gets about 358M downloads a month. SQLAlchemy is used by 39%, Postgres by 49%.
 
 ## Positioning
@@ -48,10 +48,10 @@ It's an open-source Python library (MIT) that lives inside your FastAPI app, the
 |---|---|---|
 | [fastapi-users](https://github.com/fastapi-users/fastapi-users) | 6.2k stars; maintenance mode since 2025-10-25; FastAPI only; no 2FA, passkeys, orgs or API keys | Active roadmap, 2FA, passkeys, orgs, API keys and an OAuth server, plus `gotauth import fastapi-users` to move over |
 | [reauth](https://github.com/frankie567/reauth) | By the fastapi-users author; 11 stars; early building blocks (email OTP, TOTP, social, sessions); no passwords or framework wrappers yet | A complete stack today (passwords, sessions, storage, FastAPI integration) plus the agent and MCP features |
-| [better-auth-server](https://github.com/oumarbarry/better-auth-py) | 3 stars; a parity port of Better Auth TypeScript, released 2026-09 | A Pythonic API, published tests, a security process, and no dependence on another project's release cadence |
+| [better-auth-server](https://github.com/oumarbarry/better-auth-py) | 3 stars; a parity port of Better Auth TypeScript, released 2026-09; about 3,000 tests in CI; no security policy; its OAuth server has no CIMD yet | A Pythonic API, a security process, CIMD and MCP helpers, and no dependence on another project's release cadence |
 | [qulf](https://github.com/qulflabs/qulf), auth101, userharbor | 2-15 stars; early | Agent and MCP features, docs written for coding agents, the `gotauth check` tool |
-| Auth0, Clerk, WorkOS, Stytch | Hosted; Python SDKs mostly verify tokens | Free, and your data stays in your database. Clerk charges $100/mo for orgs, Clerk and WorkOS charge $75-125 per SSO connection per month, and Auth0's agent features cost +50% |
-| django-allauth | Excellent, but Django only | Not competing on Django |
+| Auth0, Clerk, WorkOS, Stytch | Hosted; sign-in runs on the vendor's pages, and the Python SDKs wrap the vendor API | Free, and your data stays in your database. Enterprise SSO costs $60-125 per connection per month (Auth0, Clerk, WorkOS), Clerk's advanced organization features are a $100/mo add-on, and Auth0's AI Agents add-on adds 50% to the plan price |
+| django-allauth | Excellent, but Django only; its OIDC provider supports DCR and CIMD since 2026 | Not competing on Django |
 
 ## Architecture (summary; the details are in CONTRACTS.md)
 ```
@@ -153,6 +153,7 @@ The build is split into **36 work packages**: 30 to reach v0.1, plus 6 for later
 | G6 HN | A Python-auth story with >= 50 points, 2024-2026 | Fail (best: 3 points) |
 | G7 open lane | No rival with >= 500 stars or >= 50k downloads/month | Pass, fragile |
 | G8 differentiation | A written "why not X" | Met (above), refined by R1 |
+| G9 MCP auth demand | >= 50 reactions on Python MCP auth requests (FastMCP, python-sdk) in 12 months, or one HN story on MCP auth with >= 50 points | Pass (105 reactions, 56 on requests; HN 278 points), spread thin: largest single request 10 |
 
 The demand is real but quiet, so a **hard demand test runs before Phase 1.**
 
@@ -198,7 +199,7 @@ If none happen, stop adding features, keep doing security fixes, and refocus.
 
 **Hero clips:**
 1. **MCP login.** Claude connects to your FastMCP server -> your app's passkey login and consent screen -> the tools work -> you revoke access in your app -> the next call gets a 401.
-2. **Agent split screen.** The same "add GitHub login and API keys to this FastAPI app" prompt, with and without GotAuth's skill. Without it, the agent writes about 200 lines with passlib and python-jose; with it, about 15 lines. Check current passlib and python-jose maintenance facts before posting.
+2. **Agent split screen.** The same "add GitHub login and API keys to this FastAPI app" prompt, with and without GotAuth's skill. Without it, the agent writes about 200 lines with passlib and python-jose; with it, about 15 lines. Facts for the voice-over (checked 2026-10-03): FastAPI's own tutorial moved to PyJWT in May 2024 and to pwdlib in September 2025; passlib's last release is from October 2020. Do not call python-jose unmaintained: it shipped releases in 2025.
 3. **`uvx gotauth check`** on your own demo app: the score, then the fixes.
 
 ## Marketing routine (every week)
