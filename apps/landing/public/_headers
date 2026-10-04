@@ -1,0 +1,12 @@
+# Cloudflare Pages response headers. GitHub Pages ignores this file.
+# The Content-Security-Policy is in each page's <meta> tag (Astro security.csp);
+# frame-ancestors only works as a header, so framing is blocked here instead.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,207 @@
+---
+import { CONTACT_EMAIL, GITHUB_URL, ISSUES_URL, WAITLIST } from "../lib/site";
+
+// Built as one string: Astro drops the space where text and an expression
+// meet across a line break.
+const storedBy = WAITLIST?.provider
+  ? `${WAITLIST.provider}, the form service behind this list,`
+  : "the form service behind this list";
+const privacy = `your address is stored by ${storedBy} and used only to email you about GotAuth releases. We remove it on request:`;
+---
+
+<section class="section waitlist" id="waitlist">
+  <div class="wrap waitlist-inner">
+    {
+      WAITLIST ? (
+        <>
+          <h2>Join the waitlist</h2>
+          <p class="lead">Get an email when the first release is ready to try.</p>
+          <form class="waitlist-form" method="post" action={WAITLIST.endpoint.href} data-waitlist>
+            <div class="field">
+              <label for="waitlist-email">Email address</label>
+              <p class="hint" id="waitlist-hint">We only use it to email you about GotAuth releases.</p>
+              <div class="field-row">
+                <input
+                  id="waitlist-email"
+                  name="email"
+                  type="email"
+                  required
+                  maxlength="254"
+                  autocomplete="email"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  enterkeyhint="send"
+                  aria-describedby="waitlist-hint waitlist-error"
+                />
+                <p class="field-error" id="waitlist-error" aria-live="polite" />
+                <button class="button button-primary" type="submit">
+                  Join the waitlist
+                </button>
+              </div>
+            </div>
+            <div class="honeypot">
+              <label for="waitlist-hp">Leave this field empty</label>
+              <input id="waitlist-hp" type="text" name={WAITLIST.honeypot} tabindex="-1" autocomplete="off" data-honeypot />
+            </div>
+            {WAITLIST.fields.map(([name, value]) => (
+              <input type="hidden" name={name} value={value} />
+            ))}
+            <p class="form-status" id="waitlist-status" role="status" />
+          </form>
+          <p class="privacy">
+            <strong>Privacy:</strong> {privacy}
+            {CONTACT_EMAIL ? (
+              <>
+                {" email "}
+                <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+                {" from the address you signed up with."}
+              </>
+            ) : (
+              <>
+                {" ask in a "}
+                <a href={ISSUES_URL}>GitHub issue</a>
+                {" (issues are public)."}
+              </>
+            )}
+          </p>
+        </>
+      ) : (
+        <>
+          <h2>Waitlist opens soon</h2>
+          <p class="lead">
+            The waitlist form is not live yet. To follow progress until then, star or watch the repository on GitHub.
+          </p>
+          <p>
+            <a class="button button-primary" href={GITHUB_URL}>Star on GitHub</a>
+          </p>
+        </>
+      )
+    }
+  </div>
+</section>
+
+<script>
+  // Progressive enhancement. Without JavaScript the form is a plain POST to
+  // the form service and the browser's own validation applies.
+  const MESSAGES = {
+    empty: "Enter your email address.",
+    invalid: "Enter an email address in the format name@example.com.",
+    sending: "Joining...",
+    success: "You're on the list. We'll email you when the first release is ready.",
+    network: "Your address was not saved because the waitlist service could not be reached. Check your connection and try again.",
+    rejected: "Your address was not saved because the waitlist service returned an error. Try again in a minute.",
+  };
+
+  const form = document.querySelector<HTMLFormElement>("form[data-waitlist]");
+  const email = form?.querySelector<HTMLInputElement>('input[name="email"]');
+  const button = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const honeypot = form?.querySelector<HTMLInputElement>("[data-honeypot]");
+  const fieldError = document.getElementById("waitlist-error");
+  const status = document.getElementById("waitlist-status");
+
+  if (form && email && button && fieldError && status) {
+    const buttonLabel = button.textContent?.trim() ?? "";
+    // The script shows its own messages in live regions instead of the
+    // browser's validation bubbles, which screen readers announce unevenly.
+    form.noValidate = true;
+
+    const problemWith = (input: HTMLInputElement): string => {
+      if (input.validity.valueMissing) return MESSAGES.empty;
+      if (!input.validity.valid) return MESSAGES.invalid;
+      return "";
+    };
+
+    const showFieldError = (message: string) => {
+      fieldError.textContent = message;
+      if (message) email.setAttribute("aria-invalid", "true");
+      else email.removeAttribute("aria-invalid");
+    };
+
+    const showStatus = (message: string, kind: "success" | "error" | "") => {
+      status.textContent = message;
+      status.dataset.kind = kind;
+    };
+
+    // :user-invalid matches only after the person has edited and left the
+    // field, so the message appears together with the red border and never
+    // while they are still typing.
+    const userInvalid = (input: HTMLInputElement): boolean => {
+      try {
+        return input.matches(":user-invalid");
+      } catch {
+        return input.value !== "" && !input.validity.valid;
+      }
+    };
+
+    email.addEventListener("blur", () => {
+      showFieldError(userInvalid(email) ? problemWith(email) : "");
+    });
+    // Clear an error as soon as the input becomes valid.
+    email.addEventListener("input", () => {
+      if (email.hasAttribute("aria-invalid")) showFieldError(problemWith(email));
+    });
+
+    // A 2xx status alone is not proof the address was saved: a form service
+    // can answer 200 with a failure flag in its JSON body. A JSON answer
+    // counts only when the provider's own flag says so (Formspree: "ok",
+    // Web3Forms: "success"). Anything else is shown as rejected.
+    const accepted = async (response: Response): Promise<boolean> => {
+      if (!response.ok) return false;
+      if (!(response.headers.get("content-type") ?? "").includes("json")) return true;
+      try {
+        const body: unknown = await response.json();
+        if (typeof body !== "object" || body === null) return false;
+        if ("success" in body) return body.success === true;
+        if ("ok" in body) return body.ok === true;
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    let sending = false;
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (sending) return;
+      const problem = problemWith(email);
+      showFieldError(problem);
+      if (problem) {
+        email.focus();
+        return;
+      }
+
+      // Bots fill every field. Pretend it worked and send nothing.
+      if (honeypot?.value) {
+        form.reset();
+        showStatus(MESSAGES.success, "success");
+        return;
+      }
+
+      // aria-disabled instead of disabled: a disabled button loses keyboard focus.
+      sending = true;
+      button.setAttribute("aria-disabled", "true");
+      button.textContent = MESSAGES.sending;
+      showStatus("", "");
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { Accept: "application/json" },
+        });
+        if (await accepted(response)) {
+          form.reset();
+          showStatus(MESSAGES.success, "success");
+        } else {
+          showStatus(MESSAGES.rejected, "error");
+        }
+      } catch {
+        showStatus(MESSAGES.network, "error");
+      } finally {
+        sending = false;
+        button.removeAttribute("aria-disabled");
+        button.textContent = buttonLabel;
+      }
+    });
+  }
+</script>

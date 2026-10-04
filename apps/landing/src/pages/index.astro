@@ -1,0 +1,301 @@
+---
+import Base from "../layouts/Base.astro";
+import Snippet from "../components/Snippet.astro";
+import Waitlist from "../components/Waitlist.astro";
+import { GITHUB_URL, ISSUES_URL, LAST_CHECKED } from "../lib/site";
+
+import fastapiCode from "../snippets/fastapi.py?raw";
+import mcpCode from "../snippets/mcp.py?raw";
+import apiKeysCode from "../snippets/api-keys.py?raw";
+import apiKeysCurl from "../snippets/api-keys.sh?raw";
+
+const title = "GotAuth: open-source auth for Python AI backends";
+const description =
+  "Got auth? GotAuth is an open-source Python library for FastAPI: users, sessions, social login, 2FA, passkeys, organizations, API keys, agent identities and an OAuth 2.1 server for MCP servers, all in your own database.";
+
+const features = [
+  "users",
+  "sessions",
+  "social login",
+  "2FA",
+  "passkeys",
+  "organizations",
+  "API keys",
+  "agent identities",
+  "OAuth 2.1 server for MCP",
+];
+
+const reasons = [
+  {
+    title: "The main FastAPI auth library stopped adding features",
+    body: 'fastapi-users entered maintenance mode on 2025-10-25 and still gets about 1.27M downloads a month. Its maintainer wrote that Python has "no great, framework-agnostic and exhaustive solution" for auth.',
+    sources: [
+      { label: "Maintenance notice", href: "https://github.com/fastapi-users/fastapi-users/discussions/1543" },
+      { label: "fastapi-users downloads", href: "https://pypistats.org/packages/fastapi-users" },
+    ],
+  },
+  {
+    title: "AI coding agents write Python auth from scratch",
+    body: "In the Amplifying benchmark (2,430 responses), Claude Code hand-rolled Python auth 100% of the time, using JWT, passlib and python-jose.",
+    sources: [{ label: "Amplifying report", href: "https://amplifying.ai/research/claude-code-picks/report" }],
+  },
+  {
+    title: "MCP servers need an authorization server, and Python has no embeddable one",
+    body: 'No Python library offers one that runs inside a FastAPI or ASGI app, on your own user table, with client ID metadata documents (CIMD). The MCP Python SDK docs say of the authorization server: "You don\'t write this." FastMCP\'s own OAuth provider "requires significant additional configuration for user management", and every built-in FastMCP provider hands sign-in to a separate identity provider: hosted ones such as Auth0, WorkOS, Clerk and Descope, or a Keycloak server you run.',
+    sources: [
+      { label: "MCP Python SDK: Authorization", href: "https://py.sdk.modelcontextprotocol.io/run/authorization/" },
+      { label: "FastMCP: Authentication", href: "https://gofastmcp.com/servers/auth/authentication" },
+    ],
+  },
+  {
+    title: "The audience is large",
+    body: "In the JetBrains Python Developers Survey 2024, 38% of respondents use FastAPI, 39% use SQLAlchemy and 49% use PostgreSQL. FastAPI gets about 358M downloads a month.",
+    sources: [
+      { label: "JetBrains survey 2024", href: "https://lp.jetbrains.com/python-developers-survey-2024/" },
+      { label: "FastAPI downloads", href: "https://pypistats.org/packages/fastapi" },
+    ],
+  },
+];
+
+interface Link {
+  text: string;
+  href: string;
+}
+
+interface Alternative {
+  name: string;
+  href?: string;
+  /** Names listed after the linked one, without a source link. */
+  others?: string;
+  what: string;
+  /** Sources for the claims in `what`, beyond the project link. */
+  sources?: Link[];
+  why: string;
+  pricing?: Link[];
+}
+
+const alternatives: Alternative[] = [
+  {
+    name: "fastapi-users",
+    href: "https://github.com/fastapi-users/fastapi-users",
+    what: "6.2k GitHub stars. In maintenance mode since 2025-10-25. FastAPI only. No 2FA, passkeys, organizations or API keys.",
+    why: "An active roadmap with 2FA, passkeys, organizations, API keys and an OAuth server, plus a gotauth import fastapi-users command to move over.",
+  },
+  {
+    name: "reauth",
+    href: "https://github.com/frankie567/reauth",
+    what: "By the fastapi-users author. 11 stars. Early building blocks: email OTP, TOTP, social login, sessions. No password auth or framework wrappers yet.",
+    why: "A complete stack (passwords, sessions, storage, FastAPI integration) plus the agent and MCP features.",
+  },
+  {
+    name: "better-auth-server",
+    href: "https://github.com/oumarbarry/better-auth-py",
+    what: "3 stars. A parity port of the Better Auth TypeScript library, released 2026-09, with about 3,000 tests in CI. Its OAuth server has no CIMD yet.",
+    sources: [
+      { text: "CI run", href: "https://github.com/oumarbarry/better-auth-py/actions/runs/36656784799" },
+      {
+        text: "OAuth client registration code",
+        href: "https://github.com/oumarbarry/better-auth-py/blob/d2826ca2e05ecfa8c15ff22bae9430e4807a460f/src/better_auth/plugins_ext/oauth_provider/register.py#L568",
+      },
+    ],
+    why: "A Pythonic API, a security process, CIMD and MCP helpers, and no dependence on another project's release cadence.",
+  },
+  {
+    name: "qulf",
+    href: "https://github.com/qulflabs/qulf",
+    others: ", auth101, userharbor",
+    what: "2 to 15 stars. Early.",
+    why: "Agent and MCP features, docs written for coding agents, and the gotauth check tool.",
+  },
+  {
+    name: "Auth0, Clerk, WorkOS, Stytch",
+    what: "Hosted services. Sign-in runs on the vendor's pages, and the Python SDKs wrap the vendor API.",
+    why: "Free, and your data stays in your database. Enterprise SSO on these services costs $60 to $125 per connection per month:",
+    pricing: [
+      {
+        text: "Clerk: SSO $75/mo per connection (2 to 15), then $60; advanced organizations are a $100/mo add-on",
+        href: "https://clerk.com/pricing",
+      },
+      { text: "WorkOS: SSO $125/mo per connection for the first 15", href: "https://workos.com/pricing" },
+      // R1 marked the add-on price unverified because the page rendered
+      // differently across fetches; two fetches on 2026-10-04 both showed
+      // "Adds 50% to the base price (rounded up to the dollar)".
+      {
+        text: "Auth0: SSO $100/mo per extra connection; the AI Agents add-on adds 50% to the base plan price (checked 2026-10-04)",
+        href: "https://auth0.com/pricing",
+      },
+    ],
+  },
+  {
+    name: "django-allauth",
+    href: "https://allauth.org/",
+    what: "Excellent, but Django only. Its OIDC provider supports DCR and CIMD since 2026.",
+    sources: [
+      { text: "CIMD docs", href: "https://docs.allauth.org/en/latest/idp/openid-connect/client-id-metadata-document.html" },
+    ],
+    why: "GotAuth does not compete on Django. It targets FastAPI and ASGI.",
+  },
+];
+---
+
+<Base title={title} description={description} sectionNav>
+  <section class="hero">
+    <div class="wrap">
+      <p class="status"><span class="status-dot" aria-hidden="true"></span>In development. No release yet.</p>
+      <h1 class="hero-title">Got auth<span class="hero-q">?</span></h1>
+      <p class="hero-pitch">
+        GotAuth is open-source auth for Python AI backends: users, sessions, social login, 2FA, passkeys,
+        organizations, API keys, agent identities and a built-in OAuth&nbsp;2.1 server for your MCP servers. All of it lives
+        in your own database.
+      </p>
+      <p class="hero-sub">
+        A Python library, MIT licensed, that runs inside your FastAPI app. No separate auth service to deploy.
+      </p>
+      <div class="actions">
+        <a class="button button-primary" href="#waitlist">Join the waitlist</a>
+        <a class="button button-secondary" href={GITHUB_URL}>Star on GitHub</a>
+      </div>
+      <p class="chips-label" id="features-label">Planned for the first release:</p>
+      <ul class="chips" role="list" aria-labelledby="features-label">
+        {features.map((feature) => <li>{feature}</li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="why-now">
+    <div class="wrap">
+      <p class="section-num" aria-hidden="true">01</p>
+      <h2>Why now</h2>
+      <ol class="reasons" role="list">
+        {
+          reasons.map((reason) => (
+            <li class="reason">
+              <h3>{reason.title}</h3>
+              <p>{reason.body}</p>
+              <p class="sources">
+                <span class="sources-label">Sources:</span>{" "}
+                {reason.sources.map((source, index) => (
+                  <>
+                    {index > 0 && ", "}
+                    <a href={source.href}>{source.label}</a>
+                  </>
+                ))}
+              </p>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="note">Download counts are for the last 30 days on pypistats, checked on {LAST_CHECKED}.</p>
+    </div>
+  </section>
+
+  <section class="section" id="code">
+    <div class="wrap">
+      <p class="section-num" aria-hidden="true">02</p>
+      <h2>What it will look like</h2>
+      <p class="lead">
+        GotAuth is not released yet. These examples follow the current design and may change during the build.
+      </p>
+      <div class="snippets">
+        <div class="snippet-intro">
+          <h3>Add auth to a FastAPI app</h3>
+          <p>
+            Mount the auth routes under <code>/api/auth</code> and protect your own routes with a typed dependency.
+          </p>
+        </div>
+        <Snippet blocks={[{ code: fastapiCode, lang: "python", label: "main.py" }]} />
+
+        <div class="snippet-intro">
+          <h3>Sign in to your MCP server with your own users</h3>
+          <p>
+            GotAuth acts as the OAuth 2.1 authorization server. FastMCP checks the tokens it issues, so MCP clients
+            log in against your user table.
+          </p>
+        </div>
+        <Snippet blocks={[{ code: mcpCode, lang: "python", label: "mcp_server.py" }]} />
+
+        <div class="snippet-intro">
+          <h3>API keys for users and agents</h3>
+          <p>
+            Keys are scoped, revocable and stored hashed. A route that accepts a principal takes a session, an API key
+            or an OAuth access token.
+          </p>
+        </div>
+        <Snippet
+          blocks={[
+            { code: apiKeysCode, lang: "python", label: "main.py" },
+            { code: apiKeysCurl, lang: "shellscript", label: "terminal" },
+          ]}
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="compare">
+    <div class="wrap">
+      <p class="section-num" aria-hidden="true">03</p>
+      <h2>Why not X?</h2>
+      <p class="lead">
+        Short, fair summaries of the alternatives. GotAuth is not released yet, so its column describes the plan for
+        the first release. Spotted a mistake? <a href={ISSUES_URL}>Open an issue</a>.
+      </p>
+      {/*
+        Below 48rem the rows restack as cards (display: block). Browsers then
+        drop the implicit table roles, so they are set explicitly here.
+      */}
+      <table class="compare" role="table" aria-labelledby="compare-caption">
+        <caption id="compare-caption">
+          GotAuth compared with the alternatives, last checked on <time datetime={LAST_CHECKED}>{LAST_CHECKED}</time>
+        </caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader">Alternative</th>
+            <th scope="col" role="columnheader">What it is</th>
+            <th scope="col" role="columnheader">Where GotAuth differs</th>
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {
+            alternatives.map((alt) => (
+              <tr role="row">
+                <th scope="row" role="rowheader">
+                  {alt.href ? <a href={alt.href}>{alt.name}</a> : alt.name}
+                  {alt.others}
+                </th>
+                <td role="cell" data-label="What it is">
+                  {alt.what}
+                  {alt.sources && (
+                    <p class="cell-sources">
+                      {"Sources: "}
+                      {alt.sources.map((source, index) => (
+                        <>
+                          {index > 0 && ", "}
+                          <a href={source.href}>{source.text}</a>
+                        </>
+                      ))}
+                    </p>
+                  )}
+                </td>
+                <td role="cell" data-label="Where GotAuth differs">
+                  {alt.why}
+                  {alt.pricing && (
+                    <ul class="pricing" role="list">
+                      {alt.pricing.map((item) => (
+                        <li>
+                          <a href={item.href}>{item.text}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+      <p class="note">Star counts come from GitHub and prices from each vendor's pricing page.</p>
+    </div>
+  </section>
+
+  <Waitlist />
+</Base>

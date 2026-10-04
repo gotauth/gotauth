@@ -1,0 +1,29 @@
+---
+import { Code } from "astro:components";
+import { codeTheme, tokenClasses } from "../lib/code";
+
+interface Block {
+  code: string;
+  lang: "python" | "shellscript";
+  /** File-like label shown above the block, e.g. "main.py". */
+  label: string;
+}
+
+interface Props {
+  blocks: Block[];
+}
+
+const { blocks } = Astro.props;
+---
+
+<figure class="snippet">
+  <figcaption class="badge">Planned API, may change</figcaption>
+  {
+    blocks.map((block) => (
+      <div class="snippet-block">
+        <p class="snippet-label">{block.label}</p>
+        <Code code={block.code.trimEnd()} lang={block.lang} theme={codeTheme} transformers={[tokenClasses]} />
+      </div>
+    ))
+  }
+</figure>
