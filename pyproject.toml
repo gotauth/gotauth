@@ -149,8 +149,9 @@ target-version = "py311"
 # Python files only. Ruff 0.16 also formats code blocks in Markdown by default, but the
 # snippets in docs are often partial on purpose.
 include = ["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]
-# Owned by the integrator, checked by its own script.
-extend-exclude = ["docs/plan"]
+# docs/plan is checked by its own script; the landing snippets are partial on purpose
+# and checked against the build plan by apps/landing/scripts/check-dist.mjs.
+extend-exclude = ["docs/plan", "apps/landing/src/snippets"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S", "ASYNC", "DTZ", "T20", "RUF"]
