@@ -84,7 +84,29 @@ git worktree remove ../gotauth-c3
 - Only work package F1 edits `pyproject.toml` and `uv.lock`. Anyone else who needs a dependency files `docs/requests/<WP>-<topic>.md` (see [docs/requests/README.md](docs/requests/README.md)).
 - Install with `uv sync --locked`, which fails instead of rewriting `uv.lock`. CI does the same, so an outdated lockfile fails the build.
 - Extra dependency groups: `--group e2e` (Playwright) and `--group docs` (docs site).
-- Each Node project (`registry/`, `apps/landing/`, `apps/docs/`, the example frontends) keeps its own `pnpm-lock.yaml`; there is no root pnpm workspace. Pin `"packageManager": "pnpm@12.8.1"` in every `package.json`, and install with `pnpm install --frozen-lockfile` outside your own write scope.
+- Node projects keep their own lockfiles; see the next section.
+
+## Node projects
+
+A Node project is a folder with a `package.json` at one of these places:
+
+- `registry/`
+- `apps/<name>/`, for example `apps/landing/` or `apps/docs/`
+- `examples/<name>/` or `examples/<name>/<part>/`, for example `examples/fastapi-nextjs/frontend/`
+
+Every Node project follows the same rules, so CI can treat them alike:
+
+- It has its own `pnpm-lock.yaml`. There is no root pnpm workspace.
+- Its `package.json` pins `"packageManager": "pnpm@12.8.1"`, the version in the dev image.
+- It exposes a `check` script that runs whatever applies to it: lint, type check, tests and build. For example: `"check": "pnpm lint && tsc --noEmit && vitest run && pnpm build"`. Checks that compare a project with the Python side, such as the registry's OpenAPI drift check, belong in `check` too.
+- It installs with `pnpm install --frozen-lockfile` outside your own write scope.
+
+CI's `node` job finds every Node project and runs `pnpm install --frozen-lockfile`, then `pnpm run --if-present check`, in each one with the pinned Node and pnpm versions. Run the same thing locally before you push:
+
+```bash
+./dev.sh pnpm --dir registry install --frozen-lockfile
+./dev.sh pnpm --dir registry run --if-present check
+```
 
 ## Commits and pull requests
 

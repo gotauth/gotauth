@@ -8,6 +8,7 @@ Copy-in React components and a typed fetch client for GotAuth's HTTP API, publis
 - Item sources next to it; `pnpm --dir registry build` runs `shadcn build` into `public/r/`.
 - `fixtures/next-app` and `fixtures/vite-react` install the built items and must type-check and build.
 - This is a standalone pnpm project with its own `pnpm-lock.yaml`. There is no root pnpm workspace. `package.json` pins `"packageManager": "pnpm@12.8.1"`, the version in the dev image.
+- Like every Node project (CONTRIBUTING.md, "Node projects"), it exposes a `check` script: lint, type check, tests, `shadcn build`, the fixture builds and the OpenAPI drift check. CI runs `pnpm install --frozen-lockfile` and `pnpm run --if-present check` here.
 
 ## Commands
 
@@ -15,6 +16,7 @@ Run in the dev container:
 
 ```bash
 ./dev.sh pnpm --dir registry install --frozen-lockfile
+./dev.sh pnpm --dir registry run check
 ./dev.sh pnpm --dir registry test
 ./dev.sh pnpm --dir registry build
 ```

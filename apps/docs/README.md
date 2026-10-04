@@ -7,3 +7,4 @@ The documentation site for `gotauth.dev/docs`, with `llms.txt`, Markdown copies 
 - Code samples on every page run in CI against `gotauth.testing` (`apps/docs/tests/test_samples.py`).
 - Build and preview in the dev container; publish the preview port with `./dev.sh --ports` and serve on `0.0.0.0:8000`.
 - The deploy workflow is `.github/workflows/docs.yml` (G2).
+- If the site has a `package.json`, it is a Node project (CONTRIBUTING.md, "Node projects"): its own `pnpm-lock.yaml`, `"packageManager": "pnpm@12.8.1"`, and a `check` script that CI runs after `pnpm install --frozen-lockfile`. The same convention applies to every `apps/<name>/` folder.

@@ -14,5 +14,6 @@ None of them exists yet. Each row gets its one-line run command when the example
 
 - Its own folder with a `README.md`: what it shows, setup in at most five commands, how to run it and its tests.
 - Its own dependency files: `pyproject.toml` with `uv.lock`, and `package.json` with `pnpm-lock.yaml` for a frontend. GotAuth comes in as a path dependency on the repository root, with the extras the example needs. Examples are not part of the root uv project, so they never change the root `pyproject.toml` or `uv.lock`.
+- A frontend at `examples/<name>/` or `examples/<name>/<part>/` is a Node project (CONTRIBUTING.md, "Node projects"): `"packageManager": "pnpm@12.8.1"` and a `check` script (lint, type check, tests, build). CI runs `pnpm install --frozen-lockfile` and `pnpm run --if-present check` in it.
 - Configuration from environment variables, with a committed `.env.example` and no secrets.
 - Runs in Docker like everything else, for example `./dev.sh --ports bash -c "cd examples/<name> && ..."` or the example's own `compose.yaml`.
