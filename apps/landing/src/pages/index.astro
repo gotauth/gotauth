@@ -90,10 +90,9 @@ const alternatives: Alternative[] = [
   {
     name: "better-auth-server",
     href: "https://github.com/oumarbarry/better-auth-py",
-    what: "3 stars. A parity port of the Better Auth TypeScript library, released 2026-09. About 3,000 tests in CI, no security policy, and its OAuth server has no CIMD yet.",
+    what: "3 stars. A parity port of the Better Auth TypeScript library, released 2026-09, with about 3,000 tests in CI. Its OAuth server has no CIMD yet.",
     sources: [
       { text: "CI run", href: "https://github.com/oumarbarry/better-auth-py/actions/runs/36656784799" },
-      { text: "community profile", href: "https://github.com/oumarbarry/better-auth-py/community" },
       {
         text: "OAuth client registration code",
         href: "https://github.com/oumarbarry/better-auth-py/blob/d2826ca2e05ecfa8c15ff22bae9430e4807a460f/src/better_auth/plugins_ext/oauth_provider/register.py#L568",
@@ -118,8 +117,11 @@ const alternatives: Alternative[] = [
         href: "https://clerk.com/pricing",
       },
       { text: "WorkOS: SSO $125/mo per connection for the first 15", href: "https://workos.com/pricing" },
+      // R1 marked the add-on price unverified because the page rendered
+      // differently across fetches; two fetches on 2026-10-04 both showed
+      // "Adds 50% to the base price (rounded up to the dollar)".
       {
-        text: "Auth0: SSO $100/mo per extra connection; the AI Agents add-on adds 50% to the plan price",
+        text: "Auth0: SSO $100/mo per extra connection; the AI Agents add-on adds 50% to the base plan price (checked 2026-10-04)",
         href: "https://auth0.com/pricing",
       },
     ],
