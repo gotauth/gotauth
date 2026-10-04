@@ -41,7 +41,7 @@ const reasons = [
   },
   {
     title: "MCP servers need an authorization server, and Python has no embeddable one",
-    body: 'The MCP Python SDK docs say of the authorization server: "You don\'t write this." FastMCP\'s own OAuth provider "requires significant additional configuration for user management", and its ready-made providers connect to hosted services such as Auth0, WorkOS, Clerk and Descope.',
+    body: 'No Python library offers one that runs inside a FastAPI or ASGI app, on your own user table, with client ID metadata documents (CIMD). The MCP Python SDK docs say of the authorization server: "You don\'t write this." FastMCP\'s own OAuth provider "requires significant additional configuration for user management", and every built-in FastMCP provider hands sign-in to a separate identity provider: hosted ones such as Auth0, WorkOS, Clerk and Descope, or a Keycloak server you run.',
     sources: [
       { label: "MCP Python SDK: Authorization", href: "https://py.sdk.modelcontextprotocol.io/run/authorization/" },
       { label: "FastMCP: Authentication", href: "https://gofastmcp.com/servers/auth/authentication" },
@@ -57,14 +57,21 @@ const reasons = [
   },
 ];
 
+interface Link {
+  text: string;
+  href: string;
+}
+
 interface Alternative {
   name: string;
   href?: string;
   /** Names listed after the linked one, without a source link. */
   others?: string;
   what: string;
+  /** Sources for the claims in `what`, beyond the project link. */
+  sources?: Link[];
   why: string;
-  pricing?: { text: string; href: string }[];
+  pricing?: Link[];
 }
 
 const alternatives: Alternative[] = [
@@ -83,8 +90,16 @@ const alternatives: Alternative[] = [
   {
     name: "better-auth-server",
     href: "https://github.com/oumarbarry/better-auth-py",
-    what: "3 stars. A parity port of the Better Auth TypeScript library, released 2026-09.",
-    why: "A Pythonic API, published tests, a security process, and no dependence on another project's release cadence.",
+    what: "3 stars. A parity port of the Better Auth TypeScript library, released 2026-09. About 3,000 tests in CI, no security policy, and its OAuth server has no CIMD yet.",
+    sources: [
+      { text: "CI run", href: "https://github.com/oumarbarry/better-auth-py/actions/runs/36656784799" },
+      { text: "community profile", href: "https://github.com/oumarbarry/better-auth-py/community" },
+      {
+        text: "OAuth client registration code",
+        href: "https://github.com/oumarbarry/better-auth-py/blob/d2826ca2e05ecfa8c15ff22bae9430e4807a460f/src/better_auth/plugins_ext/oauth_provider/register.py#L568",
+      },
+    ],
+    why: "A Pythonic API, a security process, CIMD and MCP helpers, and no dependence on another project's release cadence.",
   },
   {
     name: "qulf",
@@ -95,18 +110,27 @@ const alternatives: Alternative[] = [
   },
   {
     name: "Auth0, Clerk, WorkOS, Stytch",
-    what: "Hosted services. Their Python SDKs mostly verify tokens.",
-    why: "Free, and your data stays in your database.",
+    what: "Hosted services. Sign-in runs on the vendor's pages, and the Python SDKs wrap the vendor API.",
+    why: "Free, and your data stays in your database. Enterprise SSO on these services costs $60 to $125 per connection per month:",
     pricing: [
-      { text: "Clerk: organizations add-on $100/mo, extra SSO connections $75/mo each", href: "https://clerk.com/pricing" },
-      { text: "WorkOS: $125/mo per SSO connection (first 15)", href: "https://workos.com/pricing" },
-      { text: "Auth0: the AI agents add-on adds 50% to the plan price", href: "https://auth0.com/pricing" },
+      {
+        text: "Clerk: SSO $75/mo per connection (2 to 15), then $60; advanced organizations are a $100/mo add-on",
+        href: "https://clerk.com/pricing",
+      },
+      { text: "WorkOS: SSO $125/mo per connection for the first 15", href: "https://workos.com/pricing" },
+      {
+        text: "Auth0: SSO $100/mo per extra connection; the AI Agents add-on adds 50% to the plan price",
+        href: "https://auth0.com/pricing",
+      },
     ],
   },
   {
     name: "django-allauth",
     href: "https://allauth.org/",
-    what: "Excellent, but Django only.",
+    what: "Excellent, but Django only. Its OIDC provider supports DCR and CIMD since 2026.",
+    sources: [
+      { text: "CIMD docs", href: "https://docs.allauth.org/en/latest/idp/openid-connect/client-id-metadata-document.html" },
+    ],
     why: "GotAuth does not compete on Django. It targets FastAPI and ASGI.",
   },
 ];
@@ -238,6 +262,17 @@ const alternatives: Alternative[] = [
                 </th>
                 <td role="cell" data-label="What it is">
                   {alt.what}
+                  {alt.sources && (
+                    <p class="cell-sources">
+                      {"Sources: "}
+                      {alt.sources.map((source, index) => (
+                        <>
+                          {index > 0 && ", "}
+                          <a href={source.href}>{source.text}</a>
+                        </>
+                      ))}
+                    </p>
+                  )}
                 </td>
                 <td role="cell" data-label="Where GotAuth differs">
                   {alt.why}

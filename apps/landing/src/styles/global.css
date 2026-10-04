@@ -649,7 +649,8 @@
     }
   }
 
-  .pricing {
+  .pricing,
+  .cell-sources {
     margin-block-start: 0.5rem;
     font-size: 0.875rem;
   }
