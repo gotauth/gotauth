@@ -145,14 +145,14 @@ This needs a workflow under `.github/`, outside G1's write scope, so it is filed
 
 The brief asks for >= 95 in Performance, Accessibility, Best Practices and SEO, mobile and desktop, with the reports attached to the PR.
 
-Measured locally on 2026-10-04 with Lighthouse 13.5.0 and headless Chromium 154, against `astro preview` in Docker (a build with a mock form endpoint):
+Measured locally on 2026-10-04 with Lighthouse 13.5.0 and headless Chromium 154, against `astro preview` in Docker. The same scores came from a build with a mock form endpoint and from the final build without one ("Waitlist opens soon"):
 
 | | Performance | Accessibility | Best Practices | SEO |
 |---|---|---|---|---|
 | Mobile | 100 | 100 | 100 | 100 |
 | Desktop | 100 | 100 | 100 | 100 |
 
-Mobile LCP 0.8 to 1.3 s, desktop LCP 0.2 s, TBT 0 to 20 ms, CLS 0. The home page is 34 KB of HTML (about 9.5 KB gzipped) with CSS and the form script inline, and no other requests except the favicon.
+Mobile LCP 0.8 to 1.3 s, desktop LCP 0.2 to 0.3 s, TBT 0 to 20 ms, CLS 0. The home page is 34 KB of HTML (about 9.5 KB gzipped) with CSS and the form script inline, and no other requests except the favicon.
 
 Repeat it on the Cloudflare preview URL of the PR (the real host, with HTTPS, compression and headers):
 
