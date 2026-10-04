@@ -4,7 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gotauth"
-version = "0.0.1"
+# The version lives in src/gotauth/__init__.py (__version__), see [tool.hatch.version].
+dynamic = ["version"]
 description = "Open-source auth for Python AI backends: sessions, social login, 2FA, passkeys, organizations, API keys, agent identities and an OAuth 2.1 server for MCP"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -93,6 +94,12 @@ docs = ["mkdocs-material>=9.7", "mkdocstrings[python]>=1.0", "tiktoken>=0.14"]
 
 [tool.uv]
 required-version = ">=0.12"
+# The version is read from __init__.py, so a change there must rebuild the metadata of
+# the editable install.
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/gotauth/__init__.py" }]
+
+[tool.hatch.version]
+path = "src/gotauth/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gotauth"]
