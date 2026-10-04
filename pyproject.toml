@@ -1,0 +1,213 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gotauth"
+version = "0.0.1"
+description = "Open-source auth for Python AI backends: sessions, social login, 2FA, passkeys, organizations, API keys, agent identities and an OAuth 2.1 server for MCP"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "GotAuth contributors" }]
+keywords = [
+  "api-keys",
+  "auth",
+  "authentication",
+  "authorization",
+  "fastapi",
+  "mcp",
+  "oauth",
+  "passkeys",
+  "sessions",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Framework :: AsyncIO",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Internet :: WWW/HTTP :: Session",
+  "Topic :: Security",
+  "Typing :: Typed",
+]
+# Core runtime dependencies (CONTRACTS section 0). Everything else is an extra and is
+# imported lazily. Only work package F1 edits this file; others file a request.
+dependencies = [
+  "cryptography>=44",
+  "httpx>=0.28",
+  "pydantic>=2",
+  "PyJWT>=2.10",
+]
+
+[project.optional-dependencies]
+argon2 = ["argon2-cffi>=23.1"]
+bcrypt = ["bcrypt>=4.2"]
+fastapi = ["fastapi>=0.115"]
+litestar = ["litestar>=2.12"]
+mcp = ["fastmcp>=4", "mcp>=2"]
+passkey = ["webauthn>=3"]
+postgres = ["asyncpg>=0.30"]
+redis = ["redis>=5.2"]
+smtp = ["aiosmtplib>=3"]
+sqlalchemy = ["alembic>=1.14", "sqlalchemy[asyncio]>=2.0.36"]
+sqlite = ["aiosqlite>=0.20"]
+starlette = ["starlette>=0.46"]
+
+[project.scripts]
+gotauth = "gotauth.cli:main"
+
+[project.urls]
+Homepage = "https://gotauth.dev"
+Documentation = "https://gotauth.dev/docs"
+Repository = "https://github.com/gotauth/gotauth"
+Changelog = "https://github.com/gotauth/gotauth/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+# Installed by default ("uv sync"). Every dev tool the work-package briefs allow.
+dev = [
+  "aiosmtpd>=1.4",
+  "anyio>=4.15",
+  "httpx>=0.28",
+  "hypothesis>=6.168",
+  "pip-audit>=2.10",
+  "poethepoet>=0.48",
+  "pyright>=1.1.414",
+  "pytest>=9.1",
+  "pytest-asyncio>=1.4",
+  "respx>=0.23",
+  "ruff>=0.16",
+  "towncrier>=26.9",
+]
+# Browser tests (work package Q2). The browsers come from Q2's Playwright image.
+e2e = ["playwright>=1.63", "pytest-playwright>=0.9"]
+# Docs site (work package G2).
+docs = ["mkdocs-material>=9.7", "mkdocstrings[python]>=1.0", "tiktoken>=0.14"]
+
+[tool.uv]
+required-version = ">=0.12"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gotauth"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/spec", "/conftest.py", "/CHANGELOG.md"]
+
+# ---------------------------------------------------------------------------- tasks
+
+[tool.poe.tasks.format]
+help = "Format the code with ruff"
+cmd = "ruff format ."
+
+[tool.poe.tasks.format-check]
+help = "Check the formatting without changing files"
+cmd = "ruff format --check ."
+
+[tool.poe.tasks.lint]
+help = "Lint with ruff, then check for en dashes, em dashes and emoji"
+sequence = ["ruff check .", "python scripts/check_text.py"]
+default_item_type = "cmd"
+
+[tool.poe.tasks.types]
+help = "Type-check with pyright (strict on src)"
+cmd = "pyright"
+
+[tool.poe.tasks.test]
+help = "Run the tests, except tests/e2e (Q2) and timing tests (Q1, own CI job)"
+cmd = "pytest --ignore=tests/e2e -m 'not timing'"
+
+[tool.poe.tasks.vectors]
+help = "Run the spec vector tests"
+cmd = "pytest --ignore=tests/e2e -m vectors"
+
+[tool.poe.tasks.check]
+help = "Run what CI runs: format check, lint, types and tests"
+sequence = ["format-check", "lint", "types", "test"]
+
+# ---------------------------------------------------------------------------- tools
+
+[tool.ruff]
+target-version = "py311"
+# Python files only. Ruff 0.16 also formats code blocks in Markdown by default, but the
+# snippets in docs are often partial on purpose.
+include = ["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]
+# Owned by the integrator, checked by its own script.
+extend-exclude = ["docs/plan"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S", "ASYNC", "DTZ", "T20", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gotauth"]
+# CONTRACTS section 0: every library module starts with this import.
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+"!src/**" = ["I002"]
+"tests/**" = ["S101", "S105", "S106", "S603"]
+"scripts/**" = ["T20"]
+
+[tool.pyright]
+include = ["src", "tests", "conftest.py", "scripts/check_text.py"]
+exclude = ["tests/e2e", "**/node_modules", "**/__pycache__", "**/.*"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+strict = ["src"]
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "-ra"]
+strict = true
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "vectors: language-neutral spec vectors from spec/ (F3)",
+  "slow: slow tests, for example full-cost password hashing (F3)",
+  "timing: timing comparisons; not run by poe test, Q1 runs them in their own CI job",
+  "postgres: needs GOTAUTH_TEST_POSTGRES_URL; skipped when it is not set",
+  "redis: needs GOTAUTH_TEST_REDIS_URL; skipped when it is not set",
+]
+
+[tool.towncrier]
+name = "GotAuth"
+package = "gotauth"
+package_dir = "src"
+directory = "changes"
+filename = "CHANGELOG.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## {version} ({project_date})"
+issue_format = "{issue}"
+ignore = ["README.md"]
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "Features"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Bug fixes"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removal"
+name = "Removals and deprecations"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "doc"
+name = "Documentation"
+showcontent = true
