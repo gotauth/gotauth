@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f6f4ee"/>
+  <rect x="0" y="0" width="1200" height="14" fill="#1b1a17"/>
+  <g transform="translate(80 92)">
+    <rect width="56" height="56" rx="12" fill="#1b1a17"/>
+    <path fill="#f6f4ee" transform="scale(1.75)" d="M16 7.5a5.5 5.5 0 0 0-2.6 10.35L12.2 25h7.6l-1.2-7.15A5.5 5.5 0 0 0 16 7.5z"/>
+    <text x="76" y="40" font-family="DejaVu Sans, Arial, sans-serif" font-size="34" font-weight="700" fill="#1b1a17">GotAuth</text>
+  </g>
+  <text x="72" y="345" font-family="DejaVu Sans, Arial, sans-serif" font-size="168" font-weight="700" letter-spacing="-6" fill="#1b1a17">Got auth<tspan fill="#0b6545">?</tspan></text>
+  <text x="80" y="430" font-family="DejaVu Sans, Arial, sans-serif" font-size="40" fill="#1b1a17">Open-source auth for Python AI backends.</text>
+  <text x="80" y="484" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" fill="#545047">Users, sessions, 2FA, passkeys, orgs, API keys, agents and an</text>
+  <text x="80" y="522" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" fill="#545047">OAuth 2.1 server for MCP. All in your own database.</text>
+  <text x="80" y="582" font-family="DejaVu Sans Mono, monospace" font-size="24" fill="#0b6545">gotauth.dev</text>
+  <text x="1120" y="582" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="24" fill="#545047">MIT  |  in development</text>
+</svg>

@@ -1,0 +1,23 @@
+---
+// Where a form service can send people after a post without JavaScript,
+// e.g. Web3Forms with redirect=https://gotauth.dev/thanks/ (see README.md).
+import Base from "../layouts/Base.astro";
+import { GITHUB_URL } from "../lib/site";
+---
+
+<Base
+  title="You're on the list | GotAuth"
+  description="Thanks for joining the GotAuth waitlist. We will email you when the first release is ready."
+  noindex
+>
+  <section class="section page-message">
+    <div class="wrap">
+      <h1>You're on the list</h1>
+      <p class="lead">We'll email you when the first release of GotAuth is ready to try.</p>
+      <div class="actions">
+        <a class="button button-primary" href="/">Back to gotauth.dev</a>
+        <a class="button button-secondary" href={GITHUB_URL}>Star on GitHub</a>
+      </div>
+    </div>
+  </section>
+</Base>

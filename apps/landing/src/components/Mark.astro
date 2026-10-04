@@ -1,0 +1,13 @@
+---
+// The GotAuth mark: a keyhole in a rounded square. Decorative wherever it
+// sits next to the "GotAuth" name, so it is hidden from assistive tech.
+interface Props {
+  size?: number;
+}
+const { size = 28 } = Astro.props;
+---
+
+<svg class="mark" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+  <rect class="mark-bg" width="32" height="32" rx="7"></rect>
+  <path class="mark-hole" d="M16 7.5a5.5 5.5 0 0 0-2.6 10.35L12.2 25h7.6l-1.2-7.15A5.5 5.5 0 0 0 16 7.5z"></path>
+</svg>

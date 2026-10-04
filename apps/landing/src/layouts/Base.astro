@@ -1,0 +1,108 @@
+---
+import "../styles/global.css";
+import Mark from "../components/Mark.astro";
+import { CONTACT_EMAIL, GITHUB_URL, LICENSE_URL, SITE_NAME, WAITLIST } from "../lib/site";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Keep a page out of search results (thank-you and 404 pages). */
+  noindex?: boolean;
+  /** Show the in-page section links in the header (home page only). */
+  sectionNav?: boolean;
+}
+
+const { title, description, noindex = false, sectionNav = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL("/og.png", Astro.site);
+
+// The CSP <meta> tag (astro.config.mjs) only lets forms post to the configured
+// waitlist service. This runs in the layout because directives added while
+// rendering the body would come after the <head> is written.
+if (WAITLIST) {
+  Astro.csp.insertDirective(`connect-src ${WAITLIST.endpoint.origin}`);
+  Astro.csp.insertDirective(`form-action 'self' ${WAITLIST.endpoint.origin}`);
+} else {
+  Astro.csp.insertDirective("form-action 'none'");
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f6f4ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#131411" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Got auth? Open-source auth for Python AI backends." />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap site-header-inner">
+        <a class="wordmark" href="/">
+          <Mark />
+          <span>{SITE_NAME}</span>
+        </a>
+        <nav aria-label="Site">
+          <ul class="nav-list" role="list">
+            {
+              sectionNav && (
+                <>
+                  <li><a href="#why-now">Why now</a></li>
+                  <li><a href="#code">Code</a></li>
+                  <li><a href="#compare">Compare</a></li>
+                </>
+              )
+            }
+            <li><a href={GITHUB_URL}>GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="content" tabindex="-1">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap site-footer-inner">
+        <p class="footer-about">
+          <Mark size={20} />
+          <span>{SITE_NAME} is an independent open-source project. This site sets no cookies and runs no analytics.</span>
+        </p>
+        <ul class="footer-links" role="list">
+          <li><a href={GITHUB_URL}>GitHub</a></li>
+          <li><a href={LICENSE_URL}>MIT license</a></li>
+          <li>
+            {
+              CONTACT_EMAIL ? (
+                <a href={`mailto:${CONTACT_EMAIL}`}>Contact: {CONTACT_EMAIL}</a>
+              ) : (
+                <a href={`${GITHUB_URL.replace(/\/$/, "")}/issues`}>Contact: GitHub issues</a>
+              )
+            }
+          </li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>
