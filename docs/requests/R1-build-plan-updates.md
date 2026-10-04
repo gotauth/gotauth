@@ -68,3 +68,12 @@ R1 checked the build plan's public-facing claims against current sources. Five n
 ```
 
 The public version of this table is the draft [docs/launch/comparison.md](../launch/comparison.md).
+
+## Status
+Applied by the integrator on 2026-10-04 in branch chore/apply-r1-requests.
+
+Applied differently or added, and why:
+- Item 2: the SDK quote now links to the SDK's authorization docs, as the "Why" for this item notes.
+- Item 5: the "Why now" headline ("Python has no embeddable one") now uses the qualifier this item gives: for FastAPI and ASGI apps, on your own user table, with CIMD.
+- Item 5: the two rows are not adjacent in the file, so each was replaced where it stands.
+- No change to `docs/research` or `docs/launch/comparison.md`: their cross-references are still accurate, and both are R1's write scope.

@@ -23,7 +23,7 @@ Copy-in React components and a typed client that talk to GotAuth's HTTP API with
     - `passkey` (P3): `getPasskeyRegistrationOptions`, `verifyPasskeyRegistration`, `getPasskeySignInOptions`, `signInPasskey`, `listPasskeys`, `renamePasskey`, `deletePasskey`.
     - `magicLink` / `emailOtp` (P4): `sendMagicLink`, `sendEmailOtp`, `verifyEmailOtp` (`verify_magic_link` is the emailed GET link; the client never calls it).
     - `organization` (P5): `listOrganizations`, `createOrganization`, `setActiveOrganization`, `hasPermission`.
-    - `oauth2` (O1): `oauthAuthorize` in JSON mode (`Accept: application/json`, per O1).
+    - `oauth2` (O1): `oauthAuthorize` in JSON mode (`Accept: application/json`, per O1) -> `{consent_id, client, scopes, resource, redirect_host, loopback_only}` or `{url}`.
   - Anything not in a brief: path from CONTRACTS section 5 plus `// TODO(<WP>)`.
   - TypeScript types mirror `contracts/http_models.py` (incl. `SessionWithUserOut`, `ChallengeOut`, `ErrorOut`); preferably generated from the models' JSON Schema by a script run in Docker, otherwise hand-written with a test against sample payloads.
 - `hooks/use-session.ts`: `useSession()` -> `{ data: SessionWithUserOut | null, error, isPending, refetch }` over `GET /session` (`getSession`), one shared store (`useSyncExternalStore`), refetched after sign-in, sign-out and revoke.
@@ -31,7 +31,7 @@ Copy-in React components and a typed client that talk to GotAuth's HTTP API with
 - Components, all `"use client"`, `GotAuthProvider` supplies the client:
   - SignInForm: email + password, renders SocialButtons, handles ChallengeOut (`onChallenge` or inline TwoFactorChallenge). SignUpForm: shows the same "check your email" message for StatusOut. SocialButtons: `signInSocial`, then `window.location.assign(url)`.
   - UserButton (avatar, sign out), SessionList (current marked via `current_session_id`, revoke, revoke others), TwoFactorSetup (QR from `totp_uri` rendered locally, backup codes shown once), PasskeyButton (`getPasskeySignInOptions` -> `navigator.credentials.get` -> `signInPasskey`), ApiKeyManager (raw key shown once with copy, then dropped from state), OrgSwitcher.
-  - ConsentScreen (client name, CIMD host, scopes, approve or deny): `oauth_consent` takes a form body (12.3), so it submits a native `<form method="post">` to `/oauth2/consent` and the browser follows the redirect to the client.
+  - ConsentScreen (client name, CIMD host, the redirect host from `redirect_host`, a warning when `loopback_only` is true, scopes, approve or deny; MCP authorization 2026-07-28 requires the redirect host on screen): `oauth_consent` takes a form body (12.3), so it submits a native `<form method="post">` to `/oauth2/consent` and the browser follows the redirect to the client.
 - Rules: tokens never in localStorage or sessionStorage; no `dangerouslySetInnerHTML`; labelled inputs, `autocomplete` (`email`, `current-password`, `new-password`, `one-time-code`), errors in an `aria-live` region, full keyboard use.
 - Fixtures `registry/fixtures/next-app` (App Router) and `registry/fixtures/vite-react` install the built items and must type-check and build.
 - **Contract check against the real backend (part 2):**
@@ -45,6 +45,7 @@ Copy-in React components and a typed client that talk to GotAuth's HTTP API with
 - `deleteUser` sends DELETE with a JSON body; `useSession` types `data` as `SessionWithUserOut | null`.
 - ApiKeyManager: the raw key appears once and is gone after closing the dialog.
 - ConsentScreen renders a form posting form-encoded fields, with no fetch call.
+- ConsentScreen shows `redirect_host`, and shows the loopback-only warning when `loopback_only` is true and never otherwise.
 - webauthn helpers round-trip random byte arrays.
 - `pnpm --dir registry build` produces `public/r/*.json`; both fixtures pass `tsc --noEmit` and build.
 - axe check in jsdom on each component: no violations.
