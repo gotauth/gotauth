@@ -38,6 +38,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     COREPACK_DEFAULT_TO_LATEST=0 \
     pnpm_config_store_dir=/opt/pnpm-store \
+    pnpm_config_update_notifier=false \
     PYRIGHT_PYTHON_IGNORE_WARNINGS=1
 
 # "pnpm --version" fetches the native pnpm binary into COREPACK_HOME now, not on every
