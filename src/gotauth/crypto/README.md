@@ -89,4 +89,4 @@ Built and tested against Python 3.11 to 3.14, cryptography 50.0 (the core depend
 
 ## Pending work package F2
 
-`ConfigError` and `PasswordCheck` are defined here until `gotauth.contracts` (work package F2) merges; then they are imported from there (see the `TODO(F2)` notes). `tests/crypto/test_contracts.py` checks the kit against the `CryptoKit` protocol once it exists.
+`ConfigError` and `PasswordCheck` are the contract types from `gotauth.contracts`. `tests/crypto/test_contracts.py` checks the kit against the `CryptoKit` protocol.

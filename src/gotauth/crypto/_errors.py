@@ -1,16 +1,11 @@
-"""Errors raised by the crypto kit."""
+"""Errors raised by the crypto kit.
+
+The kit raises the shared contract error, so ``except ConfigError`` catches the kit's
+configuration errors and everyone else's alike.
+"""
 
 from __future__ import annotations
 
+from gotauth.contracts.errors import ConfigError
+
 __all__ = ["ConfigError"]
-
-
-# TODO(F2): import ConfigError from gotauth.contracts after merge and drop this class,
-# so `except ConfigError` catches the kit's errors and everyone else's alike.
-class ConfigError(Exception):
-    """The crypto kit is configured wrongly.
-
-    Raised for a secret shorter than 32 characters, an unknown password algorithm, or
-    a password algorithm whose optional extra is not installed. Messages never contain
-    secret values.
-    """

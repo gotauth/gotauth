@@ -1,17 +1,13 @@
-"""Conformance with the CryptoKit protocol of gotauth.contracts.crypto (F2).
-
-Skipped until F2 merges.
-"""
+"""Conformance with the CryptoKit protocol of gotauth.contracts.crypto (F2)."""
 
 from __future__ import annotations
 
-import dataclasses
-import importlib
 import inspect
 from types import ModuleType
 
-import pytest
-
+import gotauth.contracts.crypto as contracts_crypto_module
+from gotauth.contracts.crypto import CryptoKit
+from gotauth.contracts.crypto import PasswordCheck as ContractPasswordCheck
 from gotauth.crypto import DefaultCryptoKit, PasswordCheck, crypto_kit
 
 # The exact members of CONTRACTS section 8.
@@ -37,11 +33,7 @@ ASYNC_MEMBERS = {"hash_password", "verify_password"}
 
 
 def contracts_crypto() -> ModuleType:
-    # importlib, not an import statement: the module does not exist before F2 merges.
-    try:
-        return importlib.import_module("gotauth.contracts.crypto")
-    except ImportError:
-        pytest.skip("gotauth.contracts.crypto does not exist yet (F2 has not merged)")
+    return contracts_crypto_module
 
 
 def test_kit_has_every_contract_member() -> None:
@@ -53,8 +45,9 @@ def test_kit_has_every_contract_member() -> None:
 
 
 def test_kit_matches_the_protocol_signatures() -> None:
-    # TODO(F2): after merge, also annotate `kit: CryptoKit = crypto_kit(...)` so
-    # pyright checks the same thing statically.
+    # The annotation makes pyright check the same thing statically.
+    kit: CryptoKit = crypto_kit("contract-tests-secret-0123456789abcdef")
+    assert isinstance(kit, CryptoKit)
     protocol = contracts_crypto().CryptoKit
     members = {
         name
@@ -80,10 +73,5 @@ def test_kit_matches_the_protocol_signatures() -> None:
         ) == inspect.iscoroutinefunction(getattr(protocol, name))
 
 
-def test_password_check_matches_the_contract() -> None:
-    # TODO(F2): replace the local PasswordCheck with the contract's after merge;
-    # then this test checks that both names are the same class.
-    contract = contracts_crypto().PasswordCheck
-    assert [field.name for field in dataclasses.fields(contract)] == [
-        field.name for field in dataclasses.fields(PasswordCheck)
-    ]
+def test_password_check_is_the_contract_class() -> None:
+    assert PasswordCheck is ContractPasswordCheck

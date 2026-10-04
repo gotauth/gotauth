@@ -328,3 +328,10 @@ def test_equal_uses_compare_digest(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hmac, "compare_digest", spy)
     assert KIT.equal("a", "a")
     assert calls == [(b"a", b"a")]
+
+
+def test_unsign_rejects_lone_surrogates_without_raising() -> None:
+    surrogate = chr(0xD800)
+    assert KIT.unsign(f"{surrogate}.abc", purpose="challenge") is None
+    assert KIT.unsign(f"ok.{surrogate}", purpose="challenge") is None
+    assert not KIT.equal(surrogate, "x")
