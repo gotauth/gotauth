@@ -1,0 +1,122 @@
+[
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 0,
+    "digits": 6,
+    "hmac_sha1_hex": "cc93cf18508d94934c64b65d8ba7667fb7cde4b0",
+    "truncated_hex": "4c93cf18",
+    "truncated_decimal": 1284755224,
+    "hotp": "755224"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 1,
+    "digits": 6,
+    "hmac_sha1_hex": "75a48a19d4cbe100644e8ac1397eea747a2d33ab",
+    "truncated_hex": "41397eea",
+    "truncated_decimal": 1094287082,
+    "hotp": "287082"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 2,
+    "digits": 6,
+    "hmac_sha1_hex": "0bacb7fa082fef30782211938bc1c5e70416ff44",
+    "truncated_hex": "82fef30",
+    "truncated_decimal": 137359152,
+    "hotp": "359152"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 3,
+    "digits": 6,
+    "hmac_sha1_hex": "66c28227d03a2d5529262ff016a1e6ef76557ece",
+    "truncated_hex": "66ef7655",
+    "truncated_decimal": 1726969429,
+    "hotp": "969429"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 4,
+    "digits": 6,
+    "hmac_sha1_hex": "a904c900a64b35909874b33e61c5938a8e15ed1c",
+    "truncated_hex": "61c5938a",
+    "truncated_decimal": 1640338314,
+    "hotp": "338314"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 5,
+    "digits": 6,
+    "hmac_sha1_hex": "a37e783d7b7233c083d4f62926c7a25f238d0316",
+    "truncated_hex": "33c083d4",
+    "truncated_decimal": 868254676,
+    "hotp": "254676"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 6,
+    "digits": 6,
+    "hmac_sha1_hex": "bc9cd28561042c83f219324d3c607256c03272ae",
+    "truncated_hex": "7256c032",
+    "truncated_decimal": 1918287922,
+    "hotp": "287922"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 7,
+    "digits": 6,
+    "hmac_sha1_hex": "a4fb960c0bc06e1eabb804e5b397cdc4b45596fa",
+    "truncated_hex": "4e5b397",
+    "truncated_decimal": 82162583,
+    "hotp": "162583"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 8,
+    "digits": 6,
+    "hmac_sha1_hex": "1b3c89f65e6c9e883012052823443f048b4332db",
+    "truncated_hex": "2823443f",
+    "truncated_decimal": 673399871,
+    "hotp": "399871"
+  },
+  {
+    "source": "RFC 4226 appendix D",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "counter": 9,
+    "digits": 6,
+    "hmac_sha1_hex": "1637409809a679dc698207310c8c7fc07290d9e5",
+    "truncated_hex": "2679dc69",
+    "truncated_decimal": 645520489,
+    "hotp": "520489"
+  }
+]

@@ -1,0 +1,80 @@
+[
+  {
+    "source": "RFC 6238 appendix B (SHA1 rows)",
+    "algorithm": "SHA1",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "unix_time": 59,
+    "utc": "1970-01-01T00:00:59Z",
+    "period": 30,
+    "time_step_hex": "0000000000000001",
+    "digits": 8,
+    "totp": "94287082"
+  },
+  {
+    "source": "RFC 6238 appendix B (SHA1 rows)",
+    "algorithm": "SHA1",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "unix_time": 1111111109,
+    "utc": "2005-03-18T01:58:29Z",
+    "period": 30,
+    "time_step_hex": "00000000023523EC",
+    "digits": 8,
+    "totp": "07081804"
+  },
+  {
+    "source": "RFC 6238 appendix B (SHA1 rows)",
+    "algorithm": "SHA1",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "unix_time": 1111111111,
+    "utc": "2005-03-18T01:58:31Z",
+    "period": 30,
+    "time_step_hex": "00000000023523ED",
+    "digits": 8,
+    "totp": "14050471"
+  },
+  {
+    "source": "RFC 6238 appendix B (SHA1 rows)",
+    "algorithm": "SHA1",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "unix_time": 1234567890,
+    "utc": "2009-02-13T23:31:30Z",
+    "period": 30,
+    "time_step_hex": "000000000273EF07",
+    "digits": 8,
+    "totp": "89005924"
+  },
+  {
+    "source": "RFC 6238 appendix B (SHA1 rows)",
+    "algorithm": "SHA1",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "unix_time": 2000000000,
+    "utc": "2033-05-18T03:33:20Z",
+    "period": 30,
+    "time_step_hex": "0000000003F940AA",
+    "digits": 8,
+    "totp": "69279037"
+  },
+  {
+    "source": "RFC 6238 appendix B (SHA1 rows)",
+    "algorithm": "SHA1",
+    "secret_ascii": "12345678901234567890",
+    "secret_hex": "3132333435363738393031323334353637383930",
+    "secret_b32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+    "unix_time": 20000000000,
+    "utc": "2603-10-11T11:33:20Z",
+    "period": 30,
+    "time_step_hex": "0000000027BC86AA",
+    "digits": 8,
+    "totp": "65353130"
+  }
+]
