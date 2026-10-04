@@ -15,7 +15,7 @@
 
   | Files | Owner |
   |---|---|
-  | `pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`, `src/gotauth/__init__.py` and the empty parent packages (`plugins/`, `integrations/`, `storage/`, `importers/`) | F1 |
+  | `pyproject.toml`, `uv.lock`, `.github/workflows/ci.yml`, `compose.yaml`, `docker/**`, `dev.sh`, `dev.ps1`, `AGENTS.md`, `CLAUDE.md`, the root `conftest.py` (service-marker skips), `scripts/check_*.py`, `src/gotauth/__init__.py` and the empty parent packages (`plugins/`, `integrations/`, `storage/`, `importers/`, `interop/`) | F1 |
   | `src/gotauth/contracts/**` and `tests/conftest.py` | F2, frozen at M0 |
   | `docs/plan/**` | the owner and integrator only (status table, briefs, contracts) |
 - **Need a change outside your scope?** Don't make it, even to fix a bug you found in someone else's module. Add a request file `docs/requests/<your-WP>-<topic>.md` (what, why, proposed diff) and continue with a local stub or the testing kit.
