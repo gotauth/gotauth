@@ -6,6 +6,8 @@
 #   .\dev.ps1 --ports <command>    also publish the dev server ports on 127.0.0.1
 #   .\dev.ps1 --build <command>    rebuild the image first (after changes in docker/)
 #   .\dev.ps1 --down               stop this worktree's containers (volumes are kept)
+#   .\dev.ps1 '--' <command>       end of wrapper options, for a command that starts
+#                                  with "--". PowerShell drops an unquoted "--" itself.
 #
 # The Compose project name is this folder's name, so each git worktree gets its own
 # containers, virtual environment, Postgres and Redis. Git Bash: ./dev.sh
@@ -27,6 +29,7 @@ while ($index -lt $args.Count) {
     if ($option -eq '--ports') { $runArgs += '--service-ports' }
     elseif ($option -eq '--build') { $build = $true }
     elseif ($option -eq '--down') { $down = $true }
+    elseif ($option -eq '--') { $index++; break }
     else { break }
     $index++
 }

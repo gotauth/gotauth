@@ -7,6 +7,7 @@
 #   ./dev.sh --ports <command>    also publish the dev server ports on 127.0.0.1
 #   ./dev.sh --build <command>    rebuild the image first (after changes in docker/)
 #   ./dev.sh --down               stop this worktree's containers (volumes are kept)
+#   ./dev.sh -- <command>         end of wrapper options, for a command that starts with "--"
 #
 # The Compose project name is this folder's name, so each git worktree gets its own
 # containers, virtual environment, Postgres and Redis. PowerShell: .\dev.ps1
