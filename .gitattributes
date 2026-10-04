@@ -1,3 +1,18 @@
 * text=auto eol=lf
 *.sh text eol=lf
 *.ps1 text eol=crlf
+
+# Binary files
+*.ico binary
+*.gif binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Generated lockfiles: collapsed in GitHub diffs
+uv.lock linguist-generated=true
+pnpm-lock.yaml linguist-generated=true

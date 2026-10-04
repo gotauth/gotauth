@@ -1,0 +1,80 @@
+# GotAuth dev environment. Use it through ./dev.sh or .\dev.ps1 (see CONTRIBUTING.md).
+#
+# There is no top-level "name": the Compose project name is the folder name (dev.sh and
+# dev.ps1 set COMPOSE_PROJECT_NAME to it), so every git worktree gets its own containers,
+# virtual environment, Postgres and Redis. No port is published unless you run
+# "./dev.sh --ports ...", which passes --service-ports for the ports listed below.
+
+services:
+  dev:
+    build:
+      context: docker
+      dockerfile: dev.Dockerfile
+      # Linux hosts whose user id is not 1000 set these, so files in the bind mount
+      # stay writable (see CONTRIBUTING.md).
+      args:
+        USER_UID: ${GOTAUTH_UID:-1000}
+        USER_GID: ${GOTAUTH_GID:-1000}
+    init: true
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - venv:/opt/venv
+      - cache:/home/dev/.cache
+      - uv-cache:/opt/uv-cache
+      - pnpm-store:/opt/pnpm-store
+    environment:
+      GOTAUTH_TEST_POSTGRES_URL: postgresql://gotauth:gotauth@postgres:5432/gotauth
+      GOTAUTH_TEST_REDIS_URL: redis://redis:6379/0
+    # Published only with "./dev.sh --ports" (docker compose run --service-ports).
+    # Dev servers must listen on 0.0.0.0 inside the container.
+    ports:
+      - "127.0.0.1:3000:3000" # Next.js
+      - "127.0.0.1:4321:4321" # Astro
+      - "127.0.0.1:5173:5173" # Vite
+      - "127.0.0.1:8000:8000" # uvicorn
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: gotauth
+      POSTGRES_PASSWORD: gotauth
+      POSTGRES_DB: gotauth
+    # Test data only: it lives in memory and is gone when the container stops.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gotauth -d gotauth"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  # Per worktree: the virtual environment holds an editable install of this worktree.
+  venv:
+  # Per worktree: tool caches such as the pyright npm package.
+  cache:
+  # Shared by all worktrees; uv and pnpm caches are safe for concurrent use.
+  # dev.sh and dev.ps1 create them on first use.
+  uv-cache:
+    external: true
+    name: gotauth-uv-cache
+  pnpm-store:
+    external: true
+    name: gotauth-pnpm-store

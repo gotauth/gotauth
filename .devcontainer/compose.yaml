@@ -1,0 +1,6 @@
+# Overrides for the Dev Containers route: keep the dev container running and publish no
+# host ports, because the editor forwards them itself.
+services:
+  dev:
+    command: ["sleep", "infinity"]
+    ports: !reset []

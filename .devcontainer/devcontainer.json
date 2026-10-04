@@ -1,0 +1,23 @@
+// Dev Containers definition on the "dev" service of compose.yaml.
+// The command line route (./dev.sh, .\dev.ps1) does not need it; see CONTRIBUTING.md.
+{
+  "name": "GotAuth",
+  "dockerComposeFile": ["../compose.yaml", "compose.yaml"],
+  "service": "dev",
+  "runServices": ["dev", "postgres", "redis"],
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "dev",
+  // The shared caches are external volumes (compose.yaml); this is a no-op once they exist.
+  "initializeCommand": "docker volume create gotauth-uv-cache && docker volume create gotauth-pnpm-store",
+  "postCreateCommand": "uv sync --locked --all-extras",
+  "forwardPorts": [3000, 4321, 5173, 8000],
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff"],
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python"
+      }
+    }
+  }
+}
