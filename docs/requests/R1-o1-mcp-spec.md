@@ -212,3 +212,19 @@ The items below are the differences. Each one gives the target, the reason, and 
 - **Current versions** ([PyPI](https://pypi.org/pypi/fastmcp/json), [PyPI](https://pypi.org/pypi/mcp/json)): `fastmcp` 4.0.10 (2026-09-25) and `mcp` 2.3.0 (2026-10-02). These match the brief's "FastMCP 4.x, `mcp` 2.x".
 - **Stateless protocol.** Revision 2026-07-28 removes `initialize` and `Mcp-Session-Id` ([changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog)). O2's in-memory client tests should use the stateless request form those versions expose.
 - **Enterprise-managed authorization** (SEP-990, the identity assertion grant) is an extension, not core. FastMCP and the MCP Python SDK support it ([SDK docs](https://py.sdk.modelcontextprotocol.io/run/authorization/), [FastMCP OAuth proxy](https://gofastmcp.com/servers/auth/oauth-proxy)). It had the largest public signal in R1 (HN 278 points; python-sdk #1593, 10 reactions). It is not part of v0.1; it is a candidate for O4 or later.
+
+## Status
+Applied by the integrator on 2026-10-04 in branch chore/apply-r1-requests.
+
+Applied differently or added, and why:
+- Item 1: the O1 test checks that both documents contain every listed key, not "exactly these keys", because the diff says "at least" and OIDC Discovery 1.0 requires `subject_types_supported` and `id_token_signing_alg_values_supported` (now named in the brief).
+- Item 1: CONTRACTS 12.3 had no diff for the `oauth_server_metadata` row, so it gained a "Discovery metadata" rule with the same keys and the exact-issuer rule from item 7.
+- Item 3: the redirect rule also applies at `update_oauth_client`, because its 12.5 shape takes `redirect_uris`.
+- Item 4: Q1's CIMD SSRF test now says > 5 KB, so it matches the new read limit.
+- Item 5, recommended part: written as a 12.3 rule keyed on the request's `redirect_uri` being loopback, which covers every CIMD client with only loopback redirects and also closes the same gap for clients that mix https and loopback.
+- Item 6: CONTRACTS also says the matching normalized `resources` entry becomes `aud`, so O2's `aud` check has one form to compare.
+- Item 7: CONTRACTS 12.2 now says the `iss` claim has no trailing slash and equals the metadata `issuer`.
+- Item 8: added an O1 acceptance test and an O2 note to set `base_url` to the tunnel URL, since the example uses `mcp=True`.
+- Item 9: the bad-token header puts `error="invalid_token"` first so the byte-for-byte test has one form, and `offline_access` is also left out of challenge `scope` values, as the spec says for challenges.
+- Item 9: CONTRACTS 12.4 lists the three challenges as comments under `fastmcp_auth`, since the request named that spot but gave no diff.
+- Notes for O2: added to the O2 brief's Notes (versions, stateless protocol, SEP-990 out of v0.1).
