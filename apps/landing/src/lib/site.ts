@@ -12,6 +12,8 @@ export const GITHUB_URL = clean(env.PUBLIC_GITHUB_URL) ?? "https://github.com/go
 
 export const LICENSE_URL = `${GITHUB_URL.replace(/\/$/, "")}/blob/main/LICENSE`;
 
+export const ISSUES_URL = `${GITHUB_URL.replace(/\/$/, "")}/issues`;
+
 export const CONTACT_EMAIL = clean(env.PUBLIC_CONTACT_EMAIL);
 
 export interface WaitlistConfig {
@@ -50,6 +52,12 @@ function readWaitlist(): WaitlistConfig | undefined {
     if (name === "email" || name === honeypot) {
       throw new Error(`PUBLIC_WAITLIST_FIELDS must not set "${name}"`);
     }
+  }
+
+  if (CONTACT_EMAIL === undefined) {
+    // The privacy note then sends removal requests to GitHub issues, which
+    // are public. A contact address lets people ask privately.
+    console.warn("PUBLIC_WAITLIST_ENDPOINT is set without PUBLIC_CONTACT_EMAIL: removal requests go to public GitHub issues.");
   }
 
   return { endpoint, honeypot, fields, provider: clean(env.PUBLIC_WAITLIST_PROVIDER) };

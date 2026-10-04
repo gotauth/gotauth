@@ -66,7 +66,7 @@ All are optional and read at build time (Astro inlines `PUBLIC_` variables into 
 | `PUBLIC_WAITLIST_FIELDS` | unset | Extra hidden fields, URL-encoded: `access_key=...&subject=...` |
 | `PUBLIC_WAITLIST_PROVIDER` | unset | The service name shown in the privacy note, e.g. `Formspree` |
 | `PUBLIC_GITHUB_URL` | `https://github.com/gotauth/gotauth` | "Star on GitHub", nav and footer links; the license link is `<url>/blob/main/LICENSE` |
-| `PUBLIC_CONTACT_EMAIL` | unset | Footer and privacy-note contact. Unset: the footer links to GitHub issues |
+| `PUBLIC_CONTACT_EMAIL` | unset | Footer contact, and where the privacy note sends removal requests. Unset: both point to GitHub issues, which are public, and the build prints a warning when the waitlist is on. Set it before the waitlist goes live |
 
 The build fails on an invalid endpoint (not a URL, or not `https`), so a typo never ships a broken form. The endpoint's origin is added to the page's Content-Security-Policy (`form-action` and `connect-src`), so the form can post nowhere else.
 
@@ -77,7 +77,7 @@ The form is a plain `<form method="post">` with an `email` field and a hidden ho
 | | Formspree | Web3Forms |
 |---|---|---|
 | Free tier | 50 submissions a month, 30-day submission archive | 250 submissions a month (per third-party summaries; their site blocked automated checks, so confirm on web3forms.com) |
-| Where signups go | Dashboard (30-day archive on free) and email | Email to the address tied to the access key |
+| Where signups go | Dashboard (30-day archive on free) and email | Email to the address tied to the access key. Their FAQ says submissions are not stored; their data processing agreement (web3forms.com/dpa, which blocked automated reads, so this is from search summaries) describes a 30-day dashboard history on free and up to 3 years of storage. Read the DPA before choosing |
 | Endpoint | `https://formspree.io/f/<form-id>` | `https://api.web3forms.com/submit` |
 | Extra fields | none | `access_key=<key>` (a public key, meant to be in the HTML) |
 | Honeypot | `_gotcha` (filled: silently ignored) | `botcheck` (still supported; their docs now prefer hCaptcha) |
@@ -86,6 +86,19 @@ The form is a plain `<form method="post">` with an `email` field and a hidden ho
 | Tracking | Non-JS posts go through a Google reCAPTCHA page by default. Turn reCAPTCHA off in the form's Settings, under "Spam protection" (allowed on every plan) | No CAPTCHA unless you add one |
 
 On Formspree's free plan the archive keeps 30 days, so keep the notification emails (or export the list) to keep older signups. Neither service needs a script or cookie on gotauth.dev.
+
+### Removing someone from the list
+
+The privacy note promises removal on request: by email to `PUBLIC_CONTACT_EMAIL` (from the address that signed up, so you can match it), or through a GitHub issue when no contact address is set. When a request comes in:
+
+1. **Match the address.** Use the sender of the email. For a GitHub issue, ask for a private way to confirm the address rather than having it posted in public.
+2. **Delete it at the form service.**
+   - **Formspree:** in the dashboard, open the form's submissions, search for the address, select the submission and delete it. If an older submission is no longer in the dashboard (30-day archive on free), there is nothing left to delete there.
+   - **Web3Forms:** if the submission shows in the dashboard history, delete it there. If it does not, or you cannot delete it, ask Web3Forms support to delete the data for that address, since their data processing agreement describes storage beyond the dashboard window.
+3. **Delete your own copies:** the notification email, any export or spreadsheet, and any mailing tool you imported the list into.
+4. **Reply** that the address has been removed.
+
+Check both services' current dashboards: these steps were written from their docs on 2026-10-04, not from a live account.
 
 Formspree:
 
@@ -115,6 +128,8 @@ PUBLIC_WAITLIST_PROVIDER=Web3Forms
 ```
 
 (`http://localhost` endpoints are accepted only for this kind of local test.) Then open http://localhost:4321/#waitlist and try: a valid address, an empty or malformed one, the same with JavaScript disabled, and a filled honeypot (set it in DevTools). With the mock stopped, the form shows the "could not be reached" error and keeps the typed address.
+
+Set `RESPONSE` on the mock to try each answer the script handles: `formspree` (the default, `200 {"ok": true}`), `web3forms` (`200 {"success": true}`), `reject` (`200 {"success": false}`, which the form must show as "not saved") and `text` (a plain-text 200, treated as success).
 
 ## Deploy
 

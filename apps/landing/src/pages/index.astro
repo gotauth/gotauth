@@ -2,7 +2,7 @@
 import Base from "../layouts/Base.astro";
 import Snippet from "../components/Snippet.astro";
 import Waitlist from "../components/Waitlist.astro";
-import { GITHUB_URL, LAST_CHECKED } from "../lib/site";
+import { GITHUB_URL, ISSUES_URL, LAST_CHECKED } from "../lib/site";
 
 import fastapiCode from "../snippets/fastapi.py?raw";
 import mcpCode from "../snippets/mcp.py?raw";
@@ -237,7 +237,7 @@ const alternatives: Alternative[] = [
       <h2>Why not X?</h2>
       <p class="lead">
         Short, fair summaries of the alternatives. GotAuth is not released yet, so its column describes the plan for
-        the first release. Spotted a mistake? <a href={`${GITHUB_URL.replace(/\/$/, "")}/issues`}>Open an issue</a>.
+        the first release. Spotted a mistake? <a href={ISSUES_URL}>Open an issue</a>.
       </p>
       {/*
         Below 48rem the rows restack as cards (display: block). Browsers then

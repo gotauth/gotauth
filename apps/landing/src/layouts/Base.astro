@@ -1,7 +1,7 @@
 ---
 import "../styles/global.css";
 import Mark from "../components/Mark.astro";
-import { CONTACT_EMAIL, GITHUB_URL, LICENSE_URL, SITE_NAME, WAITLIST } from "../lib/site";
+import { CONTACT_EMAIL, GITHUB_URL, ISSUES_URL, LICENSE_URL, SITE_NAME, WAITLIST } from "../lib/site";
 
 interface Props {
   title: string;
@@ -100,7 +100,7 @@ if (WAITLIST) {
               CONTACT_EMAIL ? (
                 <a href={`mailto:${CONTACT_EMAIL}`}>Contact: {CONTACT_EMAIL}</a>
               ) : (
-                <a href={`${GITHUB_URL.replace(/\/$/, "")}/issues`}>Contact: GitHub issues</a>
+                <a href={ISSUES_URL}>Contact: GitHub issues</a>
               )
             }
           </li>
