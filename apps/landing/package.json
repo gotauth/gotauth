@@ -13,7 +13,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "node scripts/check-contrast.mjs && node scripts/check-dist.mjs"
+    "check": "astro build && node scripts/check-contrast.mjs && node scripts/check-dist.mjs"
   },
   "devDependencies": {
     "@astrojs/sitemap": "3.7.4",
