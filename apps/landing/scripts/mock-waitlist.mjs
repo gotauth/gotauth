@@ -1,15 +1,28 @@
-// A stand-in form backend for local testing. It behaves like Formspree:
+// A stand-in form backend for local testing:
 // - JSON response for fetch() posts (Accept: application/json), with CORS
 // - a redirect to THANKS_URL (or a plain page) for posts without JavaScript
 // - a filled honeypot field is ignored, never stored
 // Every accepted or ignored post is printed as one JSON line.
 //
-// Usage: PORT=8787 HONEYPOT=_gotcha THANKS_URL=http://localhost:4321/thanks/ node scripts/mock-waitlist.mjs
+// RESPONSE picks the JSON answer to a valid fetch() post:
+//   formspree (default)  200 {"ok": true}
+//   web3forms            200 {"success": true, ...}
+//   reject               200 {"success": false, ...}  (a 2xx that is still a failure)
+//   text                 200 with a plain-text body
+//
+// Usage: PORT=8787 HONEYPOT=_gotcha RESPONSE=formspree THANKS_URL=http://localhost:4321/thanks/ node scripts/mock-waitlist.mjs
 import { createServer } from "node:http";
 
 const port = Number(process.env.PORT ?? 8787);
 const honeypot = process.env.HONEYPOT ?? "_gotcha";
 const thanksUrl = process.env.THANKS_URL;
+const mode = process.env.RESPONSE ?? "formspree";
+const ANSWERS = {
+  formspree: { ok: true, next: "/thanks" },
+  web3forms: { success: true, message: "Email sent successfully!" },
+  reject: { success: false, message: "Something went wrong." },
+};
+if (mode !== "text" && !(mode in ANSWERS)) throw new Error(`unknown RESPONSE: ${mode}`);
 
 const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -25,12 +38,20 @@ const server = createServer(async (req, res) => {
   const bot = Boolean(fields.get(honeypot));
   const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
 
-  console.log(JSON.stringify({ via: wantsJson(req) ? "fetch" : "form", email, honeypotFilled: bot, stored: valid && !bot }));
+  const rejected = wantsJson(req) && mode === "reject";
+  console.log(
+    JSON.stringify({ via: wantsJson(req) ? "fetch" : "form", email, honeypotFilled: bot, stored: valid && !bot && !rejected }),
+  );
 
   if (wantsJson(req)) {
-    // Like Formspree, a bot gets the same success answer and nothing is stored.
-    res.writeHead(valid ? 200 : 422, { "Content-Type": "application/json" });
-    return void res.end(JSON.stringify(valid ? { ok: true } : { errors: [{ field: "email", message: "invalid" }] }));
+    if (!valid) {
+      res.writeHead(422, { "Content-Type": "application/json" });
+      return void res.end(JSON.stringify({ errors: [{ field: "email", message: "invalid" }] }));
+    }
+    // Like Formspree, a bot gets the same answer as a person and nothing is stored.
+    if (mode === "text") return void res.writeHead(200, { "Content-Type": "text/plain" }).end("Received");
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return void res.end(JSON.stringify(ANSWERS[mode]));
   }
   if (thanksUrl && valid) return void res.writeHead(303, { Location: thanksUrl }).end();
   res.writeHead(valid ? 200 : 422, { "Content-Type": "text/html; charset=utf-8" });

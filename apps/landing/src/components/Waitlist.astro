@@ -1,12 +1,12 @@
 ---
-import { CONTACT_EMAIL, GITHUB_URL, WAITLIST } from "../lib/site";
+import { CONTACT_EMAIL, GITHUB_URL, ISSUES_URL, WAITLIST } from "../lib/site";
 
 // Built as one string: Astro drops the space where text and an expression
 // meet across a line break.
 const storedBy = WAITLIST?.provider
   ? `${WAITLIST.provider}, the form service behind this list,`
   : "the form service behind this list";
-const privacy = `your address is stored by ${storedBy} and used only to email you about GotAuth releases. To be removed, reply to any of those emails`;
+const privacy = `your address is stored by ${storedBy} and used only to email you about GotAuth releases. We remove it on request:`;
 ---
 
 <section class="section waitlist" id="waitlist">
@@ -52,11 +52,16 @@ const privacy = `your address is stored by ${storedBy} and used only to email yo
             <strong>Privacy:</strong> {privacy}
             {CONTACT_EMAIL ? (
               <>
-                {" or write to "}
-                <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+                {" email "}
+                <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+                {" from the address you signed up with."}
               </>
             ) : (
-              "."
+              <>
+                {" ask in a "}
+                <a href={ISSUES_URL}>GitHub issue</a>
+                {" (issues are public)."}
+              </>
             )}
           </p>
         </>
@@ -136,6 +141,24 @@ const privacy = `your address is stored by ${storedBy} and used only to email yo
       if (email.hasAttribute("aria-invalid")) showFieldError(problemWith(email));
     });
 
+    // A 2xx status alone is not proof the address was saved: a form service
+    // can answer 200 with a failure flag in its JSON body. A JSON answer
+    // counts only when the provider's own flag says so (Formspree: "ok",
+    // Web3Forms: "success"). Anything else is shown as rejected.
+    const accepted = async (response: Response): Promise<boolean> => {
+      if (!response.ok) return false;
+      if (!(response.headers.get("content-type") ?? "").includes("json")) return true;
+      try {
+        const body: unknown = await response.json();
+        if (typeof body !== "object" || body === null) return false;
+        if ("success" in body) return body.success === true;
+        if ("ok" in body) return body.ok === true;
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
     let sending = false;
 
     form.addEventListener("submit", async (event) => {
@@ -166,7 +189,7 @@ const privacy = `your address is stored by ${storedBy} and used only to email yo
           body: new FormData(form),
           headers: { Accept: "application/json" },
         });
-        if (response.ok) {
+        if (await accepted(response)) {
           form.reset();
           showStatus(MESSAGES.success, "success");
         } else {
