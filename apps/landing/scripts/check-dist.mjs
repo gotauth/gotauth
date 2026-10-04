@@ -118,7 +118,7 @@ if (forms.length === 0) {
     "status region": /role="status"/.test(form),
     "honeypot hidden with display: none": /<div class="honeypot">/.test(form) && /\.honeypot\{display:none\}/.test(index),
     "CSP form-action allows the endpoint": csp.includes(`form-action 'self' ${origin}`),
-    "CSP connect-src allows the endpoint": csp.includes(`connect-src ${origin}`),
+    "CSP connect-src allows the endpoint": csp.includes(`connect-src 'self' ${origin}`),
   };
   const missing = Object.entries(expect).filter(([, ok]) => !ok).map(([name]) => name);
   if (missing.length) fail(`waitlist form is missing: ${missing.join(", ")}`);

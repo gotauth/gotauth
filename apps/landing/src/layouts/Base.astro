@@ -18,11 +18,14 @@ const ogImage = new URL("/og.png", Astro.site);
 
 // The CSP <meta> tag (astro.config.mjs) only lets forms post to the configured
 // waitlist service. This runs in the layout because directives added while
-// rendering the body would come after the <head> is written.
+// rendering the body would come after the <head> is written. connect-src
+// includes 'self' so tools that fetch /robots.txt from the page (Lighthouse)
+// are not blocked.
 if (WAITLIST) {
-  Astro.csp.insertDirective(`connect-src ${WAITLIST.endpoint.origin}`);
+  Astro.csp.insertDirective(`connect-src 'self' ${WAITLIST.endpoint.origin}`);
   Astro.csp.insertDirective(`form-action 'self' ${WAITLIST.endpoint.origin}`);
 } else {
+  Astro.csp.insertDirective("connect-src 'self'");
   Astro.csp.insertDirective("form-action 'none'");
 }
 ---
