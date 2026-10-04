@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import re
 import secrets
 import shutil
@@ -28,6 +27,7 @@ from gotauth.crypto._keys import Secret, encrypt_with_key
 from gotauth.crypto._passwords import ScryptParams, scrypt_derive
 from gotauth.crypto._tokens import encode_token
 from gotauth.crypto._ulid import UlidGenerator
+from gotauth.testing import load_vectors
 
 pytestmark = pytest.mark.vectors
 
@@ -44,14 +44,6 @@ SPEC_FILES = [
 ]
 # Any secret works for the cases that do not depend on one.
 ANY_SECRET = "spec-vector-tests-secret-0123456789"
-
-
-# TODO(F2): switch to gotauth.testing.load_vectors after merge.
-def load_vectors(name: str) -> list[dict[str, Any]]:
-    """Read spec/<name>.json."""
-    cases = json.loads((SPEC / f"{name}.json").read_text(encoding="utf-8"))
-    assert isinstance(cases, list)
-    return cases
 
 
 def cases(name: str, kind: str | None = None) -> list[Any]:

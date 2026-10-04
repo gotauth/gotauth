@@ -21,6 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from gotauth.contracts.crypto import PasswordCheck
 from gotauth.crypto._encoding import b64_decode, b64_encode
 from gotauth.crypto._errors import ConfigError
 
@@ -53,23 +54,6 @@ PASSWORD_ALGORITHMS: tuple[PasswordAlgorithm, ...] = ("scrypt", "argon2id")
 
 ARGON2_INSTALL_HINT = 'install the argon2 extra: pip install "gotauth[argon2]"'
 BCRYPT_INSTALL_HINT = 'install the bcrypt extra: pip install "gotauth[bcrypt]"'
-
-
-# TODO(F2): import PasswordCheck from gotauth.contracts.crypto after merge and drop
-# this class, so the kit's return type is the contract's own.
-@dataclass(frozen=True)
-class PasswordCheck:
-    """Result of `verify_password`.
-
-    Attributes:
-        ok: True if the password matches the stored hash.
-        needs_rehash: True if the password matched but the stored hash uses another
-            algorithm or other parameters than the configured default. The caller
-            should then store a new hash. Always False when ``ok`` is False.
-    """
-
-    ok: bool
-    needs_rehash: bool
 
 
 @dataclass(frozen=True)
