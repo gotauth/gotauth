@@ -424,8 +424,10 @@
     border-block-start: 2px solid var(--line-strong);
   }
 
+  /* Decorative number; the ordered list already gives the position. */
   .reason h3::before {
     content: counter(reason, decimal-leading-zero) " ";
+    content: counter(reason, decimal-leading-zero) " " / "";
     color: var(--accent);
     font-family: var(--font-mono);
     font-size: 0.875rem;
