@@ -1,4 +1,4 @@
-<!-- Copy of docs/plan/AGENT-RULES.md with links rewritten for the repository root. Edit the source, then copy it here again. -->
+<!-- Generated from docs/plan/AGENT-RULES.md by scripts/check_agents.py --write. Edit the source, not this file. -->
 
 # Rules for every agent working on GotAuth
 

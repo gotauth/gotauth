@@ -118,8 +118,12 @@ help = "Check the formatting without changing files"
 cmd = "ruff format --check ."
 
 [tool.poe.tasks.lint]
-help = "Lint with ruff, then check for en dashes, em dashes and emoji"
-sequence = ["ruff check .", "python scripts/check_text.py"]
+help = "Lint with ruff, check for dashes and emoji, check that AGENTS.md is current"
+sequence = [
+  "ruff check .",
+  "python scripts/check_text.py",
+  "python scripts/check_agents.py",
+]
 default_item_type = "cmd"
 
 [tool.poe.tasks.types]
@@ -162,7 +166,13 @@ required-imports = ["from __future__ import annotations"]
 "scripts/**" = ["T20"]
 
 [tool.pyright]
-include = ["src", "tests", "conftest.py", "scripts/check_text.py"]
+include = [
+  "src",
+  "tests",
+  "conftest.py",
+  "scripts/check_agents.py",
+  "scripts/check_text.py",
+]
 exclude = ["tests/e2e", "**/node_modules", "**/__pycache__", "**/.*"]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"

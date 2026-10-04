@@ -41,7 +41,7 @@ VS Code users can open the repository with Dev Containers instead (`.devcontaine
 |---|---|
 | `./dev.sh uv run poe format` | `ruff format .` |
 | `./dev.sh uv run poe format-check` | `ruff format --check .` |
-| `./dev.sh uv run poe lint` | `ruff check .`, then `scripts/check_text.py` (fails on en dashes, em dashes and emoji in any text file of the repository, skipping `node_modules`, caches, build output, lockfiles and `docs/research/raw`) |
+| `./dev.sh uv run poe lint` | `ruff check .`, then `scripts/check_text.py` (fails on en dashes, em dashes and emoji in any text file of the repository, skipping `node_modules`, caches, build output, lockfiles and `docs/research/raw`), then `scripts/check_agents.py` (fails when `AGENTS.md` is not the current copy of `docs/plan/AGENT-RULES.md`; `--write` regenerates it) |
 | `./dev.sh uv run poe types` | `pyright`: strict on `src/`, standard on `tests/` |
 | `./dev.sh uv run poe test` | `pytest`, without `tests/e2e` and without tests marked `timing` |
 | `./dev.sh uv run poe vectors` | `pytest -m vectors` (spec vectors) |
