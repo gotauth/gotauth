@@ -1,5 +1,12 @@
 ---
 import { CONTACT_EMAIL, GITHUB_URL, WAITLIST } from "../lib/site";
+
+// Built as one string: Astro drops the space where text and an expression
+// meet across a line break.
+const storedBy = WAITLIST?.provider
+  ? `${WAITLIST.provider}, the form service behind this list,`
+  : "the form service behind this list";
+const privacy = `your address is stored by ${storedBy} and used only to email you about GotAuth releases. To be removed, reply to any of those emails`;
 ---
 
 <section class="section waitlist" id="waitlist">
@@ -26,13 +33,13 @@ import { CONTACT_EMAIL, GITHUB_URL, WAITLIST } from "../lib/site";
                   enterkeyhint="send"
                   aria-describedby="waitlist-hint waitlist-error"
                 />
+                <p class="field-error" id="waitlist-error" aria-live="polite" />
                 <button class="button button-primary" type="submit">
                   Join the waitlist
                 </button>
               </div>
-              <p class="field-error" id="waitlist-error" aria-live="polite" />
             </div>
-            <div class="honeypot" aria-hidden="true">
+            <div class="honeypot">
               <label for="waitlist-hp">Leave this field empty</label>
               <input id="waitlist-hp" type="text" name={WAITLIST.honeypot} tabindex="-1" autocomplete="off" data-honeypot />
             </div>
@@ -42,15 +49,14 @@ import { CONTACT_EMAIL, GITHUB_URL, WAITLIST } from "../lib/site";
             <p class="form-status" id="waitlist-status" role="status" />
           </form>
           <p class="privacy">
-            <strong>Privacy:</strong> your address is stored by
-            {WAITLIST.provider ? `${WAITLIST.provider}, the form service behind this list,` : "the form service behind this list"}
-            and used only to email you about GotAuth releases. To be removed, reply to any of those emails
+            <strong>Privacy:</strong> {privacy}
             {CONTACT_EMAIL ? (
               <>
-                or write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
+                {" or write to "}
+                <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
               </>
             ) : (
-              <>.</>
+              "."
             )}
           </p>
         </>

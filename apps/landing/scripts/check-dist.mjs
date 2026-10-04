@@ -116,7 +116,7 @@ if (forms.length === 0) {
     "label for the email input": /<label for="waitlist-email">/.test(form) && /id="waitlist-email"/.test(form),
     "aria-live error region": /id="waitlist-error"[^>]*aria-live="polite"|aria-live="polite"[^>]*id="waitlist-error"/.test(form),
     "status region": /role="status"/.test(form),
-    "honeypot hidden from people": /<div class="honeypot" aria-hidden="true">/.test(form) && /tabindex="-1"/.test(form),
+    "honeypot hidden with display: none": /<div class="honeypot">/.test(form) && /\.honeypot\{display:none\}/.test(index),
     "CSP form-action allows the endpoint": csp.includes(`form-action 'self' ${origin}`),
     "CSP connect-src allows the endpoint": csp.includes(`connect-src ${origin}`),
   };

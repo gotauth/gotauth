@@ -119,7 +119,7 @@ const alternatives: Alternative[] = [
       <h1 class="hero-title">Got auth<span class="hero-q">?</span></h1>
       <p class="hero-pitch">
         GotAuth is open-source auth for Python AI backends: users, sessions, social login, 2FA, passkeys,
-        organizations, API keys, agent identities and a built-in OAuth 2.1 server for your MCP servers. All of it lives
+        organizations, API keys, agent identities and a built-in OAuth&nbsp;2.1 server for your MCP servers. All of it lives
         in your own database.
       </p>
       <p class="hero-sub">
@@ -147,7 +147,7 @@ const alternatives: Alternative[] = [
               <h3>{reason.title}</h3>
               <p>{reason.body}</p>
               <p class="sources">
-                <span class="sources-label">Sources:</span>
+                <span class="sources-label">Sources:</span>{" "}
                 {reason.sources.map((source, index) => (
                   <>
                     {index > 0 && ", "}
@@ -213,45 +213,49 @@ const alternatives: Alternative[] = [
         Short, fair summaries of the alternatives. GotAuth is not released yet, so its column describes the plan for
         the first release. Spotted a mistake? <a href={`${GITHUB_URL.replace(/\/$/, "")}/issues`}>Open an issue</a>.
       </p>
-      <div class="table-scroll" role="region" aria-labelledby="compare-caption" tabindex="0">
-        <table class="compare">
-          <caption id="compare-caption">
-            GotAuth compared with the alternatives, last checked on <time datetime={LAST_CHECKED}>{LAST_CHECKED}</time>
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Alternative</th>
-              <th scope="col">What it is</th>
-              <th scope="col">Where GotAuth differs</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              alternatives.map((alt) => (
-                <tr>
-                  <th scope="row">
-                    {alt.href ? <a href={alt.href}>{alt.name}</a> : alt.name}
-                    {alt.others}
-                  </th>
-                  <td>{alt.what}</td>
-                  <td>
-                    {alt.why}
-                    {alt.pricing && (
-                      <ul class="pricing" role="list">
-                        {alt.pricing.map((item) => (
-                          <li>
-                            <a href={item.href}>{item.text}</a>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
+      {/*
+        Below 48rem the rows restack as cards (display: block). Browsers then
+        drop the implicit table roles, so they are set explicitly here.
+      */}
+      <table class="compare" role="table" aria-labelledby="compare-caption">
+        <caption id="compare-caption">
+          GotAuth compared with the alternatives, last checked on <time datetime={LAST_CHECKED}>{LAST_CHECKED}</time>
+        </caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            <th scope="col" role="columnheader">Alternative</th>
+            <th scope="col" role="columnheader">What it is</th>
+            <th scope="col" role="columnheader">Where GotAuth differs</th>
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {
+            alternatives.map((alt) => (
+              <tr role="row">
+                <th scope="row" role="rowheader">
+                  {alt.href ? <a href={alt.href}>{alt.name}</a> : alt.name}
+                  {alt.others}
+                </th>
+                <td role="cell" data-label="What it is">
+                  {alt.what}
+                </td>
+                <td role="cell" data-label="Where GotAuth differs">
+                  {alt.why}
+                  {alt.pricing && (
+                    <ul class="pricing" role="list">
+                      {alt.pricing.map((item) => (
+                        <li>
+                          <a href={item.href}>{item.text}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
       <p class="note">Star counts come from GitHub and prices from each vendor's pricing page.</p>
     </div>
   </section>

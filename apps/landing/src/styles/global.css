@@ -99,6 +99,7 @@
   input,
   button {
     font: inherit;
+    box-sizing: border-box;
   }
 }
 
@@ -446,7 +447,6 @@
 
   .sources-label {
     color: var(--ink-2);
-    margin-inline-end: 0.25rem;
   }
 
   /* Code */
@@ -472,9 +472,11 @@
     margin-block-end: 1.75rem;
   }
 
+  /* The code column is wide enough for the longest planned-API line
+     (95 characters) at 1280px. */
   @media (min-width: 60rem) {
     .snippets {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr);
     }
 
     .snippet {
@@ -514,7 +516,7 @@
     background: var(--code-bg);
     color: var(--tk-plain);
     font-family: var(--font-mono);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     line-height: 1.6;
     tab-size: 4;
     scrollbar-color: var(--tk-comment) var(--code-bg);
@@ -553,21 +555,17 @@
   }
 
   /* Comparison table */
-  .table-scroll {
-    overflow-x: auto;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-  }
-
   .compare {
     inline-size: 100%;
-    min-inline-size: 44rem;
+    border: 1px solid var(--line);
     border-collapse: collapse;
     font-size: 0.9375rem;
   }
 
   .compare caption {
     padding: 0.75rem 1rem;
+    border: 1px solid var(--line);
+    border-block-end: none;
     text-align: start;
     color: var(--ink-2);
     font-family: var(--font-mono);
@@ -594,6 +592,59 @@
 
   .compare td:nth-child(2) {
     color: var(--ink-2);
+  }
+
+  /* Phones and small tablets: one card per alternative instead of a
+     table that needs sideways scrolling. */
+  @media (max-width: 47.99rem) {
+    .compare,
+    .compare caption,
+    .compare tbody,
+    .compare tr,
+    .compare th,
+    .compare td {
+      display: block;
+    }
+
+    .compare thead {
+      position: absolute;
+      clip-path: inset(50%);
+      overflow: hidden;
+      inline-size: 1px;
+      block-size: 1px;
+      white-space: nowrap;
+    }
+
+    .compare caption {
+      border: none;
+    }
+
+    .compare tr {
+      padding: 1rem;
+      border-block-start: 1px solid var(--line);
+    }
+
+    .compare th,
+    .compare td {
+      padding: 0;
+      border: none;
+    }
+
+    .compare tbody th {
+      inline-size: auto;
+      font-size: 1.0625rem;
+    }
+
+    /* Visual column names; screen readers get them from the column headers. */
+    .compare td::before {
+      content: attr(data-label);
+      content: attr(data-label) / "";
+      display: block;
+      margin-block: 0.75rem 0.15rem;
+      color: var(--ink-2);
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+    }
   }
 
   .pricing {
@@ -629,14 +680,19 @@
     margin-block: 0.15rem 0.6rem;
   }
 
+  /* Grid areas keep the error message right under the input at every width:
+     beside the button on wide screens, above it on phones. */
   .field-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "input button"
+      "error error";
+    column-gap: 0.75rem;
   }
 
   .field-row input {
-    flex: 1 1 16rem;
+    grid-area: input;
     min-inline-size: 0;
     min-block-size: 3rem;
     padding: 0.6rem 0.85rem;
@@ -654,12 +710,24 @@
   }
 
   .field-row .button {
-    flex: 0 0 auto;
+    grid-area: button;
+  }
+
+  .field-row .field-error {
+    grid-area: error;
   }
 
   @media (max-width: 30rem) {
+    .field-row {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "input"
+        "error"
+        "button";
+    }
+
     .field-row .button {
-      flex: 1 1 100%;
+      margin-block-start: 0.75rem;
     }
   }
 
@@ -673,12 +741,17 @@
     margin-block-start: 0.5rem;
   }
 
+  .form-status {
+    margin-block-start: 1rem;
+  }
+
   /* Live regions stay rendered while empty, or some screen readers miss the first message. */
   .field-error:empty,
   .form-status:empty {
     margin: 0;
   }
 
+  /* A round icon before each message, so state is not shown by color alone. */
   .field-error:not(:empty)::before,
   .form-status:not(:empty)::before {
     display: inline-grid;
@@ -687,7 +760,7 @@
     block-size: 1.25rem;
     margin-inline-end: 0.5rem;
     border-radius: 50%;
-    background: currentColor;
+    color: var(--paper-2);
     font-size: 0.8125rem;
     line-height: 1;
     vertical-align: 0.1em;
@@ -697,20 +770,13 @@
   .form-status[data-kind="error"]:not(:empty)::before {
     content: "!";
     content: "!" / "";
+    background: var(--error);
   }
 
   .form-status[data-kind="success"]:not(:empty)::before {
     content: "\2713";
     content: "\2713" / "";
-  }
-
-  .field-error::before,
-  .form-status::before {
-    color: var(--paper-2);
-  }
-
-  .form-status {
-    margin-block-start: 1rem;
+    background: var(--success);
   }
 
   .form-status[data-kind="success"] {
@@ -732,14 +798,10 @@
     color: var(--ink);
   }
 
-  /* Hidden from people; form services treat a filled value as a bot. */
+  /* Hidden from people, assistive tech and autofill. Bots that fill every
+     field in the HTML fill it, and the form service drops those posts. */
   .honeypot {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    display: none;
   }
 
   /* Thank-you and 404 pages */
