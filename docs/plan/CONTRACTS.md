@@ -176,7 +176,7 @@ class Session(BaseModel):
 `Account`, `Verification` and the plugin models follow the same pattern. Fields with `returned=False` are never present on these models.
 
 **Names F2 defines in `contracts/`** that other sections use:
-- `ConfigError`, `SchemaConflictError`, `UniqueViolation`
+- `ConfigError`, `SchemaConflictError`, `UniqueViolation`, `ReferenceViolation`
 - `HookPayload`, `ASGIApp`, `ResolvedConfig`, `AuthApi`, `ChallengeState`
 - `FakeClock`, `FakeMailer`, `FakeOAuthProvider`
 - `EndpointContext` and `GotAuthInstance` as **Protocols**, because contracts cannot import C1's classes.
@@ -221,6 +221,7 @@ Rules every adapter follows (checked by the conformance suite):
 - `string_list` and `json` round-trip as Python lists and objects; `datetime` round-trips as aware UTC.
 - `transaction()` gives an adapter whose operations commit or roll back together. Nested calls reuse the outer transaction.
 - Unique violations (including `unique_together`) raise `UniqueViolation(model, fields)`.
+- A reference to a missing row, and deleting a row that a `restrict` reference still points at, raise `ReferenceViolation(model, fields)`.
 
 ## 4. HTTP abstraction
 Framework integrations convert to and from these types. The core never sees a framework object.

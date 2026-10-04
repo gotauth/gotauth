@@ -252,14 +252,17 @@ Agents load these skills with the Skill tool before starting, and list them in t
 - the hero clip
 
 ## Status
+**M0 reached on 2026-10-04:** F1, F2 and F3 merged and `poe check` is green on `main`. The contracts are frozen; changes now go through `docs/ccr/`. The demand test (build plan) is the owner's call.
+
 | ID | Status | Merge | Notes |
 |---|---|---|---|
-| F1 | done | `8b6324d` | Docker dev env per worktree (Python 3.14.8, uv 0.12.22, Node 24.21.0, pnpm 12.8.1), CI incl. Node projects job, text and AGENTS.md checks. Reviewed with `code-review` (8 findings, all fixed) |
-| R1 | done | `0e096fb`, requests applied in `94c8418` | G9 passes (thin). MCP authorization 2026-07-28 rules applied to CONTRACTS 12.x, O1, O2, D2, Q1 and the build plan |
-| G1 | in progress | | Landing page; skills: modern-web-guidance, ux-copy, accessibility-review |
-| F2, F3 | in progress | | M0 when both merge and the demand test passes |
-| G3 | in progress | | Started early: needs only F1 |
-| C1, C2, C3, C4, S1, D1, D2, P1 | not started | | Wave 1, after M0 |
+| F1 | done | `8b6324d` | Docker dev env per worktree, CI incl. Node projects, text and AGENTS.md checks. `code-review`: 8 findings, all fixed |
+| R1 | done | `0e096fb`, requests applied in `94c8418` | G9 passes (thin). MCP authorization 2026-07-28 rules applied |
+| G1 | done | `e450c1e` | Landing page; Lighthouse 100/100/100/100. `code-review`: 5 findings, all fixed |
+| G3 | done | `0f3bd73` | `gotauth check`: 13 rules, text, JSON and SARIF 2.1.0 |
+| F3 | done | `5cbccdd` | Crypto kit and spec vectors (Node cross-check). Surrogate bug in `unsign` found and fixed during F2 |
+| F2 | done | `a5b3f2b` | Contracts as code (tested against CONTRACTS.md), memory adapter, testing kit. `code-review`: 3 findings, all fixed |
+| C1, C2, C3, C4, S1, D1, D2, P1 | not started | | Wave 1 |
 | A1, A2, O1, Q1 | not started | | Wave 2 |
 | P2, P3, P4, P5, P6, O2, O3, I1, G2, G4, Q2, G5 | not started | | Wave 3 |
 | O4, E1, A3, S2, B1, X | not started | | Only after the post-launch test |
