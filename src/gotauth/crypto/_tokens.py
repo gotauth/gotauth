@@ -86,7 +86,9 @@ def equal(a: str | bytes, b: str | bytes) -> bool:
 
 
 def _as_bytes(value: str | bytes) -> bytes:
-    return value.encode("utf-8") if isinstance(value, str) else value
+    # surrogatepass: untrusted input may hold lone surrogates; they must compare as
+    # unequal, never raise.
+    return value.encode("utf-8", "surrogatepass") if isinstance(value, str) else value
 
 
 def pkce_s256(verifier: str) -> str:

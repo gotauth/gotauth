@@ -224,6 +224,9 @@ class DefaultCryptoKit:
         """
         check_purpose(purpose)
         value, separator, given = signed.rpartition(".")
+        if not _utf8(value):
+            # `sign` cannot have produced it: lone surrogates do not encode as UTF-8.
+            return None
         valid = False
         # Check every secret without stopping early, so the time taken does not
         # depend on which one matched.
@@ -406,3 +409,11 @@ def crypto_kit(
             the password algorithm is unknown or its extra is not installed.
     """
     return DefaultCryptoKit(secret, password_algorithm=password_algorithm)
+
+
+def _utf8(text: str) -> bool:
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
