@@ -1,29 +1,41 @@
-"""Fail on en dashes, em dashes and emoji in project text files.
+"""Fail on en dashes, em dashes and emoji in the repository's text files.
 
 Usage::
 
     python scripts/check_text.py [PATH ...]
 
-Without arguments it checks ``src``, ``tests``, ``docs`` and the Markdown files in the
-repository root. AGENT-RULES section 5 asks for plain ASCII punctuation and no emoji.
-Tests that need such characters as data use escapes, for example ``"\\u2014"``.
+Without arguments it checks every text file in the repository: the files git lists
+(tracked, plus untracked files that are not ignored) when git works, otherwise a walk
+of the working tree. That fallback matters in the dev container, which has no git.
+Dependency folders, caches, build output, lockfiles and ``docs/research/raw``
+(verbatim third-party snapshots) are skipped. With arguments it checks those files and
+folders, relative to the repository root.
+
+AGENT-RULES section 5 asks for plain ASCII punctuation and no emoji. Tests that need
+such characters as data use escapes, for example ``"\\u2014"``.
 """
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import sys
-from collections.abc import Iterator, Sequence
-from pathlib import Path
+from collections.abc import Iterable, Iterator, Sequence
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PATHS: tuple[str, ...] = ("src", "tests", "docs", "*.md")
+
 SKIP_DIRS = frozenset(
     {
+        ".astro",
         ".git",
         ".hypothesis",
         ".mypy_cache",
+        ".next",
         ".pytest_cache",
         ".ruff_cache",
+        ".turbo",
         ".venv",
         "__pycache__",
         "build",
@@ -33,29 +45,59 @@ SKIP_DIRS = frozenset(
     }
 )
 # Verbatim third-party snapshots kept as research evidence (work package R1).
-SKIP_PATHS = frozenset({ROOT / "docs" / "research" / "raw"})
+SKIP_PREFIXES = ("docs/research/raw/",)
+LOCKFILES = frozenset(
+    {"package-lock.json", "pnpm-lock.yaml", "poetry.lock", "uv.lock", "yarn.lock"}
+)
 TEXT_SUFFIXES = frozenset(
     {
+        ".astro",
         ".cfg",
+        ".cjs",
         ".css",
+        ".dockerfile",
+        ".htm",
         ".html",
         ".ini",
         ".j2",
         ".jinja",
         ".js",
         ".json",
+        ".jsonc",
+        ".jsx",
         ".md",
+        ".mdx",
+        ".mjs",
+        ".mts",
         ".ps1",
         ".py",
         ".pyi",
+        ".scss",
         ".sh",
         ".sql",
+        ".svg",
         ".toml",
         ".ts",
         ".tsx",
         ".txt",
+        ".xml",
         ".yaml",
         ".yml",
+    }
+)
+TEXT_NAMES = frozenset(
+    {
+        ".editorconfig",
+        ".env.example",
+        ".gitattributes",
+        ".gitignore",
+        ".node-version",
+        ".npmrc",
+        ".nvmrc",
+        ".python-version",
+        "Dockerfile",
+        "LICENSE",
+        "Makefile",
     }
 )
 DASHES = {0x2013: "en dash", 0x2014: "em dash"}
@@ -81,34 +123,78 @@ def describe(char: str) -> str | None:
     return None
 
 
-def iter_files(arguments: Sequence[str]) -> Iterator[Path]:
-    """Yield the text files named by ``arguments`` (paths or root-relative globs)."""
-    for argument in arguments:
-        candidates = (
-            sorted(ROOT.glob(argument)) if "*" in argument else [ROOT / argument]
-        )
-        for candidate in candidates:
-            if candidate.is_file():
-                yield candidate
-            elif candidate.is_dir():
-                yield from iter_dir(candidate)
+def is_skipped_dir(relative: PurePosixPath) -> bool:
+    """Return True for a folder this check never enters."""
+    return relative.name in SKIP_DIRS or (relative.as_posix() + "/").startswith(
+        SKIP_PREFIXES
+    )
 
 
-def iter_dir(directory: Path) -> Iterator[Path]:
-    """Yield text files below ``directory``, skipping caches and vendored folders."""
-    for path in sorted(directory.iterdir()):
-        if path.is_dir():
-            if path.name not in SKIP_DIRS and path not in SKIP_PATHS:
-                yield from iter_dir(path)
-        elif path.suffix in TEXT_SUFFIXES:
-            yield path
+def is_skipped(relative: PurePosixPath) -> bool:
+    """Return True for files inside skipped folders and for lockfiles."""
+    if any(is_skipped_dir(parent) for parent in relative.parents):
+        return True
+    return relative.name in LOCKFILES or relative.suffix == ".lock"
 
 
-def check_file(path: Path) -> list[str]:
-    """Return one problem line per disallowed character in ``path``."""
-    relative = path.relative_to(ROOT).as_posix()
+def is_text(relative: PurePosixPath) -> bool:
+    """Return True for files this check reads, judged by name or suffix."""
+    return relative.name in TEXT_NAMES or relative.suffix.lower() in TEXT_SUFFIXES
+
+
+def git_files() -> list[PurePosixPath] | None:
+    """Return the files git knows about, or None when git is not usable here."""
+    git = shutil.which("git")
+    if git is None:
+        return None
     try:
-        text = path.read_text(encoding="utf-8")
+        # Fixed arguments, no user input.
+        result = subprocess.run(  # noqa: S603
+            [git, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    names = result.stdout.decode("utf-8", errors="surrogateescape").split("\0")
+    return [PurePosixPath(name) for name in names if name]
+
+
+def walk_files(start: Path) -> Iterator[PurePosixPath]:
+    """Yield the files below ``start``, pruning skipped folders."""
+    for directory, dirnames, filenames in os.walk(start):
+        relative_dir = PurePosixPath(Path(directory).relative_to(ROOT).as_posix())
+        dirnames[:] = sorted(
+            name for name in dirnames if not is_skipped_dir(relative_dir / name)
+        )
+        for name in sorted(filenames):
+            yield relative_dir / name
+
+
+def default_files() -> Iterable[PurePosixPath]:
+    """Return the repository's files, from git when possible."""
+    files = git_files()
+    return files if files is not None else walk_files(ROOT)
+
+
+def argument_files(arguments: Sequence[str]) -> Iterator[PurePosixPath]:
+    """Yield the files named by ``arguments`` (files or folders)."""
+    for argument in arguments:
+        path = (ROOT / argument).resolve()
+        if path.is_dir():
+            yield from walk_files(path)
+        elif path.is_file():
+            yield PurePosixPath(path.relative_to(ROOT).as_posix())
+
+
+def check_file(relative: PurePosixPath) -> list[str]:
+    """Return one problem line per disallowed character in the file."""
+    data = (ROOT / relative).read_bytes()
+    if b"\0" in data:
+        return []  # binary
+    try:
+        text = data.decode("utf-8")
     except UnicodeDecodeError:
         return [f"{relative}: not valid UTF-8"]
     problems: list[str] = []
@@ -122,10 +208,19 @@ def check_file(path: Path) -> list[str]:
     return problems
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Check the given paths and return the process exit code."""
-    files = list(dict.fromkeys(iter_files(argv or DEFAULT_PATHS)))
-    problems = [problem for path in files for problem in check_file(path)]
+def main(argv: Sequence[str] | None = None) -> int:
+    """Check the given paths, or the whole repository, and return the exit code."""
+    candidates = argument_files(argv) if argv else default_files()
+    files = sorted(
+        {
+            relative
+            for relative in candidates
+            if not is_skipped(relative)
+            and is_text(relative)
+            and (ROOT / relative).is_file()
+        }
+    )
+    problems = [problem for relative in files for problem in check_file(relative)]
     for problem in problems:
         print(problem)
     if problems:
