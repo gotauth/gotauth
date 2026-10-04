@@ -19,6 +19,13 @@ CONTRACT_VERSION = 0
 - table prefix
 - entry points and import paths
 
+**Revision note (pre-M0, R1):** sections 12.1, 12.3 and 12.4 now follow MCP authorization revision 2026-07-28 ([R1 request](../requests/R1-o1-mcp-spec.md)). The topics:
+- flat scopes (12.1)
+- discovery metadata fields, redirect URI rules, stricter CIMD checks, `resource` at the token endpoint, and no code from stored consent on GET for a CIMD client on a loopback redirect (12.3)
+- the `WWW-Authenticate` challenges and no `offline_access` in protected resource metadata (12.4)
+
+No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has not been reached.
+
 ---
 
 ## 0. Ground rules for all code
@@ -682,6 +689,7 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 **Field rules:**
 - **`organization_id`:** the C3 session resolver copies `session.active_organization_id` into it when that field exists (P5 installed).
 - **Permissions and scopes** share one vocabulary: the scope `"project:delete"` is the permission `{"project": ["delete"]}`. P5's `has_permission` and A1's `require(...)` both use this mapping.
+- **Scopes are flat.** No scope implies another (`projects:write` does not grant `projects:read`), so `has_scopes` is exact containment. Apps that want a hierarchy request both scopes, and that hierarchy is out of scope for v0.1.
 - **`client_credentials` tokens:** `user_id` is the owning user of the client's agent (if the agent is user-owned), otherwise `None`; `agent_id` is the agent.
 
 ### 12.2 Models and token rules
@@ -744,7 +752,7 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 - Signed ES256 by default.
 - Header `typ: at+jwt`, `kid`.
 - Claims:
-  - `iss` = `base_url` + `base_path`
+  - `iss` = `base_url` + `base_path` with no trailing slash, identical to the metadata `issuer` (12.3)
   - `sub` = user id (for `client_credentials`: the agent id, or the client id when there is no agent)
   - `aud` = the `resource` (RFC 8707), or the issuer when no resource was requested
   - `client_id`
@@ -780,7 +788,7 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 | `oauth_userinfo` | GET `/oauth2/userinfo` | none (own token check) | O1 |
 | `oauth_register` | POST `/oauth2/register` (off by default) | none | O1 |
 | `oauth_openid_configuration` | GET `/.well-known/openid-configuration` (inside the mount: issuer + path) | none | O1 |
-| `oauth_server_metadata` | well-known: GET `/.well-known/oauth-authorization-server{base_path}` at the host root (RFC 8414 path insertion) | none | O1 |
+| `oauth_server_metadata` | well-known: GET `/.well-known/oauth-authorization-server{base_path}` at the host root (RFC 8414 path insertion); the same document as `oauth_openid_configuration` | none | O1 |
 | `create_oauth_client`, `list_oauth_clients`, `get_oauth_client`, `update_oauth_client`, `delete_oauth_client`, `rotate_oauth_client_secret`, `rotate_signing_key`, `revoke_oauth_tokens`, `verify_access_token` | server_only | | O1 |
 | `create_agent` | POST `/agents` | session | O3 |
 | `list_agents` | GET `/agents` | session | O3 |
@@ -794,15 +802,20 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 
 **OAuth server rules (O1):**
 - **PKCE S256 is required** for every authorization-code request. `plain` is rejected.
-- **Exact `redirect_uri` match.** Loopback redirect URIs may use any port (RFC 8252).
+- **Discovery metadata.** `oauth_openid_configuration` and `oauth_server_metadata` serve the same document. It contains at least `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `userinfo_endpoint`, `introspection_endpoint`, `revocation_endpoint`, `scopes_supported`, `response_types_supported: ["code"]`, `grant_types_supported`, `token_endpoint_auth_methods_supported`, `code_challenge_methods_supported: ["S256"]`, `authorization_response_iss_parameter_supported: true`, and `client_id_metadata_document_supported: true` when CIMD is on. `registration_endpoint` appears only when dynamic registration is on. `issuer` is `base_url + base_path` with no trailing slash, string-identical to the access token `iss` (12.2) and to the `iss` on every authorization response (RFC 9207).
+- **Redirect URIs.** A registered or presented `redirect_uri` must be `https`, or `http` with a loopback host (`localhost`, `127.0.0.1` or `[::1]`). No fragment, no userinfo, no custom schemes in v0.1. Matching is an exact string comparison, except that for a loopback host the port may differ (RFC 8252 section 7.3). The rule applies at `create_oauth_client` and `update_oauth_client`, at CIMD load and at DCR. With DCR on, `application_type` is required: `native` allows only loopback redirects, `web` only `https`.
 - **CIMD (client ID metadata documents):**
-  - A `client_id` that is an https URL is fetched, with a 5s timeout, a 64 KB size cap and caching by HTTP cache headers.
-  - Its `client_id` field must equal the URL.
-  - Its redirect URIs are then trusted.
-  - Private, loopback and link-local IPs (checked after DNS resolution) are rejected (SSRF guard).
-- **Resource indicators:** `resource` binds tokens to an audience; a token for one MCP server can't be used at another.
+  - A `client_id` that is an https URL with a non-empty path, no fragment, no userinfo and no `.` or `..` segments is fetched. Fetch limits: a 5s timeout, no redirects, a 5 KB read limit, and only HTTP 200 accepted. Valid documents are cached by HTTP cache headers within fixed bounds; errors and invalid documents are never cached.
+  - The document must be a JSON object whose `client_id` equals the URL by simple string comparison. It must have `client_name` and a non-empty `redirect_uris`, each meeting the redirect rule above.
+  - It must not contain `client_secret` or `client_secret_expires_at`. Its `token_endpoint_auth_method` must be absent or `none`; `private_key_jwt` is rejected with `invalid_client` in v0.1 (a later version may add it). `grant_types` may only contain `authorization_code` and `refresh_token`.
+  - Private, loopback, link-local, unique-local, multicast and IPv4-mapped addresses (checked after DNS resolution) are rejected (SSRF guard).
+- **Resource indicators (RFC 8707):** `resource` binds tokens to an audience; a token for one MCP server can't be used at another.
+  - At authorize: at most one `resource`, and it must be in `resources`. Otherwise the client is redirected with `error=invalid_target` (after the client and `redirect_uri` checks pass).
+  - At the token endpoint (`authorization_code` and `refresh_token`): `resource` is optional. When present, it must equal the resource bound to the code or grant, else `invalid_target`. Refreshed tokens keep the original `aud`.
+  - Comparison: lowercase the scheme and host, drop a default port, and compare the path exactly. URIs with a fragment or dot segments are rejected. `resources` entries are normalized the same way when `GotAuth(...)` is constructed, and the matching normalized entry becomes the token `aud`.
 - **Grants:** `authorization_code`, `refresh_token`, `client_credentials` (confidential clients only).
 - **`GET /oauth2/authorize` may issue a code directly** when the user's consent for the same client, scopes and resource is already stored. This is the standard OAuth flow and an allowed exception to "no state change on GET".
+  - **Not for a CIMD client on a loopback redirect.** When the client is a CIMD client and the request's `redirect_uri` is loopback, the consent screen is shown again and no code is issued on the GET. Any local program can claim such a client, so stored consent alone is not enough. This covers every CIMD client whose redirect URIs are all loopback.
 
 **Organization permission check (P5)** is used by A1, P1 and O3:
 
@@ -855,13 +868,19 @@ def fastmcp_auth(auth: GotAuth | None = None, *, issuer: str | None = None, reso
 # Remote (`issuer=`): verifies locally via JWKS. With introspect=True it also calls RFC 7662
 # introspection, authenticating as the confidential client (client_id, client_secret) given in
 # introspection_client; introspect=True without it raises ConfigError.
+# WWW-Authenticate challenges (MCP 2026-07-28), built or checked by GotAuth, not left to the framework:
+#   no token:              401  Bearer resource_metadata="<url>", scope="<scopes>"   (scope omitted when empty)
+#   bad or expired token:  401  Bearer error="invalid_token", resource_metadata="<url>", scope="<scopes>"
+#   missing scope:         403  Bearer error="insufficient_scope", scope="<all scopes the call needs>", resource_metadata="<url>"
+# <scopes> is the scopes argument, space-separated, without "offline_access".
 
 def mcp_sdk_auth(auth: GotAuth | None = None, *, issuer: str | None = None, resource: str,
                  scopes: Sequence[str] = (), introspect: bool = False,
                  introspection_client: tuple[str, str] | None = None) -> tuple[Any, Any]: ...
-# Returns (AuthSettings, TokenVerifier) for the official MCP Python SDK.
+# Returns (AuthSettings, TokenVerifier) for the official MCP Python SDK. Same challenges as fastmcp_auth.
 
 def protected_resource_metadata(*, resource: str, issuer: str, scopes: Sequence[str]) -> dict[str, Any]: ...
+# scopes_supported never contains "offline_access" (MCP 2026-07-28, Refresh Tokens).
 ```
 
 ## 13. Configuration and the `auth.api` contract
