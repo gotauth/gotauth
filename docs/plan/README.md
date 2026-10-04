@@ -252,10 +252,14 @@ Agents load these skills with the Skill tool before starting, and list them in t
 - the hero clip
 
 ## Status
-| ID | Status | PR | Notes |
+| ID | Status | Merge | Notes |
 |---|---|---|---|
-| F1, F2, F3, G1, R1 | not started | | Phase 0 |
-| C1, C2, C3, C4, S1, D1, D2 | not started | | Waits for M0 and the demand test |
-| A1, A2, P1, O1, G3, G4 | not started | | |
-| P2, P3, P4, P5, P6, O2, O3, I1, G2, Q1, Q2, G5 | not started | | |
+| F1 | done | `8b6324d` | Docker dev env per worktree (Python 3.14.8, uv 0.12.22, Node 24.21.0, pnpm 12.8.1), CI incl. Node projects job, text and AGENTS.md checks. Reviewed with `code-review` (8 findings, all fixed) |
+| R1 | done | `0e096fb`, requests applied in `94c8418` | G9 passes (thin). MCP authorization 2026-07-28 rules applied to CONTRACTS 12.x, O1, O2, D2, Q1 and the build plan |
+| G1 | in progress | | Landing page; skills: modern-web-guidance, ux-copy, accessibility-review |
+| F2, F3 | in progress | | M0 when both merge and the demand test passes |
+| G3 | in progress | | Started early: needs only F1 |
+| C1, C2, C3, C4, S1, D1, D2, P1 | not started | | Wave 1, after M0 |
+| A1, A2, O1, Q1 | not started | | Wave 2 |
+| P2, P3, P4, P5, P6, O2, O3, I1, G2, G4, Q2, G5 | not started | | Wave 3 |
 | O4, E1, A3, S2, B1, X | not started | | Only after the post-launch test |
