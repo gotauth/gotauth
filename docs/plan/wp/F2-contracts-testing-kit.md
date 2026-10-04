@@ -7,7 +7,7 @@
 | Depends on | F1 |
 | Can start | when F1 is merged |
 | Write scope | `src/gotauth/contracts/**`, `src/gotauth/storage/memory/**`, `src/gotauth/testing/**`, `tests/conftest.py`, `tests/contracts/`, `tests/storage/memory/`, `tests/testing/`, `tests/integration/test_plugin_matrix.py`, `changes/F2.*.md` |
-| Allowed new deps | none (pytest is imported lazily inside `adapter_conformance`) |
+| Allowed new deps | none. `gotauth.testing` must import with the core dependencies only, because the CI no-extras job imports it: pytest, hypothesis, respx and every extra are imported lazily inside the functions that need them |
 
 ## Goal
 Every interface in CONTRACTS.md exists as typed code, plus a memory adapter and the `gotauth.testing` kit, so Wave 1 builds in parallel. Frozen at M0.

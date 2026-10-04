@@ -223,6 +223,7 @@ Agents load these skills with the Skill tool before starting, and list them in t
 
 ## Integrator routine (after every merge)
 1. `./dev.sh uv run poe check` is green on `main`.
+   - Before removing a merged worktree, stop and delete its Docker project so idle databases, volumes and images do not pile up. In the worktree run `docker compose -p <folder name> down --volumes --rmi local`, then run `git worktree remove`. The shared uv and pnpm caches are external volumes and are kept.
 2. After M2: run the `fastapi-nextjs` scenario. After O2: run the `fastmcp-server` scenario.
 3. Update the **Status** table below.
 4. Handle any new `docs/requests/*` or `docs/ccr/*` files: accept, reject or schedule them. Give each accepted CCR the next number (`docs/ccr/<NNN>-<topic>.md`) and bump `CONTRACT_VERSION`.
