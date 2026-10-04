@@ -1,0 +1,18 @@
+# Examples
+
+Runnable apps that use GotAuth. Work package G4 owns this index; each example is owned by the work package that builds it.
+
+| Example | What it shows | Owner |
+|---|---|---|
+| `fastapi-nextjs/` | FastAPI backend and Next.js frontend: email and password, GitHub login, API keys; later 2FA, passkeys and organizations | G4 |
+| `litestar-htmx/` | Server-rendered Litestar app (only if work package A2 keeps Litestar) | G4 |
+| `fastmcp-server/` | FastMCP server protected by the GotAuth OAuth 2.1 server | O2 |
+
+None of them exists yet. Each row gets its one-line run command when the example lands.
+
+## Format of an example
+
+- Its own folder with a `README.md`: what it shows, setup in at most five commands, how to run it and its tests.
+- Its own dependency files: `pyproject.toml` with `uv.lock`, and `package.json` with `pnpm-lock.yaml` for a frontend. GotAuth comes in as a path dependency on the repository root, with the extras the example needs. Examples are not part of the root uv project, so they never change the root `pyproject.toml` or `uv.lock`.
+- Configuration from environment variables, with a committed `.env.example` and no secrets.
+- Runs in Docker like everything else, for example `./dev.sh --ports bash -c "cd examples/<name> && ..."` or the example's own `compose.yaml`.
