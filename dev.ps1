@@ -9,8 +9,10 @@
 #
 # The Compose project name is this folder's name, so each git worktree gets its own
 # containers, virtual environment, Postgres and Redis. Git Bash: ./dev.sh
-
-$ErrorActionPreference = 'Stop'
+#
+# Exit codes come from $LASTEXITCODE. $ErrorActionPreference stays at its default:
+# with 'Stop', Windows PowerShell 5.1 aborts when docker writes progress to a redirected
+# stderr.
 
 # Same normalization as Compose: lower case, only [a-z0-9_-], no leading "_" or "-".
 $project = ((Split-Path -Leaf $PSScriptRoot).ToLowerInvariant() -replace '[^a-z0-9_-]', '').TrimStart('_', '-')
