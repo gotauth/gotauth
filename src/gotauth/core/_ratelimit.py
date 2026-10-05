@@ -1,10 +1,11 @@
 """Fixed-window rate limiting (CONTRACTS 10.2).
 
 Counting happens outside the request transaction, so a rolled-back request still
-counts. Rules come from four places; for one key kind the first source that has a
-matching rule wins, in this order: the endpoint's own ``rate_limit``, plugin rules,
-config ``rules``, then ``DEFAULT_RATE_LIMITS``. Within a source the most specific path
-wins: an exact path, then the longest prefix, then ``"*"``.
+counts. For each key kind one rule applies: the one with the most specific path (an
+exact path, then the longest prefix, then ``"*"``) across the endpoint's own
+``rate_limit``, plugin rules, config ``rules`` and ``DEFAULT_RATE_LIMITS``. On a tie the
+earlier source wins, so a broad config rule never hides a specific default such as
+``/sign-in/*``.
 """
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ import asyncio
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from gotauth.contracts.adapter import Adapter, Where
@@ -73,24 +73,30 @@ def select_rules(
     """
     chosen: list[RateLimitRule] = []
     for key in keys:
-        for rules in sources:
-            best: tuple[int, RateLimitRule] | None = None
+        best: tuple[int, int, RateLimitRule] | None = None
+        for rank, rules in enumerate(sources):
             for rule in rules:
                 if rule.key != key:
                     continue
                 score = _specificity(rule.path, path)
-                if score is not None and (best is None or score > best[0]):
-                    best = (score, rule)
-            if best is not None:
-                chosen.append(best[1])
-                break
+                if score is None:
+                    continue
+                # The most specific path wins; an earlier source wins a tie.
+                if best is None or (score, -rank) > best[:2]:
+                    best = (score, -rank, rule)
+        if best is not None:
+            chosen.append(best[2])
     return chosen
 
 
 @dataclass
 class _Window:
     count: int
-    reset_at: datetime
+    reset_at: float  # UNIX seconds
+
+
+_SWEEP_EVERY = 1000
+_MAX_KEYS = 100_000
 
 
 class RateLimiter:
@@ -117,6 +123,7 @@ class RateLimiter:
         self._adapter = adapter
         self._secondary = secondary
         self._memory: dict[str, _Window] = {}
+        self._hits = 0
         self._lock = asyncio.Lock()
 
     def rules_for(
@@ -177,22 +184,37 @@ class RateLimiter:
         return ctx.crypto.hash_token(raw.strip().lower())
 
     async def _hit(self, key: str, rule: RateLimitRule) -> tuple[bool, int]:
-        window = to_timedelta(rule.window)
-        if self._storage == "secondary" and self._secondary is not None:
-            seconds = max(1, math.ceil(window.total_seconds()))
-            count = await self._secondary.incr(f"gotauth:rl:{key}", seconds)
-            return count <= rule.max, seconds
+        window = max(1, math.ceil(to_timedelta(rule.window).total_seconds()))
         if self._storage == "database":
             return await self._hit_database(key, rule)
-        now = self._clock.now()
+        now = self._clock.now().timestamp()
+        # Windows are aligned to multiples of their length, so every storage knows
+        # exactly when the current one ends.
+        bucket = int(now // window)
+        retry = max(1, math.ceil((bucket + 1) * window - now))
+        if self._storage == "secondary" and self._secondary is not None:
+            count = await self._secondary.incr(f"gotauth:rl:{key}:{bucket}", window + 1)
+            return count <= rule.max, retry
         async with self._lock:
-            current = self._memory.get(key)
-            if current is None or now >= current.reset_at:
-                current = _Window(count=0, reset_at=now + window)
-                self._memory[key] = current
+            self._hits += 1
+            if self._hits % _SWEEP_EVERY == 0 or len(self._memory) > _MAX_KEYS:
+                self._sweep(now)
+            slot = f"{key}:{bucket}"
+            current = self._memory.get(slot)
+            if current is None:
+                current = _Window(count=0, reset_at=(bucket + 1) * window)
+                self._memory[slot] = current
             current.count += 1
-            retry = max(1, math.ceil((current.reset_at - now).total_seconds()))
             return current.count <= rule.max, retry
+
+    def _sweep(self, now: float) -> None:
+        expired = [key for key, value in self._memory.items() if value.reset_at <= now]
+        for key in expired:
+            del self._memory[key]
+        if len(self._memory) > _MAX_KEYS:
+            # Still too many live windows (a flood of new keys): drop the oldest half.
+            for key in list(self._memory)[: len(self._memory) // 2]:
+                del self._memory[key]
 
     async def _hit_database(self, key: str, rule: RateLimitRule) -> tuple[bool, int]:
         window = to_timedelta(rule.window)

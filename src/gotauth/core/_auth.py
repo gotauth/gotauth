@@ -73,6 +73,7 @@ from gotauth.core._context import HookedAdapter, RequestContext, unwrap
 from gotauth.core._http import (
     check_content_type,
     error_response,
+    input_format,
     parse_body,
     validate,
 )
@@ -135,13 +136,16 @@ class _ConsoleSender:
 class _BasicEmailService:
     """Used until the email module (D1) is installed: plain text, no templates."""
 
-    def __init__(self, sender: EmailSender, config: EmailConfig) -> None:
+    def __init__(self, sender: EmailSender | None, config: EmailConfig) -> None:
         self._sender = sender
         self._config = config
 
     async def send(
         self, kind: Any, to: str, **data: Any
     ) -> None:  # Any: EmailKind, data
+        if self._sender is None:
+            # Never log links or codes outside localhost; fail loudly instead.
+            raise ConfigError("no email sender is configured (set email_sender)")
         lines = [f"{key}: {value}" for key, value in data.items()]
         await self._sender.send(
             EmailMessage(
@@ -261,7 +265,7 @@ class GotAuth:
         self._error_codes = self._collect_error_codes()
 
         self._sessions: SessionService | None = advanced_config.session_service or (
-            self._load_session_service(config)
+            self._load_session_service(config, secondary_storage)
             if advanced_config.install_core_plugins
             else None
         )
@@ -379,10 +383,14 @@ class GotAuth:
         return codes
 
     @staticmethod
-    def _load_session_service(config: ResolvedConfig) -> SessionService | None:
+    def _load_session_service(
+        config: ResolvedConfig, secondary: SecondaryStorage | None
+    ) -> SessionService | None:
         module = importlib.import_module("gotauth.sessions")
         factory = getattr(module, "session_service", None)
-        return cast("SessionService", factory(config)) if factory is not None else None
+        if factory is None:
+            return None
+        return cast("SessionService", factory(config, secondary_storage=secondary))
 
     @staticmethod
     def _load_email(config: ResolvedConfig, sender: EmailSender | None) -> EmailService:
@@ -390,7 +398,9 @@ class GotAuth:
         factory = getattr(module, "email_service", None)
         if factory is not None:
             return cast("EmailService", factory(config, sender))
-        return _BasicEmailService(sender or _ConsoleSender(), config.email)
+        if sender is None and is_localhost(config.base_url):
+            sender = _ConsoleSender()
+        return _BasicEmailService(sender, config.email)
 
     # ------------------------------------------------------------ properties
 
@@ -855,7 +865,10 @@ class GotAuth:
             body=b"",
             client_ip=ctx.request.client_ip if ctx is not None else None,
         )
-        data = validate(endpoint, body)
+        if input_format(endpoint) == "query" and body is None:
+            data = validate(endpoint, dict(query or {}))
+        else:
+            data = validate(endpoint, body)
         if ctx is not None:
             call_ctx = RequestContext(
                 auth=self,
