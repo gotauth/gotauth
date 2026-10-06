@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import json
-import math
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -30,6 +29,7 @@ __all__ = ["SESSION_PREFIX", "DefaultSessionService", "session_service"]
 SESSION_PREFIX = TOKEN_PREFIXES["session_token"]
 _USER_AGENT_LIMIT = 512
 _CACHE_LIMIT = 3500  # bytes; larger cache cookies are skipped
+_SECONDARY_TTL = 300  # seconds; bounds staleness after direct writes to a session row
 
 
 def _b64(data: bytes) -> str:
@@ -106,17 +106,23 @@ class DefaultSessionService:
     # ------------------------------------------------------------ read
 
     async def get(self, ctx: EndpointContext, token: str) -> SessionWithUser | None:
-        """Return the session for a raw token, or ``None``; expired rows are deleted."""
+        """Return the session for a raw token, or ``None``; expired rows are deleted.
+
+        Cookies are written only when ``token`` is the request's session cookie, so a
+        bearer request never changes the browser's cookie session.
+        """
         if not token.startswith(SESSION_PREFIX):
             return None
-        cached = self._from_cookie_cache(ctx, token)
-        if cached is not None:
-            return cached
+        from_cookie = self._is_cookie_token(ctx, token)
+        if from_cookie:
+            cached = self._from_cookie_cache(ctx, token)
+            if cached is not None:
+                return cached
         token_hash = ctx.crypto.hash_token(token)
-        row = await self._find(ctx, token_hash)
+        now = ctx.clock.now()
+        row = await self._find(ctx, token_hash, now)
         if row is None:
             return None
-        now = ctx.clock.now()
         if now >= row["expires_at"]:
             await ctx.adapter.delete("session", [Where("id", row["id"])])
             await self._forget(token_hash)
@@ -125,18 +131,32 @@ class DefaultSessionService:
         if user is None:
             return None
         slid = await self._slide(ctx, row, now)
+        if slid is not None:
+            await self._remember(token_hash, slid, now)
+        elif self._due(ctx, row, now):
+            # Another request refreshed it first; drop any copy older than its write.
+            await self._forget(token_hash)
         session = Session.model_validate(
             returned_only(ctx.auth.schema["session"], slid or row)
         )
-        if slid is not None:
-            self._set_cookie(ctx, token, session)
-            await self._remember(token_hash, slid, now)
-        if ctx.auth.config.sessions.cookie_cache.enabled:
-            self._set_cache(ctx, token, session, user)
+        if from_cookie:
+            if slid is not None:
+                self._set_cookie(ctx, token, session)
+            if ctx.auth.config.sessions.cookie_cache.enabled:
+                self._set_cache(ctx, token, session, user)
         return SessionWithUser(session=session, user=user)
 
+    def _is_cookie_token(self, ctx: EndpointContext, token: str) -> bool:
+        cookie = ctx.request.cookies.get(self._name(ctx, "session_token"))
+        return cookie is not None and ctx.crypto.equal(cookie, token)
+
+    @staticmethod
+    def _due(ctx: EndpointContext, row: Mapping[str, Any], now: datetime) -> bool:
+        update_age = to_timedelta(ctx.auth.config.sessions.update_age)
+        return now - row["updated_at"] >= update_age
+
     async def _find(
-        self, ctx: EndpointContext, token_hash: str
+        self, ctx: EndpointContext, token_hash: str, now: datetime
     ) -> dict[str, Any] | None:
         if self._secondary is not None:
             raw = await self._secondary.get(f"session:{token_hash}")
@@ -144,12 +164,18 @@ class DefaultSessionService:
                 data = json.loads(raw)
                 for key in ("expires_at", "created_at", "updated_at"):
                     data[key] = datetime.fromisoformat(data[key])
-                if ctx.crypto.equal(data.get("token_hash", ""), token_hash):
+                # Expiry and refresh are decided on the database row, never on a copy.
+                if (
+                    ctx.crypto.equal(data.get("token_hash", ""), token_hash)
+                    and now < data["expires_at"]
+                    and not self._due(ctx, data, now)
+                ):
                     return data
         row = await ctx.adapter.find_one("session", [Where("token_hash", token_hash)])
         if row is None or not ctx.crypto.equal(row["token_hash"], token_hash):
             return None
-        await self._remember(token_hash, row, ctx.clock.now())
+        if not self._due(ctx, row, now):
+            await self._remember(token_hash, row, now)
         return row
 
     async def _remember(
@@ -157,7 +183,8 @@ class DefaultSessionService:
     ) -> None:
         if self._secondary is None:
             return
-        ttl = math.ceil((row["expires_at"] - now).total_seconds())
+        remaining = int((row["expires_at"] - now).total_seconds())  # rounds down
+        ttl = min(remaining, _SECONDARY_TTL)
         if ttl > 0:
             await self._secondary.set(
                 f"session:{token_hash}",

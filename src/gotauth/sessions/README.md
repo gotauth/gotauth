@@ -43,4 +43,13 @@ be paired with another session. It is skipped when it would be larger than 3.5 K
 ## Secondary storage
 
 When `GotAuth(secondary_storage=...)` is set, sessions are cached under
-`session:<token hash>` until they expire and removed on revocation.
+`session:<token hash>` and removed on revocation. An entry lives at most 5 minutes (and
+never past `expires_at`), which bounds how long a direct write to a session row, such as
+a plugin changing a field, can go unseen. Expiry and sliding refresh are always decided
+on the database row, never on a cached copy.
+
+## Bearer requests
+
+`get` writes cookies only when the token is the request's own session cookie. A request
+with `Authorization: Bearer gas_...` or `X-Api-Key: gas_...` never changes the
+browser's cookie session.

@@ -64,9 +64,13 @@ def _current_session_id(ctx: EndpointContext) -> str | None:
 
 
 def _request_token(ctx: EndpointContext) -> str | None:
-    authorization = ctx.request.headers.get("authorization", "")
+    # The same order as the pipeline (C1): Bearer, then X-Api-Key, then the cookie.
+    headers = ctx.request.headers
+    authorization = headers.get("authorization", "")
     if authorization[:7].lower() == "bearer ":
         return authorization[7:].strip()
+    if headers.get("x-api-key"):
+        return headers["x-api-key"].strip()
     config = ctx.auth.config
     name = cookie_name(
         "session_token", base_url=config.base_url, prefix=config.advanced.cookie_prefix

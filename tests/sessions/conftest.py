@@ -7,7 +7,7 @@ from typing import Any
 
 from gotauth.contracts import Plugin, SecondaryStorage, Where
 from gotauth.sessions import DefaultSessionService
-from gotauth.testing import FakeContext, make_context
+from gotauth.testing import FakeContext, ManualClock, make_context
 
 
 def session_ctx(
@@ -17,6 +17,7 @@ def session_ctx(
     base_url: str = "http://localhost:8000",
     plugins: tuple[Plugin, ...] = (),
     user_agent: str | None = None,
+    clock: ManualClock | None = None,
 ) -> FakeContext:
     """Return a context whose ``ctx.sessions`` is the real C3 service."""
     ctx = make_context(
@@ -24,6 +25,7 @@ def session_ctx(
         session_config=session_config,
         base_url=base_url,
         plugins=plugins,
+        clock=clock,
     )
     if user_agent is not None:
         ctx = ctx.next_request(headers={"user-agent": user_agent})
