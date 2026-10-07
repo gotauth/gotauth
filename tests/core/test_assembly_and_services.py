@@ -123,7 +123,10 @@ def test_email_sender_required_off_localhost() -> None:
     gotauth(plugins=[needs])  # localhost: console sender
 
 
-def test_core_plugins_need_their_modules() -> None:
+def test_core_plugins_need_their_modules(monkeypatch: pytest.MonkeyPatch) -> None:
+    import gotauth.email_password
+
+    monkeypatch.delattr(gotauth.email_password, "email_password_plugin")
     with pytest.raises(ConfigError, match="install_core_plugins"):
         GotAuth(
             database=memory_adapter(), secret=SECRET, base_url="http://localhost:8000"
