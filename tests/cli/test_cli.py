@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import sys
 import uuid
@@ -39,9 +40,22 @@ auth = GotAuth(
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.chdir(tmp_path)
+    # Alembic's env.py calls logging.config.fileConfig, which disables every existing
+    # logger; restore them so later tests still see GotAuth's log records.
+    loggers = logging.root.manager.loggerDict
+    disabled = {
+        name: logger.disabled
+        for name, logger in loggers.items()
+        if isinstance(logger, logging.Logger)
+    }
+    root_level = logging.root.level
     yield tmp_path
     if str(tmp_path) in sys.path:
         sys.path.remove(str(tmp_path))
+    for name, logger in list(loggers.items()):
+        if isinstance(logger, logging.Logger):
+            logger.disabled = disabled.get(name, False)
+    logging.root.setLevel(root_level)
 
 
 def write_auth(project: Path, url: str) -> str:
