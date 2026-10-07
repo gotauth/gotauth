@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import importlib
 import logging
+import sys
 import uuid
 from email.message import EmailMessage as MimeMessage
-from typing import Any
+from typing import Any, TextIO
 
 import httpx
 from pydantic import SecretStr
@@ -56,14 +57,27 @@ def _from(own: str | None, message: EmailMessage) -> str:
 
 
 class ConsoleSender:
-    """Logs each message, links included. Development only (localhost)."""
+    """Prints each message, links included, to stderr. Development only (localhost).
+
+    It writes to stderr directly rather than logging: apps rarely configure logging
+    in development, and a link nobody sees is useless.
+    """
 
     needs_from_address = False
     from_address: str | None = None
 
+    def __init__(self, stream: TextIO | None = None) -> None:
+        self._stream = stream
+
     async def send(self, message: EmailMessage) -> None:
-        """Log recipient, subject and the text body."""
-        logger.info("email to %s: %s\n%s", message.to, message.subject, message.text)
+        """Print recipient, subject and the text body."""
+        stream = self._stream or sys.stderr
+        rule = "-" * 60
+        stream.write(
+            f"\n{rule}\ngotauth email to {message.to}\nSubject: {message.subject}\n\n"
+            f"{message.text.rstrip()}\n{rule}\n"
+        )
+        stream.flush()
 
 
 def console_sender(*, base_url: str = "http://localhost") -> ConsoleSender:
@@ -105,6 +119,13 @@ class SmtpSender:
         self.start_tls = start_tls and not use_tls
         self.use_tls = use_tls
         self.timeout = timeout
+        try:
+            self._smtp: Any = importlib.import_module(
+                "aiosmtplib"
+            )  # Any: optional extra
+        except ModuleNotFoundError as exc:
+            msg = 'the SMTP sender needs the smtp extra: pip install "gotauth[smtp]"'
+            raise ConfigError(msg) from exc
 
     def __repr__(self) -> str:
         return f"SmtpSender(host={self.host!r}, port={self.port})"
@@ -125,9 +146,8 @@ class SmtpSender:
     async def send(self, message: EmailMessage) -> None:
         """Deliver over SMTP; certificates are always checked."""
         mime = self.mime(message)
-        aiosmtplib: Any = importlib.import_module("aiosmtplib")  # Any: optional extra
         try:
-            await aiosmtplib.send(
+            await self._smtp.send(
                 mime,
                 hostname=self.host,
                 port=self.port,

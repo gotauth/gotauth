@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import email
 import json
-import logging
 import socket
 from collections.abc import Iterator
 from email.message import Message
@@ -208,11 +207,21 @@ def test_from_address_is_required_for_gotauth_senders() -> None:
     )  # other senders: no rule
 
 
-async def test_console_sender_logs(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO, logger="gotauth.email")
+async def test_console_sender_prints_without_logging_setup(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     svc = email_service(config("http://localhost:8000"), None)
     await svc.send("otp", "ada@example.com", code="424242", purpose="sign_in")
-    assert "424242" in caplog.text
+    err = capsys.readouterr().err
+    assert "424242" in err and "ada@example.com" in err
+
+
+def test_smtp_needs_its_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+
+    monkeypatch.setitem(sys.modules, "aiosmtplib", None)
+    with pytest.raises(ConfigError, match="smtp extra"):
+        smtp_sender("smtp.test", from_address="a@acme.test")
 
 
 # ---------------------------------------------------------------- background

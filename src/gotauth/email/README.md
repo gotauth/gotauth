@@ -19,10 +19,10 @@ auth = GotAuth(
 
 | Sender | Notes |
 |---|---|
-| none, on `localhost` / `127.0.0.1` | The console sender logs each message, links included |
+| none, on `localhost` / `127.0.0.1` | The console sender prints each message, links included, to stderr |
 | none, elsewhere | Sending raises `ConfigError`; features that need email fail at construction |
 | `console_sender()` | Development only: `ConfigError` off localhost |
-| `smtp_sender(host, port=587, *, username, password, from_address, start_tls=True, use_tls=False, timeout=10)` | aiosmtplib (the `smtp` extra); multipart/alternative; certificates always checked |
+| `smtp_sender(host, port=587, *, username, password, from_address, start_tls=True, use_tls=False, timeout=10)` | aiosmtplib (the `smtp` extra, checked when the sender is built); multipart/alternative; certificates always checked |
 | `resend_sender(api_key, *, from_address, http=None)` | `POST https://api.resend.com/emails` with a bearer key and an `Idempotency-Key` |
 | your own | Anything with `async def send(self, message: EmailMessage)` |
 
