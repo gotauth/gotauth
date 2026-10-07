@@ -62,6 +62,12 @@ that window, the account is verified with the other person's password. A passwor
 by the owner removes them. The verification email should tell people to ignore links they
 did not request (D1 default templates).
 
+Verification links are only for users who sign in with a password. A user created by
+a social provider that did not verify the email cannot be verified through a link: that
+account belongs to whoever controls the provider account, and the email's owner must not
+verify it for them. The owner can claim the address by signing in with a provider that
+verifies emails and is in `account_linking.trusted_providers`.
+
 ## Tokens
 
 Verification, email change and reset tokens look like `gav_<random>`. Only their hash is

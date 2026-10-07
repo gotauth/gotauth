@@ -718,3 +718,34 @@ async def test_verified_or_linked_accounts_are_never_released() -> None:
     for email in ("ada@example.com", "bob@example.com"):
         await call(ctx, "sign_up_email", {"email": email, "password": PASSWORD})
     assert ctx.auth.deleted_users == []
+
+
+async def test_social_only_users_cannot_be_verified_by_link() -> None:
+    ctx = ep_ctx()
+    user = await ctx.auth.create_user_record(ctx, {"email": "ada@example.com"})
+    now = ctx.clock.now()
+    await ctx.adapter.create(
+        "account",
+        {
+            "id": "acc_discord",
+            "user_id": user.id,
+            "provider_id": "discord",
+            "account_id": "attacker",
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+    out = await call(ctx, "send_verification_email", {"email": "ada@example.com"})
+    assert out == StatusOut(status="ok")
+    assert ctx.mailer.sent == []
+    # A token issued anyway (e.g. before the rule) is refused too.
+    from gotauth.email_password._tokens import issue_token
+
+    token = await issue_token(
+        ctx, "verify_email", user.id, "1h", {"email": "ada@example.com"}
+    )
+    with pytest.raises(AuthError) as error:
+        await call(ctx, "verify_email", {"token": token})
+    assert error.value.code == "TOKEN_INVALID"
+    row = await ctx.adapter.find_one("user", [Where("id", user.id)])
+    assert row is not None and not row["email_verified"]
