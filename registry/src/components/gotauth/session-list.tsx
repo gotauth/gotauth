@@ -69,7 +69,12 @@ export function SessionList({ onCurrentRevoked }: { onCurrentRevoked?: () => voi
       return
     }
     if (sessionId === list?.current_session_id) {
-      onCurrentRevoked?.()
+      if (onCurrentRevoked) {
+        onCurrentRevoked()
+        return
+      }
+      setList({ sessions: [], current_session_id: null })
+      setMessage("You signed out of this device.")
       return
     }
     setMessage("Signed out that device.")
@@ -90,6 +95,7 @@ export function SessionList({ onCurrentRevoked }: { onCurrentRevoked?: () => voi
   }
 
   if (!list) return <FormMessage error={error} message={error ? null : "Loading sessions..."} />
+  if (list.sessions.length === 0) return <FormMessage error={error} message={message} />
   const others = list.sessions.filter((s) => s.id !== list.current_session_id)
   return (
     <div className="grid gap-4">

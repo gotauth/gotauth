@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { useGotAuthClient } from "@/components/gotauth/gotauth-provider"
@@ -22,6 +22,15 @@ export function SocialButtons({
   const client = useGotAuthClient()
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<GotAuthError | null>(null)
+
+  // Coming back with the Back button can restore this page from the cache: re-enable.
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) setPending(null)
+    }
+    window.addEventListener("pageshow", reset)
+    return () => window.removeEventListener("pageshow", reset)
+  }, [])
 
   async function start(provider: SocialProvider) {
     setPending(provider.id)

@@ -15,6 +15,9 @@ type Store = {
   snapshot: Snapshot
   listeners: Set<() => void>
   inFlight: Promise<void> | null
+  // Bumped by every load: only the newest answer is published, so a fetch that
+  // started before a sign-in or sign-out can never overwrite the newer state.
+  generation: number
   loaded: boolean
 }
 
@@ -28,6 +31,7 @@ function storeFor(client: GotAuthClient): Store {
       snapshot: { data: null, error: null, isPending: true },
       listeners: new Set(),
       inFlight: null,
+      generation: 0,
       loaded: false,
     }
     stores.set(client, store)
@@ -45,14 +49,20 @@ function publish(store: Store, snapshot: Snapshot) {
 }
 
 function load(client: GotAuthClient, store: Store): Promise<void> {
-  if (store.inFlight) return store.inFlight
+  const generation = ++store.generation
   if (!store.snapshot.isPending) publish(store, { ...store.snapshot, isPending: true })
-  store.inFlight = client.getSession().then((result) => {
+  const request = client.getSession().then((result) => {
+    if (generation !== store.generation) return // a newer load is on its way
     store.inFlight = null
     store.loaded = true
     publish(store, { data: result.data ?? null, error: result.error, isPending: false })
   })
-  return store.inFlight
+  store.inFlight = request
+  return request
+}
+
+function ensureLoaded(client: GotAuthClient, store: Store): void {
+  if (!store.loaded && !store.inFlight) void load(client, store)
 }
 
 const SERVER_SNAPSHOT: Snapshot = { data: null, error: null, isPending: true }
@@ -81,7 +91,7 @@ export function useSession(explicit?: GotAuthClient) {
     () => SERVER_SNAPSHOT,
   )
   useEffect(() => {
-    if (!store.loaded) void load(client, store)
+    ensureLoaded(client, store)
   }, [client, store])
   const refetch = useCallback(() => load(client, store), [client, store])
   return { ...snapshot, refetch }

@@ -44,7 +44,7 @@ export function ApiKeyManager({
   const [open, setOpen] = useState(false)
   // The raw key lives only here, only while the dialog is open.
   const [newKey, setNewKey] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<"yes" | "failed" | null>(null)
   const [pending, setPending] = useState(false)
 
   const load = useCallback(async () => {
@@ -63,7 +63,8 @@ export function ApiKeyManager({
     setOpen(next)
     if (!next) {
       setNewKey(null)
-      setCopied(false)
+      setCopied(null)
+      setError(null)
     }
   }
 
@@ -95,8 +96,13 @@ export function ApiKeyManager({
 
   async function copy() {
     if (!newKey) return
-    await navigator.clipboard.writeText(newKey)
-    setCopied(true)
+    try {
+      // navigator.clipboard is missing on plain-http hosts.
+      await navigator.clipboard.writeText(newKey)
+      setCopied("yes")
+    } catch {
+      setCopied("failed")
+    }
   }
 
   return (
@@ -124,9 +130,16 @@ export function ApiKeyManager({
                     </code>
                   </AlertDescription>
                 </Alert>
+                <FormMessage
+                  message={
+                    copied === "failed"
+                      ? "Copying didn't work. Select the key and copy it yourself."
+                      : null
+                  }
+                />
                 <DialogFooter>
                   <Button variant="outline" onClick={() => void copy()}>
-                    {copied ? "Copied" : "Copy key"}
+                    {copied === "yes" ? "Copied" : "Copy key"}
                   </Button>
                   <Button onClick={() => onOpenChange(false)}>Done</Button>
                 </DialogFooter>

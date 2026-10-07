@@ -31,7 +31,8 @@ export function UserButton({
   const client = useGotAuthClient()
   const { data, isPending } = useSession()
 
-  if (isPending) return null
+  // Only before the first answer: refetches keep the avatar (and an open menu) in place.
+  if (isPending && !data) return null
   if (!data) {
     return signInHref ? (
       <Button asChild variant="outline">

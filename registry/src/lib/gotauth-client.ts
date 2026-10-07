@@ -118,7 +118,13 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
       return { data: null, error: { code: "NETWORK_ERROR", message, status: 0 } }
     }
     let payload: unknown = null
-    const text = await response.text()
+    let text: string
+    try {
+      text = await response.text()
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Network error"
+      return { data: null, error: { code: "NETWORK_ERROR", message, status: 0 } }
+    }
     if (text) {
       try {
         payload = JSON.parse(text)
@@ -182,8 +188,10 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
     sendVerificationEmail(body: { email: string; callback_url?: string }) {
       return request<StatusOut>("POST", "/send-verification-email", { body })
     },
-    verifyEmail(query: { token: string; callback_url?: string }) {
-      return changing(request<StatusOut>("GET", "/verify-email", { query }))
+    /** Verify from app code. The emailed link (with callback_url) is for the browser;
+     * here no callback_url is sent, so the answer is always JSON. */
+    verifyEmail(query: { token: string }) {
+      return changing(request<StatusOut>("GET", "/verify-email", { query: { token: query.token } }))
     },
     requestPasswordReset(body: { email: string; redirect_to: string }) {
       return request<StatusOut>("POST", "/request-password-reset", { body })
