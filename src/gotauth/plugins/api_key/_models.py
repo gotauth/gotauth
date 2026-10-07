@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from gotauth.contracts.http_models import ApiKeyOut
 from gotauth.contracts.primitives import Duration
@@ -43,7 +42,7 @@ class UpdateApiKeyIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     scopes: list[str] | None = None
     enabled: bool | None = None
-    expires_at: datetime | None = None
+    expires_at: AwareDatetime | None = None
 
 
 class ApiKeyListOut(BaseModel):

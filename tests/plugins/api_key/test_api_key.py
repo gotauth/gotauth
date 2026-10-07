@@ -488,3 +488,57 @@ async def test_sqlite_never_stores_the_key_and_cascades() -> None:
     await auth.delete_user(None, user_id)
     assert await auth.database.count("api_key") == 0
     await engine.dispose()
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_rate_limit_windows_do_not_interfere() -> None:
+    clock = fake_clock()
+    auth = build(clock=clock)
+    async with make_client(auth) as client:
+        await sign_up(client)
+        hourly = await create_key(client, rate_limit_max=2, rate_limit_window=3600)
+        minute = await create_key(client, rate_limit_max=100, rate_limit_window=60)
+        client.cookies.clear()
+        for _ in range(2):
+            assert (
+                await client.get("/whoami", headers=bearer(hourly["key"]))
+            ).status_code == 200
+        clock.advance("120s")
+        await client.get("/whoami", headers=bearer(minute["key"]))  # sweeps old windows
+        assert (
+            await client.get("/whoami", headers=bearer(hourly["key"]))
+        ).status_code == 429
+
+
+async def test_default_window_and_lonely_window() -> None:
+    auth = build(keys={"rate_limit": (10, 3600)})
+    async with make_client(auth) as client:
+        await sign_up(client)
+        created = await create_key(client, rate_limit_max=5)
+        assert created["api_key"]["rate_limit_window"] == 3600
+        lonely = await client.post(
+            "/api-keys", json={"name": "x", "rate_limit_window": 60}
+        )
+        assert lonely.status_code == 400
+
+
+async def test_update_respects_the_maximum_and_needs_a_time_zone() -> None:
+    auth = build(keys={"max_expires_in": "30d"})
+    async with make_client(auth) as client:
+        await sign_up(client)
+        key_id = (await create_key(client))["api_key"]["id"]
+        for value in (None, "2099-01-01T00:00:00+00:00"):
+            response = await client.patch(
+                f"/api-keys/{key_id}", json={"expires_at": value}
+            )
+            assert response.status_code == 400, value
+        naive = await client.patch(
+            f"/api-keys/{key_id}", json={"expires_at": "2026-01-02T00:00:00"}
+        )
+        assert naive.status_code == 400
+        ok = await client.patch(
+            f"/api-keys/{key_id}", json={"expires_at": "2026-01-02T00:00:00+00:00"}
+        )
+        assert ok.status_code == 200

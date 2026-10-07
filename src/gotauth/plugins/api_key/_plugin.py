@@ -65,7 +65,8 @@ class _Settings:
         self.max_expires_in = to_timedelta(max_expires_in) if max_expires_in else None
         self.rate_limit = rate_limit
         # (key id, window start) -> count; only used without secondary storage.
-        self.windows: dict[tuple[str, int], int] = {}
+        # (key id, window start) -> (count, window seconds).
+        self.windows: dict[tuple[str, int], tuple[int, int]] = {}
 
     def check_scopes(self, scopes: Sequence[str]) -> list[str]:
         unknown = sorted(set(scopes) - self.allowed_scopes)
@@ -74,6 +75,16 @@ class _Settings:
                 "INVALID_REQUEST", 400, "Scopes not allowed", {"scopes": unknown}
             )
         return sorted(set(scopes))
+
+    def check_expires_at(
+        self, now: datetime, expires_at: datetime | None
+    ) -> datetime | None:
+        """An explicit new expiry must respect ``max_expires_in`` as create does."""
+        if self.max_expires_in is not None and (
+            expires_at is None or expires_at > now + self.max_expires_in
+        ):
+            raise AuthError("INVALID_REQUEST", 400, "expires_at is above the maximum")
+        return expires_at
 
     def expiry(self, now: datetime, expires_in: Duration | None) -> datetime | None:
         lifetime = to_timedelta(expires_in) if expires_in is not None else None
@@ -154,8 +165,14 @@ async def _issue(
 ) -> IssueApiKeyOut:
     now = ctx.clock.now()
     key = ctx.crypto.random_token(API_KEY_PREFIX)
-    if rate_limit_max is None and settings.rate_limit is not None:
-        rate_limit_max, rate_limit_window = settings.rate_limit
+    default_window = settings.rate_limit[1] if settings.rate_limit is not None else 60
+    if rate_limit_max is None:
+        if rate_limit_window is not None:
+            raise AuthError(
+                "INVALID_REQUEST", 400, "rate_limit_window needs rate_limit_max"
+            )
+        if settings.rate_limit is not None:
+            rate_limit_max, rate_limit_window = settings.rate_limit
     row = await ctx.adapter.create(
         "api_key",
         {
@@ -169,7 +186,9 @@ async def _issue(
             "scopes": settings.check_scopes(scopes),
             "expires_at": settings.expiry(now, expires_in),
             "rate_limit_max": rate_limit_max,
-            "rate_limit_window": (rate_limit_window or 60) if rate_limit_max else None,
+            "rate_limit_window": (rate_limit_window or default_window)
+            if rate_limit_max
+            else None,
             "enabled": True,
             "created_by": created_by,
             "created_at": now,
@@ -216,10 +235,11 @@ async def _rate_limit(
     else:
         # In-process only: each worker process counts on its own.
         windows = settings.windows
-        for stale in [k for k in windows if k[1] + window <= now]:
+        # Each counter expires by its own window, not by this key's.
+        for stale in [k for k, (_, size) in windows.items() if k[1] + size <= now]:
             del windows[stale]
-        count = windows.get((row["id"], start), 0) + 1
-        windows[(row["id"], start)] = count
+        count = windows.get((row["id"], start), (0, window))[0] + 1
+        windows[(row["id"], start)] = (count, window)
     if count > limit:
         retry = max(1, math.ceil(start + window - now))
         raise _error("API_KEY_RATE_LIMITED", headers={"retry-after": str(retry)})
@@ -362,7 +382,9 @@ def api_key(
         if body.enabled is not None:
             changes["enabled"] = body.enabled
         if "expires_at" in body.model_fields_set:
-            changes["expires_at"] = body.expires_at
+            changes["expires_at"] = settings.check_expires_at(
+                ctx.clock.now(), body.expires_at
+            )
         if not changes:
             return _out(ctx, row)
         updated = await ctx.adapter.update("api_key", [Where("id", row["id"])], changes)
