@@ -591,3 +591,68 @@ async def test_passwords_never_leak(
     outputs.append(repr([event.data for event in ctx.events]))
     outputs.append(caplog.text)
     assert all(password not in text for text in outputs)
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_email_change_cancels_pending_reset_links() -> None:
+    ctx = ep_ctx()
+    user_id = await add_user(ctx)
+    reset = await request_reset(ctx)
+    await ctx.sign_in(user_id)
+    await call(ctx, "change_email", {"new_email": "new@example.com"})
+    await call(
+        ctx,
+        "verify_email",
+        {"token": token_from(ctx.mailer.last("change_email").data["url"])},
+    )
+    with pytest.raises(AuthError) as error:
+        await call(
+            ctx, "reset_password", {"token": reset, "new_password": "a new password"}
+        )
+    assert error.value.code == "TOKEN_INVALID"
+
+
+async def test_password_change_cancels_pending_reset_links() -> None:
+    ctx = ep_ctx()
+    user_id = await add_user(ctx)
+    reset = await request_reset(ctx)
+    await ctx.sign_in(user_id)
+    await call(
+        ctx,
+        "change_password",
+        {"current_password": PASSWORD, "new_password": "another password"},
+    )
+    with pytest.raises(AuthError) as error:
+        await call(
+            ctx, "reset_password", {"token": reset, "new_password": "a new password"}
+        )
+    assert error.value.code == "TOKEN_INVALID"
+
+
+async def test_verify_email_ignores_tracking_parameters() -> None:
+    ctx = ep_ctx()
+    await add_user(ctx, verified=False)
+    await call(ctx, "send_verification_email", {"email": "ada@example.com"})
+    token = token_from(ctx.mailer.last("verify_email").data["url"])
+    out = await call(ctx, "verify_email", {"token": token, "utm_source": "mail"})
+    assert out == StatusOut(status="ok")
+
+
+async def test_query_goes_before_the_fragment() -> None:
+    ctx = ep_ctx()
+    out = await call(
+        ctx, "verify_email", {"token": "gav_unknown", "callback_url": "/done?a=1#top"}
+    )
+    assert isinstance(out, AuthResponse)
+    assert out.redirect == "/done?a=1&error=TOKEN_INVALID#top"
+    await add_user(ctx)
+    await call(
+        ctx,
+        "request_password_reset",
+        {"email": "ada@example.com", "redirect_to": "/reset#form"},
+    )
+    url = ctx.mailer.last("reset_password").data["url"]
+    assert url.startswith("http://localhost:8000/reset?token=gav_")
+    assert url.endswith("#form")

@@ -50,7 +50,8 @@ Verification, email change and reset tokens look like `gav_<random>`. Only their
 stored. Each token is single use, and a new token replaces older ones of the same kind
 for the same user. Lifetimes: `verify_token_expires_in` (24h) and
 `reset_token_expires_in` (1h). A verification token only verifies the address it was
-sent to.
+sent to. Changing the email or the password cancels pending reset links, and changing
+the email also cancels pending verification links for the old address.
 
 Reset links go to the app's `redirect_to` page with `?token=gav_...`; that page calls
 `POST /reset-password`. There is no GET reset endpoint.

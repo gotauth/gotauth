@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 
 from gotauth.contracts.adapter import Where
 from gotauth.contracts.config import EmailPasswordConfig, ResolvedConfig
@@ -120,8 +120,18 @@ async def _security_notice(ctx: EndpointContext, email: str, event: str) -> None
 
 
 def _with_query(url: str, **params: str) -> str:
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}{urlencode(params)}"
+    # Into the query, before any #fragment, so the app can read the values.
+    parts = urlsplit(url)
+    query = f"{parts.query}&{urlencode(params)}" if parts.query else urlencode(params)
+    return urlunsplit(parts._replace(query=query))
+
+
+async def _drop_tokens(ctx: EndpointContext, user_id: str, *kinds: str) -> None:
+    """Delete a user's pending tokens of these kinds (old links stop working)."""
+    for kind in kinds:
+        await ctx.adapter.delete(
+            "verification", [Where("identifier", f"{kind}:{user_id}")]
+        )
 
 
 # ---------------------------------------------------------------- sign-up and sign-in
@@ -290,6 +300,8 @@ async def _apply_verification(ctx: EndpointContext, token: str) -> None:
         )
     except UniqueViolation as exc:
         raise AuthError("USER_ALREADY_EXISTS", 409) from exc
+    # Links sent to the old address must not outlive the change.
+    await _drop_tokens(ctx, row["id"], "reset_password", "verify_email")
     await ctx.emit("user.email_changed", user_id=row["id"])
 
 
@@ -330,6 +342,7 @@ async def _reset_password(ctx: EndpointContext, body: ResetPasswordIn) -> Status
     if _settings(ctx).revoke_sessions_on_password_reset:
         await ctx.sessions.revoke_all(ctx, row["id"])
     await _security_notice(ctx, row["email"], "password.reset")
+    await _drop_tokens(ctx, row["id"], "reset_password")
     await ctx.emit("password.reset", user_id=row["id"])
     return StatusOut(status="ok")
 
@@ -357,6 +370,7 @@ async def _change_password(ctx: EndpointContext, body: ChangePasswordIn) -> Stat
     row = await _user_by_id(ctx, user_id)
     if row is not None:
         await _security_notice(ctx, row["email"], "password.changed")
+    await _drop_tokens(ctx, user_id, "reset_password")
     await ctx.emit("password.changed", user_id=user_id)
     return StatusOut(status="ok")
 

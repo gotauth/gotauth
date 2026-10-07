@@ -71,8 +71,13 @@ class SendVerificationEmailIn(_In):
     callback_url: str | None = None
 
 
-class VerifyEmailIn(_In):
-    """``verify_email`` query parameters."""
+class VerifyEmailIn(BaseModel):
+    """``verify_email`` query parameters.
+
+    Unknown parameters are ignored: mail providers add tracking ones to links.
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     token: str
     callback_url: str | None = None
