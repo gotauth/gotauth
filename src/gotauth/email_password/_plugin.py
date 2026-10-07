@@ -270,7 +270,14 @@ async def _send_verification_email(
 ) -> StatusOut:
     callback_url = _redirect(ctx, body.callback_url)
     row = await _find_user(ctx, body.email)
-    if row is not None and not row["email_verified"]:
+    # Only password users: a user created through a social provider that did not
+    # verify the email was set up by whoever controls that provider account, and the
+    # email's owner must not be able to verify it for them by clicking a link.
+    if (
+        row is not None
+        and not row["email_verified"]
+        and await _credential(ctx, row["id"]) is not None
+    ):
         await _send_verification(ctx, row["id"], row["email"], callback_url)
     return StatusOut(status="ok")
 
@@ -300,6 +307,8 @@ async def _apply_verification(ctx: EndpointContext, token: str) -> None:
         # The token verifies the address it was sent to, not a later one.
         if consumed.data.get("email") != row["email"]:
             raise AuthError("TOKEN_INVALID", 400)
+        if await _credential(ctx, row["id"]) is None:
+            raise AuthError("TOKEN_INVALID", 400)  # see _send_verification_email
         await ctx.adapter.update(
             "user",
             [Where("id", row["id"])],
