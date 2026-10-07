@@ -1,11 +1,11 @@
-# GotAuth contracts (version 1)
+# GotAuth contracts (version 2)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -27,6 +27,8 @@ CONTRACT_VERSION = 1
 No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has not been reached.
 
 **Version 1 (2026-10-07, [CCR 001](../ccr/001-unique-violation-keeps-transaction.md)):** section 3 now requires that a `UniqueViolation` leaves the surrounding transaction usable. The conformance suite checks it.
+
+**Version 2 (2026-10-07, [CCR 002](../ccr/002-auth-secondary-storage.md)):** `GotAuthInstance.secondary_storage` (section 13) exposes the configured `SecondaryStorage`, so plugins such as P1 can keep shared counters.
 
 ---
 
@@ -954,6 +956,7 @@ A `before_*` hook may return modified data, or raise `AuthError` to abort. The c
     providers: Mapping[str, OAuthProvider]
     plugin_ids: frozenset[str]                       # e.g. {"api_key", "organization"}
     http: httpx.AsyncClient                          # shared client for providers, CIMD and email APIs (10s timeout)
+    secondary_storage: SecondaryStorage | None       # GotAuth(secondary_storage=...), for shared counters and caches
     async def complete_sign_in(self, ctx: EndpointContext, user: User, *, method: SignInMethod,
                                remember_me: bool = True) -> SignInOut | ChallengeOut: ...
     # Owned by C1. Every sign-in path calls this, never ctx.sessions.create directly.

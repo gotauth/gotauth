@@ -58,6 +58,7 @@ from gotauth.contracts.schema import Schema, merge_schemas, returned_only
 from gotauth.contracts.sessions import (
     TOKEN_PREFIXES,
     CreatedSession,
+    SecondaryStorage,
     SessionConfig,
     SessionService,
     cookie_name,
@@ -523,8 +524,10 @@ class FakeAuth:
         mailer: FakeMailer,
         database_hooks: DatabaseHooks | None = None,
         http: httpx.AsyncClient | None = None,
+        secondary_storage: SecondaryStorage | None = None,
     ) -> None:
         self.config = config
+        self.secondary_storage = secondary_storage
         self.plugins: tuple[Plugin, ...] = tuple(plugins)
         self.providers: Mapping[str, OAuthProvider] = dict(providers)
         self.plugin_ids: frozenset[str] = frozenset(
@@ -1067,6 +1070,7 @@ def make_context(
     providers: Sequence[OAuthProvider] = (),
     database_hooks: DatabaseHooks | None = None,
     http: httpx.AsyncClient | None = None,
+    secondary_storage: SecondaryStorage | None = None,
     config: ResolvedConfig | None = None,
     secret: str | Sequence[str] = TEST_SECRET,
     base_url: str = TEST_BASE_URL,
@@ -1137,6 +1141,7 @@ def make_context(
         mailer=the_mailer,
         database_hooks=database_hooks,
         http=http,
+        secondary_storage=secondary_storage,
     )
     the_adapter.bind_schema(auth.schema, table_prefix=config.advanced.table_prefix)
     return auth.context(
