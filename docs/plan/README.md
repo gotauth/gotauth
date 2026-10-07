@@ -264,9 +264,10 @@ Agents load these skills with the Skill tool before starting, and list them in t
 | F2 | done | `a5b3f2b` | Contracts as code (tested against CONTRACTS.md), memory adapter, testing kit. `code-review`: 3 findings, all fixed |
 | C1 | done | `48c763b` | Request pipeline, rate limiter, `auth.api`, ASGI app. `code-review`: 6 findings, all fixed; `security-review`: none |
 | C3 | done | `c09f485` | Sessions, cookie cache, memory and Redis secondary storage. `code-review`: 3 findings, all fixed; `security-review`: none |
-| C2 | done | `b0ecd29` | Email and password flows, enumeration rules, pre-hijacking guard. `code-review`: 3 findings, all fixed; `security-review`: one sub-threshold note (pre-hijacking), fixed. CCR `C2-unique-violation-keeps-transaction` open for S1 |
+| C2 | done | `b0ecd29` | Email and password flows, enumeration rules, pre-hijacking guard. `code-review`: 3 findings, all fixed; `security-review`: one sub-threshold note (pre-hijacking), fixed. CCR 001 (UniqueViolation keeps the transaction usable) accepted, implemented by S1 |
 | C4 | done | `16ab347` | Social login: 7 providers, `social/oidc.py`, PKCE, browser-bound state. `code-review`: 3 findings, all fixed; `security-review`: one sub-threshold note, fixed in C2 (verification links only for password users) |
-| S1, D1, D2, P1 | not started | | Wave 1 |
+| S1 | done | `90eaaab` | SQLAlchemy adapter (conformance on Postgres, SQLite file and memory), `gotauth` CLI (`init`, `migrate`, `generate`, `secret`). Accepted CCR 001, `CONTRACT_VERSION` 1. `code-review`: 7 findings, 6 fixed, 1 documented (root adapter inside a transaction) |
+| D1, D2, P1 | not started | | Wave 1 |
 | A1, A2, O1, Q1 | not started | | Wave 2 |
 | P2, P3, P4, P5, P6, O2, O3, I1, G2, G4, Q2, G5 | not started | | Wave 3 |
 | O4, E1, A3, S2, B1, X | not started | | Only after the post-launch test |
