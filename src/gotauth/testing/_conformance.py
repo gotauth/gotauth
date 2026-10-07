@@ -401,4 +401,42 @@ def adapter_conformance(factory: AdapterFactory) -> type:
                     raise Boom
             assert await adapter.count("owner") == 0
 
+        async def test_null_rows_in_ne_and_membership(self, adapter: Adapter) -> None:
+            await adapter.create("owner", _owner("o1", "ada", age=36))
+            await adapter.create("owner", _owner("o2", "bob", age=20))
+            await adapter.create("owner", _owner("o3", "cy"))  # age NULL
+            assert await self._ids(adapter, [Where("age", 36, "ne")]) == ["o2", "o3"]
+            assert await self._ids(adapter, [Where("age", [36, None], "in")]) == [
+                "o1",
+                "o3",
+            ]
+            assert await self._ids(adapter, [Where("age", [36], "not_in")]) == [
+                "o2",
+                "o3",
+            ]
+            assert await self._ids(adapter, [Where("age", [36, None], "not_in")]) == [
+                "o2"
+            ]
+            assert await self._ids(adapter, [Where("age", [None], "in")]) == ["o3"]
+
+        async def test_sort_puts_nulls_first_ascending(self, adapter: Adapter) -> None:
+            await adapter.create("owner", _owner("o1", "ada", age=36))
+            await adapter.create("owner", _owner("o2", "bob"))
+            await adapter.create("owner", _owner("o3", "cy", age=20))
+            up = await adapter.find_many("owner", sort_by=SortBy("age"))
+            down = await adapter.find_many("owner", sort_by=SortBy("age", "desc"))
+            assert [row["id"] for row in up] == ["o2", "o3", "o1"]
+            assert [row["id"] for row in down] == ["o1", "o3", "o2"]
+
+        async def test_unique_violation_keeps_the_transaction_usable(
+            self, adapter: Adapter
+        ) -> None:
+            # CONTRACTS 3 (CCR 001): callers catch the error and carry on.
+            async with adapter.transaction() as tx:
+                await tx.create("owner", _owner("o1", "ada"))
+                with pytest.raises(UniqueViolation):
+                    await tx.create("owner", _owner("o2", "ada"))
+                await tx.create("owner", _owner("o3", "bob"))
+            assert await adapter.count("owner") == 2
+
     return AdapterConformance
