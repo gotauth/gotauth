@@ -136,6 +136,7 @@ class OidcProvider(OAuth2Provider):
 
     default_scopes: tuple[str, ...] = ("openid", "email", "profile")
     discovery_url: str = ""
+    uses_nonce = True
 
     def __init__(
         self,

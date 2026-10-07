@@ -54,10 +54,11 @@ present and every check runs.
   `account_linking.trusted_providers`. Otherwise `ACCOUNT_NOT_LINKED`.
 - Otherwise a new user is created with the provider's verification flag.
 
-When a trusted provider links to a local account whose email was never verified, that
-account's password is removed and its sessions are revoked: whoever set the password
-never proved the address (pre-account hijacking). The owner can set a new one with a
-password reset.
+When a trusted provider links to a local account whose email was never verified, every
+existing sign-in method of that account (its password and other linked providers) is
+removed and its sessions are revoked: whoever set them up never proved the address
+(pre-account hijacking). The owner can set a password with a reset and link providers
+again.
 
 `POST /link-social` links a provider to the signed-in user (same email unless
 `allow_different_emails`). `POST /unlink-account` refuses to remove the last sign-in
@@ -74,4 +75,6 @@ reuses this module.
 ## Provider tokens
 
 Not stored by default. With `store_provider_tokens=True` the access, refresh and ID
-tokens are stored encrypted (AES-GCM, purpose `account_token`).
+tokens are stored encrypted (AES-GCM, purpose `account_token`). A later sign-in only
+replaces the values the provider sends again, so a refresh token given only on first
+consent is kept.

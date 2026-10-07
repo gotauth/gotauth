@@ -134,7 +134,9 @@ async def _start(
     wanted: list[str] = list(dict.fromkeys([*provider.default_scopes, *(scopes or [])]))
     state = ctx.crypto.random_token()
     verifier = ctx.crypto.random_token()
-    nonce = ctx.crypto.random_token() if "openid" in wanted else None
+    # OIDC providers always get a nonce, whatever the scopes (Apple omits "openid").
+    oidc = getattr(provider, "uses_nonce", False) or "openid" in wanted
+    nonce = ctx.crypto.random_token() if oidc else None
     payload = {
         "verifier": verifier,
         "nonce": nonce,
@@ -332,21 +334,29 @@ async def _finish(
 
 
 def _token_fields(
-    ctx: EndpointContext, provider: OAuthProvider, tokens: ProviderTokens
+    ctx: EndpointContext,
+    provider: OAuthProvider,
+    tokens: ProviderTokens,
+    *,
+    update: bool = False,
 ) -> dict[str, Any]:  # Any: account field values
-    if not provider.store_provider_tokens:
-        return {"scope": tokens.scope}
+    """Account fields for the tokens. On ``update``, values the provider did not send
+    are left alone: Google, for one, sends a refresh token only on first consent."""
 
     def seal(value: str | None) -> str | None:
         return ctx.crypto.encrypt(value, purpose="account_token") if value else None
 
-    return {
-        "access_token_enc": seal(tokens.access_token),
-        "refresh_token_enc": seal(tokens.refresh_token),
-        "id_token_enc": seal(tokens.id_token),
-        "access_token_expires_at": tokens.expires_at,
-        "scope": tokens.scope,
-    }
+    fields: dict[str, Any] = {"scope": tokens.scope}
+    if provider.store_provider_tokens:
+        fields.update(
+            access_token_enc=seal(tokens.access_token),
+            refresh_token_enc=seal(tokens.refresh_token),
+            id_token_enc=seal(tokens.id_token),
+            access_token_expires_at=tokens.expires_at,
+        )
+    if update:
+        fields = {key: value for key, value in fields.items() if value is not None}
+    return fields
 
 
 async def _find_pair(
@@ -397,7 +407,10 @@ async def _existing_pair(
     await ctx.adapter.update(
         "account",
         [Where("id", account["id"])],
-        {"updated_at": ctx.clock.now(), **_token_fields(ctx, provider, tokens)},
+        {
+            "updated_at": ctx.clock.now(),
+            **_token_fields(ctx, provider, tokens, update=True),
+        },
     )
     return await _user(ctx, account["user_id"])
 
@@ -452,13 +465,11 @@ async def _resolve_user(
 async def _claim_unverified(ctx: EndpointContext, user_id: str) -> None:
     """A trusted provider proved the email for a local account nobody verified.
 
-    Whoever set that account's password never proved the address, so the password
-    goes (pre-account hijacking) and so do its sessions. The owner can set a new
-    password with a reset.
+    Whoever set that account's password or linked its other providers never proved
+    the address (pre-account hijacking), so every existing sign-in method and session
+    goes. The owner can set a password with a reset and link providers again.
     """
-    await ctx.adapter.delete(
-        "account", [Where("user_id", user_id), Where("provider_id", _CREDENTIAL)]
-    )
+    await ctx.adapter.delete("account", [Where("user_id", user_id)])
     await ctx.sessions.revoke_all(ctx, user_id)
     await ctx.adapter.update(
         "user",

@@ -21,6 +21,8 @@ from gotauth.contracts import (
     Where,
 )
 from gotauth.contracts.http_models import StatusOut
+from gotauth.contracts.social import ProviderTokens
+from gotauth.testing._oauth import StubOAuthProvider
 
 from .conftest import (
     ENDPOINTS,
@@ -420,3 +422,75 @@ async def test_form_post_for_a_get_provider_is_not_found() -> None:
     with pytest.raises(AuthError) as error:
         await call(form_ctx, "social_callback_post", {"code": "x", "state": "y"})
     assert error.value.code == "NOT_FOUND"
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_trusted_claim_removes_every_unproven_link() -> None:
+    fake = provider(users={"c1": person()})
+    ctx = social_ctx(fake, linking={"trusted_providers": ("fake",)})
+    user_id = await local_user(ctx, verified=False)
+    now = ctx.clock.now()
+    await ctx.adapter.create(
+        "account",
+        {
+            "id": "acc_attacker",
+            "user_id": user_id,
+            "provider_id": "microsoft",
+            "account_id": "attacker",
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+    await sign_in_with(ctx, fake, "c1")
+    assert [r["provider_id"] for r in await accounts(ctx, user_id)] == ["fake"]
+
+
+class RefreshOnce(StubOAuthProvider):
+    """Sends a refresh token only on the first exchange, like Google."""
+
+    async def exchange_code(self, http: Any, **kwargs: Any) -> ProviderTokens:
+        tokens = await super().exchange_code(http, **kwargs)
+        first = len(self.exchanged) == 1
+        return ProviderTokens(
+            access_token=tokens.access_token,
+            refresh_token="rt-1" if first else None,
+            id_token=None,
+            expires_at=None,
+            scope=tokens.scope if first else None,
+        )
+
+
+async def test_later_sign_ins_keep_the_stored_refresh_token() -> None:
+    fake = RefreshOnce(
+        "fake", users={"c1": person(), "c2": person()}, store_provider_tokens=True
+    )
+    ctx = social_ctx(fake)
+    await sign_in_with(ctx, fake, "c1")
+    await sign_in_with(ctx, fake, "c2")
+    [row] = await ctx.adapter.find_many("account")
+    assert (
+        ctx.crypto.decrypt(row["refresh_token_enc"], purpose="account_token") == "rt-1"
+    )
+    assert (
+        ctx.crypto.decrypt(row["access_token_enc"], purpose="account_token")
+        == "fake-access-2"
+    )
+    assert row["scope"] is not None
+
+
+async def test_oidc_providers_get_a_nonce_without_openid_scope() -> None:
+    fake = provider(users={"c1": person()})
+    fake.default_scopes = ("name", "email")
+    fake.uses_nonce = True  # type: ignore[attr-defined]
+    ctx = social_ctx(fake)
+    url = await start(ctx)
+    state = parse_qs(urlsplit(url).query)["state"][0]
+    assert fake.started[state].nonce is not None
+    plain = provider("plain", users={"c1": person()})
+    plain.default_scopes = ("email",)
+    ctx = social_ctx(plain)
+    url = await start(ctx, provider="plain")
+    state = parse_qs(urlsplit(url).query)["state"][0]
+    assert plain.started[state].nonce is None
