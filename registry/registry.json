@@ -1,0 +1,210 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "gotauth",
+  "homepage": "https://gotauth.dev",
+  "items": [
+    {
+      "name": "gotauth-client",
+      "type": "registry:lib",
+      "title": "GotAuth client",
+      "description": "Typed fetch client for GotAuth's HTTP API, with cookies.",
+      "files": [
+        {
+          "path": "src/lib/gotauth-client.ts",
+          "type": "registry:lib",
+          "target": "lib/gotauth-client.ts"
+        }
+      ]
+    },
+    {
+      "name": "webauthn",
+      "type": "registry:lib",
+      "title": "WebAuthn helpers",
+      "description": "base64url and ArrayBuffer conversion for passkey options and responses.",
+      "files": [
+        {
+          "path": "src/lib/webauthn.ts",
+          "type": "registry:lib",
+          "target": "lib/webauthn.ts"
+        }
+      ]
+    },
+    {
+      "name": "gotauth-provider",
+      "type": "registry:component",
+      "title": "GotAuth provider",
+      "description": "Supplies the GotAuth client to the components.",
+      "registryDependencies": [
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/gotauth-provider.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/gotauth-provider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "use-session",
+      "type": "registry:hook",
+      "title": "useSession",
+      "description": "The current session, shared and refetched after sign-in and sign-out.",
+      "registryDependencies": [
+        "@gotauth/gotauth-provider",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/hooks/use-session.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-session.ts"
+        }
+      ]
+    },
+    {
+      "name": "form-message",
+      "type": "registry:component",
+      "title": "Form message",
+      "description": "Accessible error and status messages for GotAuth forms.",
+      "registryDependencies": [
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/form-message.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/form-message.tsx"
+        }
+      ]
+    },
+    {
+      "name": "social-buttons",
+      "type": "registry:component",
+      "title": "Social buttons",
+      "description": "Sign in with GitHub, Google and other providers.",
+      "registryDependencies": [
+        "button",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/social-buttons.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/social-buttons.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sign-in-form",
+      "type": "registry:component",
+      "title": "Sign-in form",
+      "description": "Email and password sign-in with social buttons.",
+      "registryDependencies": [
+        "button",
+        "card",
+        "input",
+        "label",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/social-buttons",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/sign-in-form.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/sign-in-form.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sign-up-form",
+      "type": "registry:component",
+      "title": "Sign-up form",
+      "description": "Email and password sign-up with social buttons.",
+      "registryDependencies": [
+        "button",
+        "card",
+        "input",
+        "label",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/social-buttons",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/sign-up-form.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/sign-up-form.tsx"
+        }
+      ]
+    },
+    {
+      "name": "user-button",
+      "type": "registry:component",
+      "title": "User button",
+      "description": "The signed-in user's avatar and a sign-out menu.",
+      "registryDependencies": [
+        "avatar",
+        "button",
+        "dropdown-menu",
+        "@gotauth/gotauth-provider",
+        "@gotauth/use-session"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/user-button.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/user-button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "session-list",
+      "type": "registry:component",
+      "title": "Session list",
+      "description": "Devices signed in to the account, with sign-out buttons.",
+      "registryDependencies": [
+        "button",
+        "table",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/session-list.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/session-list.tsx"
+        }
+      ]
+    },
+    {
+      "name": "api-key-manager",
+      "type": "registry:component",
+      "title": "API key manager",
+      "description": "Create, list and delete API keys; new keys are shown once.",
+      "registryDependencies": [
+        "alert",
+        "button",
+        "dialog",
+        "input",
+        "label",
+        "table",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/api-key-manager.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/api-key-manager.tsx"
+        }
+      ]
+    }
+  ]
+}
