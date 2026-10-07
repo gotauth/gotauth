@@ -74,8 +74,10 @@ class MigrationPlan:
         return not self.statements and not self.manual
 
 
-def _literal(value: object) -> str | None:
+def _literal(value: object, dialect: Dialect) -> str | None:
     if isinstance(value, bool):
+        if dialect.name == "postgresql":
+            return "true" if value else "false"
         return "1" if value else "0"
     if isinstance(value, int):
         return str(value)
@@ -89,9 +91,14 @@ def _add_column(
 ) -> tuple[list[str], bool]:
     """Return the statements to add a column and whether migrate may run them."""
     spec = str(CreateColumn(column).compile(dialect=dialect)).strip()
-    # A UNIQUE or REFERENCES clause on ADD COLUMN is not portable; indexes come after.
+    # UNIQUE on ADD COLUMN is not portable: a unique index follows instead.
     spec = spec.replace(" UNIQUE", "")
-    literal = _literal(default)
+    for key in column.foreign_keys:
+        # SQLite allows REFERENCES on ADD COLUMN when the column may be NULL.
+        target = key.column
+        action = f" ON DELETE {key.ondelete}" if key.ondelete else ""
+        spec += f" REFERENCES {target.table.name} ({target.name}){action}"
+    literal = _literal(default, dialect)
     automatic = column.nullable or literal is not None
     if not column.nullable and literal is not None:
         spec += f" DEFAULT {literal}"
@@ -132,7 +139,30 @@ def _plan(
             )
             statements, automatic = _add_column(table, column, conn.dialect, default)
             (plan.statements if automatic else plan.manual).extend(statements)
+        plan.statements.extend(_missing_unique_groups(inspector, table, model))
     return plan
+
+
+def _missing_unique_groups(
+    inspector: Any, table: Table, model: Any
+) -> list[str]:  # Any: SQLAlchemy inspector, ModelSchema
+    """Unique indexes for ``unique_together`` groups the table does not enforce yet."""
+    enforced = {
+        tuple(sorted(c for c in item["column_names"] if c))
+        for item in [
+            *inspector.get_unique_constraints(table.name),
+            *(i for i in inspector.get_indexes(table.name) if i.get("unique")),
+        ]
+    }
+    statements: list[str] = []
+    for group in model.unique_together:
+        if tuple(sorted(group)) in enforced:
+            continue
+        name = f"uq_{table.name}_{'_'.join(group)}"
+        statements.append(
+            f"CREATE UNIQUE INDEX {name} ON {table.name} ({', '.join(group)});"
+        )
+    return statements
 
 
 async def missing_changes(

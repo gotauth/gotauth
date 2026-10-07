@@ -46,7 +46,10 @@ def _clause(
         case "eq":
             return column.is_(None) if value is None else column == value
         case "ne":
-            return column.is_not(None) if value is None else column != value
+            if value is None:
+                return column.is_not(None)
+            # NULL differs from any value, as in the memory adapter.
+            return or_(column != value, column.is_(None))
         case "lt":
             return column < value
         case "lte":
@@ -55,10 +58,8 @@ def _clause(
             return column > value
         case "gte":
             return column >= value
-        case "in":
-            return column.in_(list(value)) if value else false()
-        case "not_in":
-            return column.not_in(list(value)) if value else true()
+        case "in" | "not_in":
+            return _membership(column, list(value), negate=clause.op == "not_in")
         case "is_null":
             return column.is_(None) if value else column.is_not(None)
         case "contains":
@@ -70,6 +71,24 @@ def _clause(
             return column.like(f"{_escape(str(value))}%", escape="\\")
         case "ends_with":
             return column.like(f"%{_escape(str(value))}", escape="\\")
+
+
+def _membership(
+    column: Any, options: list[Any], *, negate: bool
+) -> ColumnElement[bool]:  # Any: a column and its values
+    """SQL ``IN`` with the memory adapter's NULL rules: a ``None`` option matches NULL
+    rows, and ``not_in`` keeps NULL rows unless ``None`` is an option."""
+    values = [option for option in options if option is not None]
+    has_null = len(values) != len(options)
+    if not negate:
+        parts: list[ColumnElement[bool]] = [column.in_(values)] if values else []
+        if has_null:
+            parts.append(column.is_(None))
+        return or_(*parts) if parts else false()
+    kept = column.not_in(values) if values else true()
+    if has_null:
+        return and_(kept, column.is_not(None))
+    return or_(kept, column.is_(None))
 
 
 def _list_contains(

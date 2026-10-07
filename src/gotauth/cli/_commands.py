@@ -31,6 +31,21 @@ def _err(message: str) -> None:
     sys.stderr.write(message.rstrip() + "\n")
 
 
+def load_env(path: Path) -> None:
+    """Set variables from a ``.env`` file that the environment does not set yet."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.removeprefix("export ").partition("=")
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
 def load_auth(spec: str) -> Any:  # Any: the user's GotAuth instance
     """Import ``module:attr`` from the current directory.
 
@@ -44,12 +59,19 @@ def load_auth(spec: str) -> Any:  # Any: the user's GotAuth instance
     cwd = str(Path.cwd())
     if cwd not in sys.path:
         sys.path.insert(0, cwd)
+    load_env(Path(cwd) / ".env")  # what `gotauth init` wrote
     try:
         module = importlib.import_module(module_name)
     except ModuleNotFoundError as exc:
         if exc.name in {"sqlalchemy", "alembic", "asyncpg", "aiosqlite"}:
             raise CliError(_HINT) from exc
         msg = f"cannot import {module_name!r} from {cwd}: {exc}"
+        raise CliError(msg) from exc
+    except KeyError as exc:
+        msg = f"importing {module_name!r} failed: environment variable {exc} is not set"
+        raise CliError(msg) from exc
+    except Exception as exc:
+        msg = f"importing {module_name!r} failed: {type(exc).__name__}: {exc}"
         raise CliError(msg) from exc
     auth = getattr(module, attr, None)
     if auth is None:

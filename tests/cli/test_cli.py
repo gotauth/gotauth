@@ -226,3 +226,26 @@ def test_alembic_postgres(project: Path) -> None:
             await asyncio.to_thread(alembic_cycle, project, url)
 
     asyncio.run(run())
+
+
+def test_init_then_migrate_reads_the_env_file(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GOTAUTH_SECRET", raising=False)
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{project / 'init.db'}")
+    assert main(["init"]) == 0
+    module = f"auth_{uuid.uuid4().hex[:8]}"
+    (project / "auth.py").rename(project / f"{module}.py")
+    assert main(["migrate", "--auth", f"{module}:auth"]) == 0
+    assert "auth_user" in table_names(os.environ["DATABASE_URL"])
+
+
+def test_auth_import_errors_are_clean(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("MISSING_VAR", raising=False)
+    (project / "broken_auth.py").write_text(
+        "import os\nauth = os.environ['MISSING_VAR']\n", encoding="utf-8"
+    )
+    assert main(["migrate", "--auth", "broken_auth:auth"]) == 1
+    assert "MISSING_VAR" in capsys.readouterr().err

@@ -62,8 +62,10 @@ def _sqlite_setup(engine: AsyncEngine) -> None:
     if getattr(sync, "_gotauth_sqlite", False):
         return
 
-    @event.listens_for(sync, "connect")
-    def _connect(dbapi_connection: Any, _: Any) -> None:  # Any: DBAPI objects
+    # On every checkout, not only on connect: the pool may hold connections opened
+    # before this adapter existed (for example by a migration on the same engine).
+    @event.listens_for(sync, "checkout")
+    def _checkout(dbapi_connection: Any, *_: Any) -> None:  # Any: DBAPI objects
         # The driver's own transaction handling breaks SAVEPOINT; BEGIN is emitted
         # by the "begin" listener instead.
         dbapi_connection.isolation_level = None
@@ -226,8 +228,11 @@ class SqlAlchemyAdapter:
         )
         if sort_by is not None:
             column = table.c[sort_by.field]
+            # NULLs first ascending and last descending, on every backend.
             query = query.order_by(
-                column.desc() if sort_by.direction == "desc" else column
+                column.desc().nulls_last()
+                if sort_by.direction == "desc"
+                else column.asc().nulls_first()
             )
         if limit is not None:
             query = query.limit(limit)

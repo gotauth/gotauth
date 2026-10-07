@@ -9,10 +9,11 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from gotauth.contracts import UniqueViolation, Where
+from gotauth.contracts import ReferenceViolation, UniqueViolation, Where
 from gotauth.contracts.core_schema import CORE_SCHEMA
-from gotauth.contracts.schema import Field, ModelSchema, merge_schemas
+from gotauth.contracts.schema import Field, ModelSchema, Reference, merge_schemas
 from gotauth.storage.sqlalchemy import (
+    SqlAlchemyAdapter,
     create_missing,
     metadata_for,
     missing_changes,
@@ -249,3 +250,57 @@ def test_dry_run_changes_nothing(tmp_path: object) -> None:
         await engine.dispose()
 
     asyncio.run(run())
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+@pytest.mark.parametrize("make", ENGINES)
+async def test_migrate_adds_working_constraints(
+    make: Callable[[], AsyncEngine],
+) -> None:
+    engine = make()
+    prefix = "fix_"
+    base = {
+        "owner": ModelSchema(name="owner", fields={"name": Field("string")}),
+        "pet": ModelSchema(name="pet", fields={"label": Field("string")}),
+    }
+    extended = {
+        "owner": ModelSchema(
+            name="owner",
+            fields={
+                "name": Field("string"),
+                "active": Field("boolean", default=True),
+            },
+        ),
+        "pet": ModelSchema(
+            name="pet",
+            fields={
+                "label": Field("string"),
+                "owner_id": Field(
+                    "string", required=False, references=Reference(model="owner")
+                ),
+            },
+            unique_together=(("owner_id", "label"),),
+        ),
+    }
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            lambda c: metadata_for(extended, table_prefix=prefix).drop_all(c)
+        )
+    await create_missing(engine, base, table_prefix=prefix)
+    plan = await create_missing(engine, extended, table_prefix=prefix)
+    assert plan.manual == []
+    assert (await missing_changes(engine, extended, table_prefix=prefix)).empty
+    adapter = SqlAlchemyAdapter(engine)
+    adapter.bind_schema(extended, table_prefix=prefix)
+    owner = await adapter.create("owner", {"id": "o1", "name": "ada"})
+    assert owner["active"] is True
+    await adapter.create("pet", {"id": "p1", "label": "x", "owner_id": "o1"})
+    with pytest.raises(UniqueViolation):
+        await adapter.create("pet", {"id": "p2", "label": "x", "owner_id": "o1"})
+    with pytest.raises(ReferenceViolation):
+        await adapter.create("pet", {"id": "p3", "label": "y", "owner_id": "nobody"})
+    await adapter.delete("owner", [Where("id", "o1")])
+    assert await adapter.count("pet") == 0  # the added foreign key cascades
+    await engine.dispose()

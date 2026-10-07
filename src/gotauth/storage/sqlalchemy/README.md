@@ -46,6 +46,12 @@ migrations stay stable.
 - SQLite: foreign keys on, case-sensitive `LIKE`, real `SAVEPOINT` support. SQLite has
   one writer, so operations on one engine are serialized; calls made inside a
   transaction on the same task reuse its connection.
+- Inside a transaction, use the adapter that `transaction()` yields (`ctx.adapter` in
+  handlers). On Postgres the root adapter opens a separate connection and commits on its
+  own; if it touches a row the transaction has locked, it waits for that transaction.
+- `ne`, `in` and `not_in` treat NULL like the memory adapter: NULL differs from every
+  value, and a `None` option matches NULL rows. Sorting puts NULLs first ascending and
+  last descending on every backend.
 
 ## Migrations
 
