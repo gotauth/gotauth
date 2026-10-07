@@ -1,6 +1,7 @@
 # CCR: a UniqueViolation leaves the transaction usable
 
 - Requested by: C2
+- Status: accepted 2026-10-07 (CONTRACT_VERSION 1), implemented by S1
 - CONTRACTS section: 3, Adapter protocol (rules every adapter follows)
 - Affected work packages: S1 (SQLAlchemy adapter), F2 (memory adapter and conformance suite), C2, C4, P5
 

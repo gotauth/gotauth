@@ -1,11 +1,11 @@
-# GotAuth contracts (version 0)
+# GotAuth contracts (version 1)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 0
+CONTRACT_VERSION = 1
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -25,6 +25,8 @@ CONTRACT_VERSION = 0
 - the `WWW-Authenticate` challenges and no `offline_access` in protected resource metadata (12.4)
 
 No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has not been reached.
+
+**Version 1 (2026-10-07, [CCR 001](../ccr/001-unique-violation-keeps-transaction.md)):** section 3 now requires that a `UniqueViolation` leaves the surrounding transaction usable. The conformance suite checks it.
 
 ---
 
@@ -220,7 +222,7 @@ Rules every adapter follows (checked by the conformance suite):
 - **`delete` returns the number of rows removed.** Single-use consumption is `delete(where=[id, value_hash, expires_at > now]) == 1`. That is atomic in SQL and in the memory adapter.
 - `string_list` and `json` round-trip as Python lists and objects; `datetime` round-trips as aware UTC.
 - `transaction()` gives an adapter whose operations commit or roll back together. Nested calls reuse the outer transaction.
-- Unique violations (including `unique_together`) raise `UniqueViolation(model, fields)`.
+- Unique violations (including `unique_together`) raise `UniqueViolation(model, fields)`. The failed write has no effect and the surrounding transaction stays usable, so a caller can catch the error and carry on (SQL adapters run writes in a savepoint).
 - A reference to a missing row, and deleting a row that a `restrict` reference still points at, raise `ReferenceViolation(model, fields)`.
 
 ## 4. HTTP abstraction

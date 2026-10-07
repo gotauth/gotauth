@@ -1,8 +1,21 @@
-"""SQLAlchemy storage adapter and Alembic migration support.
+"""SQLAlchemy storage adapter and migration support (work package S1).
 
-Skeleton created by work package F1. Work package S1 implements it.
+Needs the ``sqlalchemy`` extra plus ``postgres`` (asyncpg) or ``sqlite`` (aiosqlite).
 """
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from ._adapter import SqlAlchemyAdapter, sqlalchemy_adapter
+from ._schema import create_missing, missing_changes, schema_ddl
+from ._tables import NAMING_CONVENTION, UtcDateTime, metadata_for
+
+__all__ = [
+    "NAMING_CONVENTION",
+    "SqlAlchemyAdapter",
+    "UtcDateTime",
+    "create_missing",
+    "metadata_for",
+    "missing_changes",
+    "schema_ddl",
+    "sqlalchemy_adapter",
+]

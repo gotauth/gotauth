@@ -401,4 +401,15 @@ def adapter_conformance(factory: AdapterFactory) -> type:
                     raise Boom
             assert await adapter.count("owner") == 0
 
+        async def test_unique_violation_keeps_the_transaction_usable(
+            self, adapter: Adapter
+        ) -> None:
+            # CONTRACTS 3 (CCR 001): callers catch the error and carry on.
+            async with adapter.transaction() as tx:
+                await tx.create("owner", _owner("o1", "ada"))
+                with pytest.raises(UniqueViolation):
+                    await tx.create("owner", _owner("o2", "ada"))
+                await tx.create("owner", _owner("o3", "bob"))
+            assert await adapter.count("owner") == 2
+
     return AdapterConformance
