@@ -656,3 +656,65 @@ async def test_query_goes_before_the_fragment() -> None:
     url = ctx.mailer.last("reset_password").data["url"]
     assert url.startswith("http://localhost:8000/reset?token=gav_")
     assert url.endswith("#form")
+
+
+async def test_reset_password_verifies_the_email() -> None:
+    ctx = ep_ctx()
+    user_id = await add_user(ctx, verified=False)
+    token = await request_reset(ctx)
+    await call(
+        ctx, "reset_password", {"token": token, "new_password": "a new password"}
+    )
+    row = await ctx.adapter.find_one("user", [Where("id", user_id)])
+    assert row is not None and row["email_verified"]
+    await call(
+        ctx, "sign_in_email", {"email": "ada@example.com", "password": "a new password"}
+    )
+    assert [s.user_id for s in ctx.auth.sign_ins] == [user_id]
+
+
+async def test_abandoned_unverified_sign_up_can_be_claimed() -> None:
+    ctx = ep_ctx()
+    squatter = await add_user(ctx, password="attacker password", verified=False)
+    ctx.clock.advance("23h")
+    await call(ctx, "sign_up_email", {"email": "ada@example.com", "password": PASSWORD})
+    assert ctx.auth.deleted_users == []  # still inside the verification window
+    ctx.clock.advance("1h")
+    out = await call(
+        ctx, "sign_up_email", {"email": "ada@example.com", "password": PASSWORD}
+    )
+    assert out == StatusOut(status="verification_sent")
+    assert ctx.auth.deleted_users == [squatter]
+    row = await ctx.adapter.find_one("user", [Where("email", "ada@example.com")])
+    assert row is not None and row["id"] != squatter
+    token = token_from(ctx.mailer.last("verify_email").data["url"])
+    await call(ctx, "verify_email", {"token": token})
+    with pytest.raises(AuthError):
+        await call(
+            ctx,
+            "sign_in_email",
+            {"email": "ada@example.com", "password": "attacker password"},
+        )
+    await call(ctx, "sign_in_email", {"email": "ada@example.com", "password": PASSWORD})
+
+
+async def test_verified_or_linked_accounts_are_never_released() -> None:
+    ctx = ep_ctx()
+    await add_user(ctx, verified=True)
+    other = await add_user(ctx, "bob@example.com", verified=False)
+    now = ctx.clock.now()
+    await ctx.adapter.create(
+        "account",
+        {
+            "id": "acc_social",
+            "user_id": other,
+            "provider_id": "github",
+            "account_id": "1",
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+    ctx.clock.advance("2d")
+    for email in ("ada@example.com", "bob@example.com"):
+        await call(ctx, "sign_up_email", {"email": email, "password": PASSWORD})
+    assert ctx.auth.deleted_users == []

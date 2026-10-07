@@ -14,6 +14,7 @@ from gotauth.contracts.endpoints import Endpoint, EndpointContext, Plugin
 from gotauth.contracts.errors import AuthError, UniqueViolation
 from gotauth.contracts.http import AuthResponse
 from gotauth.contracts.http_models import ChallengeOut, SignInOut, StatusOut, UserOut
+from gotauth.contracts.primitives import to_timedelta
 from gotauth.contracts.principal import Principal
 from gotauth.contracts.protection import validate_redirect
 from gotauth.contracts.schema import returned_only
@@ -143,7 +144,8 @@ async def _sign_up_email(
     settings = _settings(ctx)
     _check_length(ctx, body.password)
     callback_url = _redirect(ctx, body.callback_url)
-    if await _find_user(ctx, body.email) is not None:
+    existing = await _find_user(ctx, body.email)
+    if existing is not None and not await _release_abandoned(ctx, existing):
         return await _existing_sign_up(ctx, body, callback_url)
     password_hash = await ctx.crypto.hash_password(body.password)
     try:
@@ -174,6 +176,25 @@ async def _sign_up_email(
             ctx, user, method="password", remember_me=body.remember_me
         )
     return StatusOut(status="ok")
+
+
+async def _release_abandoned(ctx: EndpointContext, row: dict[str, Any]) -> bool:
+    """Delete a sign-up nobody verified in time, so the email's owner can claim it.
+
+    Someone else may have signed up with this address and a password they know
+    (pre-account hijacking). Once the verification window has passed, the account is
+    abandoned: it has never been verified and has no other sign-in method.
+    """
+    if row["email_verified"]:
+        return False
+    window = to_timedelta(_settings(ctx).verify_token_expires_in)
+    if ctx.clock.now() - row["created_at"] < window:
+        return False
+    accounts = await ctx.adapter.find_many("account", [Where("user_id", row["id"])])
+    if any(a["provider_id"] != CREDENTIAL_PROVIDER for a in accounts):
+        return False
+    await ctx.auth.delete_user(ctx, row["id"])
+    return True
 
 
 async def _existing_sign_up(
@@ -334,11 +355,20 @@ async def _reset_password(ctx: EndpointContext, body: ResetPasswordIn) -> Status
     if row is None or account is None:
         raise AuthError("TOKEN_INVALID", 400)
     password_hash = await ctx.crypto.hash_password(body.new_password)
+    now = ctx.clock.now()
     await ctx.adapter.update(
         "account",
         [Where("id", account["id"])],
-        {"password_hash": password_hash, "updated_at": ctx.clock.now()},
+        {"password_hash": password_hash, "updated_at": now},
     )
+    if not row["email_verified"]:
+        # The link went to this address, so its owner just proved control of it.
+        await ctx.adapter.update(
+            "user",
+            [Where("id", row["id"])],
+            {"email_verified": True, "updated_at": now},
+        )
+        await ctx.emit("user.email_verified", user_id=row["id"])
     if _settings(ctx).revoke_sessions_on_password_reset:
         await ctx.sessions.revoke_all(ctx, row["id"])
     await _security_notice(ctx, row["email"], "password.reset")

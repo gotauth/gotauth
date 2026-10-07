@@ -44,6 +44,24 @@ Email delivery errors on these endpoints are logged (kind and error type only) a
 change the answer. Off localhost, delivery runs in the background so response time does
 not reveal the account either.
 
+## Pre-account hijacking
+
+Someone can sign up first with another person's email and a password they know. The
+account stays unusable until the email is verified, and two rules hand it back to the
+real owner:
+
+- A password reset marks the email as verified (the link went to that address) and,
+  by default, signs out every session. The owner's usual path, "forgot password", works.
+- An account that was never verified, has no other sign-in method and is older than
+  `verify_token_expires_in` is treated as abandoned: a new sign-up with that email
+  deletes it (through `auth.delete_user`) and starts fresh. The reply is the same as
+  for any sign-up.
+
+One case remains: if the owner clicks a verification link they did not ask for within
+that window, the account is verified with the other person's password. A password reset
+by the owner removes them. The verification email should tell people to ignore links they
+did not request (D1 default templates).
+
 ## Tokens
 
 Verification, email change and reset tokens look like `gav_<random>`. Only their hash is
