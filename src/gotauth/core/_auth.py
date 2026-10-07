@@ -462,6 +462,11 @@ class GotAuth:
         return self._email
 
     @property
+    def secondary_storage(self) -> SecondaryStorage | None:
+        """``GotAuth(secondary_storage=...)``, for shared counters and caches."""
+        return self._secondary
+
+    @property
     def http(self) -> httpx.AsyncClient:
         """A shared HTTP client (10 s timeout)."""
         if self._http is None:

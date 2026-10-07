@@ -18,7 +18,7 @@ from pydantic import Field as PydanticField
 from gotauth.contracts.email import EmailConfig, EmailService
 from gotauth.contracts.primitives import Clock, Duration, IdGenerator, to_timedelta
 from gotauth.contracts.protection import RateLimitConfig
-from gotauth.contracts.sessions import SessionConfig, SessionService
+from gotauth.contracts.sessions import SecondaryStorage, SessionConfig, SessionService
 
 if TYPE_CHECKING:
     import httpx
@@ -374,6 +374,11 @@ class GotAuthInstance(Protocol):
     @property
     def http(self) -> httpx.AsyncClient:
         """Shared HTTP client for providers, CIMD and email APIs (10s timeout)."""
+        ...
+
+    @property
+    def secondary_storage(self) -> SecondaryStorage | None:
+        """``GotAuth(secondary_storage=...)``, for shared counters and caches."""
         ...
 
     @property
