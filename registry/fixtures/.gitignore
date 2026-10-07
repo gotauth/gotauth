@@ -1,0 +1,8 @@
+# Written by scripts/install-fixtures.mjs from public/r.
+*/src/components/
+*/src/lib/
+*/src/hooks/
+# Build output.
+next-app/.next/
+vite-react/dist/
+*.tsbuildinfo

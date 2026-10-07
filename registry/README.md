@@ -1,14 +1,57 @@
 # UI registry
 
-Copy-in React components and a typed fetch client for GotAuth's HTTP API, published as a [shadcn registry](https://ui.shadcn.com/docs/registry) so apps install them with the shadcn CLI. Work package D2 owns this folder.
+Copy-in React components and a typed fetch client for GotAuth's HTTP API, published as a
+[shadcn registry](https://ui.shadcn.com/docs/registry) so apps install them with the
+shadcn CLI. Work package D2 owns this folder. Built against React 19.3, Next.js 16,
+Vite 8, Tailwind CSS 4.3 and shadcn CLI 4.21 (checked 2026-10-07).
 
-## Format
+## Install in an app
 
-- `registry.json`: the shadcn registry file listing every item (components, `lib/gotauth-client.ts`, `lib/webauthn.ts`, `hooks/use-session.ts`).
-- Item sources next to it; `pnpm --dir registry build` runs `shadcn build` into `public/r/`.
-- `fixtures/next-app` and `fixtures/vite-react` install the built items and must type-check and build.
-- This is a standalone pnpm project with its own `pnpm-lock.yaml`. There is no root pnpm workspace. `package.json` pins `"packageManager": "pnpm@12.8.1"`, the version in the dev image.
-- Like every Node project (CONTRIBUTING.md, "Node projects"), it exposes a `check` script: lint, type check, tests, `shadcn build`, the fixture builds and the OpenAPI drift check. CI runs `pnpm install --frozen-lockfile` and `pnpm run --if-present check` here.
+Add the registry to the app's `components.json`, then add items by name:
+
+```json
+{ "registries": { "@gotauth": "https://gotauth.dev/r/{name}.json" } }
+```
+
+```bash
+npx shadcn@latest add @gotauth/sign-in-form @gotauth/user-button @gotauth/use-session
+```
+
+Wrap the app in `<GotAuthProvider baseURL="/api/auth">` and use the components inside it.
+
+## Items (part 1)
+
+| Item | What it is |
+|---|---|
+| `gotauth-client` | `createGotAuthClient({ baseURL, fetch })`: one method per endpoint, `{ data, error }` results |
+| `gotauth-provider` | `GotAuthProvider` and `useGotAuthClient()` |
+| `use-session` | `useSession()`: `{ data: SessionWithUserOut \| null, error, isPending, refetch }`, shared, refetched after sign-in and sign-out |
+| `webauthn` | base64url and ArrayBuffer helpers for passkeys |
+| `sign-in-form`, `sign-up-form`, `social-buttons` | Email and password forms with social buttons |
+| `user-button` | Avatar with a sign-out menu |
+| `session-list` | Signed-in devices, sign out one or all others |
+| `api-key-manager` | Create, list and delete API keys; a new key is shown once |
+
+Part 2 (two-factor, passkeys, organizations, OAuth consent and the OpenAPI drift check)
+follows once those plugins are built.
+
+## Client rules
+
+- Every call sends `credentials: "include"`, so the session cookie does the work. Tokens
+  are never put in `localStorage` or `sessionStorage`.
+- POST, PATCH and DELETE always send a JSON body with `Content-Type: application/json`
+  (GotAuth answers 415 otherwise); GET inputs go in the query string.
+- Errors come back as `{ code, message, status }` from GotAuth's error body; network
+  failures are `NETWORK_ERROR`.
+
+## Layout
+
+- `registry.json`: the shadcn registry; `pnpm build` runs `shadcn build` into `public/r/`.
+- `src/`: item sources. `src/components/ui/` and `src/lib/utils.ts` are the shadcn
+  primitives the items depend on (added with `shadcn add`), used by tests and fixtures.
+- `tests/`: Vitest, Testing Library, MSW and axe-core.
+- `fixtures/next-app`, `fixtures/vite-react`: `scripts/install-fixtures.mjs` installs the
+  built items into them, then both must type-check and build.
 
 ## Commands
 
@@ -16,7 +59,7 @@ Run in the dev container:
 
 ```bash
 ./dev.sh pnpm --dir registry install --frozen-lockfile
-./dev.sh pnpm --dir registry run check
+./dev.sh pnpm --dir registry run check      # typecheck, tests, build, fixtures
 ./dev.sh pnpm --dir registry test
 ./dev.sh pnpm --dir registry build
 ```
