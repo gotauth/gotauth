@@ -252,6 +252,8 @@ Agents load these skills with the Skill tool before starting, and list them in t
 - the hero clip
 
 ## Status
+**M1 reached on 2026-10-07:** C1-C4, S1 and D1 merged, plus P1 and D2 part 1; adapter conformance green on memory, SQLite and Postgres. Next: Wave 2 (A1, A2, O1, Q1).
+
 **M0 reached on 2026-10-04:** F1, F2 and F3 merged and `poe check` is green on `main`. The contracts are frozen; changes now go through `docs/ccr/`. The demand test (build plan) is the owner's call.
 
 | ID | Status | Merge | Notes |
@@ -269,7 +271,7 @@ Agents load these skills with the Skill tool before starting, and list them in t
 | S1 | done | `90eaaab` | SQLAlchemy adapter (conformance on Postgres, SQLite file and memory), `gotauth` CLI (`init`, `migrate`, `generate`, `secret`). Accepted CCR 001, `CONTRACT_VERSION` 1. `code-review`: 7 findings, 6 fixed, 1 documented (root adapter inside a transaction) |
 | D1 | done | `b9c9385` | Email service: default templates for all eight kinds, console (stderr, localhost only), SMTP and Resend senders, background delivery off localhost. `code-review`: 2 findings, both fixed |
 | P1 | done | `a8c3bff` | API keys: create/list/update/delete, server-only issue/verify/revoke, `gak_` resolver, per-key rate limits. Accepted CCR 002 (`auth.secondary_storage`), `CONTRACT_VERSION` 2. `code-review`: 4 findings, all fixed; `security-review`: none (note for P6: revocation that the owner cannot undo) |
-| D2 | not started | | Wave 1 |
+| D2 part 1 | done | `f14b106` | shadcn registry: typed client (core + API keys), `useSession`, WebAuthn helpers, SignInForm, SignUpForm, SocialButtons, UserButton, SessionList, ApiKeyManager; Next.js 16 and Vite 8 fixtures build. `code-review`: 8 findings, all fixed. Part 2 waits for P2, P3, P5, O1 |
 | A1, A2, O1, Q1 | not started | | Wave 2 |
 | P2, P3, P4, P5, P6, O2, O3, I1, G2, G4, Q2, G5 | not started | | Wave 3 |
 | O4, E1, A3, S2, B1, X | not started | | Only after the post-launch test |
