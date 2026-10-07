@@ -30,6 +30,7 @@ from fastapi import (
     Request,
     Response,
 )
+from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
@@ -71,6 +72,21 @@ def _cookies(header: str) -> dict[str, str]:
         if separator and name:
             cookies.setdefault(name, value)
     return cookies
+
+
+def _headers(request: Request) -> dict[str, str]:
+    """Request headers with repeats joined, as the core's ASGI app does: cookies with
+    "; " (HTTP/2 may split them), everything else with ", "."""
+    headers: dict[str, str] = {}
+    for raw_name, raw_value in request.scope.get("headers", []):
+        name = bytes(raw_name).decode("latin-1").lower()
+        value = bytes(raw_value).decode("latin-1")
+        if name in headers:
+            separator = "; " if name == "cookie" else ", "
+            headers[name] = f"{headers[name]}{separator}{value}"
+        else:
+            headers[name] = value
+    return headers
 
 
 def _to_starlette(response: AuthResponse) -> Response:
@@ -236,7 +252,7 @@ class FastAPIIntegration:
                 )
                 raise ConfigError(msg)
             path = path[len(base) :] or "/"
-        headers = {name.lower(): value for name, value in request.headers.items()}
+        headers = _headers(request)
         query_string = request.url.query
         peer = request.client.host if request.client else None
         auth_request = AuthRequest(
@@ -261,7 +277,10 @@ class FastAPIIntegration:
         """
         base = self._auth.config.base_path.rstrip("/")
         found: dict[str, str] = {}
-        paths = cast(dict[str, dict[str, Any]], app.openapi().get("paths", {}))
+        # get_openapi, not app.openapi(): that caches the schema on the app, and routes
+        # added after this check would then be missing from /docs.
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        paths = cast(dict[str, dict[str, Any]], schema.get("paths", {}))
         for path, operations in paths.items():
             for operation in operations.values():
                 if isinstance(operation, dict):
@@ -291,8 +310,8 @@ class FastAPIIntegration:
 
     @staticmethod
     def _credentials(request: Request) -> tuple[dict[str, str], dict[str, str]]:
-        headers = {name.lower(): value for name, value in request.headers.items()}
-        return headers, dict(request.cookies)
+        headers = _headers(request)
+        return headers, _cookies(headers.get("cookie", ""))
 
     async def _session(
         self, request: Request, response: Response
@@ -319,11 +338,14 @@ class FastAPIIntegration:
         body = out.body
         if body is None:
             return None
-        found = (
-            body
-            if isinstance(body, SessionWithUserOut)
-            else SessionWithUserOut.model_validate(body)
-        )
+        try:
+            found = (
+                body
+                if isinstance(body, SessionWithUserOut)
+                else SessionWithUserOut.model_validate(body)
+            )
+        except Exception as exc:
+            raise AuthError("INTERNAL_ERROR", 500) from exc
         return SessionWithUser(session=found.session, user=found.user)
 
     async def current_session(
@@ -340,8 +362,14 @@ class FastAPIIntegration:
         return (await self.current_session(request, response)).user
 
     async def optional_user(self, request: Request, response: Response) -> User | None:
-        """The signed-in user, or ``None``."""
-        found = await self._session(request, response)
+        """The signed-in user, or ``None``: a bad or rejected credential counts as
+        signed out, never a 401."""
+        try:
+            found = await self._session(request, response)
+        except AuthError as error:
+            if error.status in (401, 403):
+                return None
+            raise
         return found.user if found is not None else None
 
     async def current_principal(self, request: Request) -> Principal:
@@ -396,15 +424,20 @@ class FastAPIIntegration:
                     for key, value in headers.items()
                     if key in ("cookie", "authorization", "x-api-key")
                 }
-                result = await integration._auth.api.call(
-                    "has_permission",
-                    body={
-                        "permissions": {
-                            key: list(value) for key, value in permission.items()
-                        }
-                    },
-                    headers=forwarded,
-                )
+                try:
+                    result = await integration._auth.api.call(
+                        "has_permission",
+                        body={
+                            "permissions": {
+                                key: list(value) for key, value in permission.items()
+                            }
+                        },
+                        headers=forwarded,
+                    )
+                except AuthError:
+                    raise
+                except Exception as exc:
+                    raise AuthError("INTERNAL_ERROR", 500) from exc
                 if not getattr(result, "success", False):
                     raise AuthError("FORBIDDEN", 403)
             return principal

@@ -449,3 +449,69 @@ def test_alias_form_passes_pyright_strict(tmp_path: Path) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stdout
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_optional_user_treats_bad_credentials_as_signed_out() -> None:
+    _, app = build()
+    async with client(app) as http:
+        bad = await http.get(
+            "/maybe", headers={"authorization": "Bearer gas_" + "x" * 43}
+        )
+        assert bad.status_code == 200
+        assert bad.json() == {"id": None}
+
+
+async def test_check_app_does_not_freeze_the_docs() -> None:
+    auth, app = build(mount=False)
+    auth.fastapi.check_app(app)
+
+    @app.get("/added-later")
+    async def added_later() -> dict[str, str]:
+        return {}
+
+    assert "/added-later" in app.openapi()["paths"]
+
+
+async def test_split_cookie_headers_are_joined() -> None:
+    _, app = build()
+    async with client(app) as http:
+        await sign_up(http)
+        session = http.cookies["gotauth.session_token"]
+        http.cookies = httpx.Cookies()
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as raw:
+        request = raw.build_request("GET", "/me")
+        request.headers = httpx.Headers(
+            [("cookie", f"gotauth.session_token={session}"), ("cookie", "theme=dark")]
+        )
+        assert (await raw.send(request)).status_code == 200
+        request = raw.build_request("GET", "/api/auth/session")
+        request.headers = httpx.Headers(
+            [("cookie", "theme=dark"), ("cookie", f"gotauth.session_token={session}")]
+        )
+        assert (await raw.send(request)).json()["user"]["email"] == "ada@example.com"
+
+
+async def test_permission_lookup_failures_are_json_500s() -> None:
+    async def has_permission(**body: Any) -> dict[str, bool]:
+        raise RuntimeError("database down")
+
+    orgs = stub_plugin("organization", {"has_permission": has_permission})
+    auth, app = build(orgs, mount=False)
+    guard = auth.fastapi.require(permission={"project": ["read"]})
+
+    @app.get("/guarded")
+    async def guarded(p: Annotated[Principal, Depends(guard)]) -> dict[str, str]:
+        return {"via": p.via}
+
+    async with client(app) as http:
+        await sign_up(http)
+        response = await http.get("/guarded")
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert "database down" not in response.text
