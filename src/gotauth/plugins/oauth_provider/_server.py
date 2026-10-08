@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import html
 import json
+import re
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from typing import Any, cast
@@ -38,6 +39,7 @@ REFRESH_PREFIX = TOKEN_PREFIXES["oauth_refresh_token"]
 _CODE_TTL = timedelta(seconds=60)
 _CONSENT_TTL = 600  # seconds
 _ACCEPT = {"true", "yes", "1", "on", "allow", "accept"}
+_VERIFIER = re.compile(r"[A-Za-z0-9._~-]{43,128}")  # RFC 7636 section 4.1
 
 
 class AuthorizeIn(BaseModel):
@@ -245,13 +247,8 @@ class OAuthServer:
         if client is None or client.get("disabled_at") is not None:
             return _error_page("Unknown client.")
         registered: list[str] = list(client["redirect_uris"])
+        # Always required, so the token request can match it exactly (OAuth 2.1).
         redirect_uri = query.redirect_uri
-        if (
-            redirect_uri is None
-            and len(registered) == 1
-            and not is_loopback_redirect(registered[0])
-        ):
-            redirect_uri = registered[0]
         if redirect_uri is None or not any(
             redirect_matches(r, redirect_uri) for r in registered
         ):
@@ -570,6 +567,13 @@ class OAuthServer:
         nonce: str | None,
     ) -> str:
         code = ctx.crypto.random_token(CODE_PREFIX)
+        auth_time = None
+        principal = ctx.principal
+        if principal is not None and principal.via == "session":
+            session = await ctx.adapter.find_one(
+                "session", [Where("id", principal.credential_id)]
+            )
+            auth_time = session["created_at"] if session is not None else None
         await ctx.adapter.create(
             "oauth_code",
             {
@@ -582,6 +586,7 @@ class OAuthServer:
                 "resource": resource,
                 "code_challenge": code_challenge,
                 "nonce": nonce,
+                "auth_time": auth_time,
                 "expires_at": ctx.clock.now() + _CODE_TTL,
             },
         )
@@ -647,7 +652,7 @@ class OAuthServer:
             or row["redirect_uri"] != form.redirect_uri
         ):
             raise oauth_error("invalid_grant")
-        if not ctx.crypto.equal(
+        if not _VERIFIER.fullmatch(form.code_verifier) or not ctx.crypto.equal(
             ctx.crypto.pkce_s256(form.code_verifier), row["code_challenge"]
         ):
             raise oauth_error("invalid_grant", 400, "PKCE verification failed")
@@ -665,6 +670,7 @@ class OAuthServer:
             family_id=code_hash,
             nonce=row.get("nonce"),
             refresh="refresh_token" in client["grant_types"],
+            auth_time=row.get("auth_time"),
         )
 
     async def _grant_refresh(
@@ -712,11 +718,13 @@ class OAuthServer:
             client,
             user_id=row.get("user_id"),
             scopes=scopes,
+            grant_scopes=list(row["scopes"]),  # narrowing is for this token only
             resource=row.get("resource"),
             family_id=row["family_id"],
             nonce=None,
             refresh=True,
             parent_expires=row["expires_at"],
+            auth_time=row.get("auth_time"),
         )
 
     async def _grant_client_credentials(
@@ -771,6 +779,8 @@ class OAuthServer:
         refresh: bool,
         subject: str | None = None,
         parent_expires: Any = None,  # Any: datetime of the rotated grant
+        grant_scopes: Sequence[str] | None = None,
+        auth_time: Any = None,  # Any: datetime when the user signed in
     ) -> dict[str, Any]:  # Any: JSON
         now = ctx.clock.now()
         access_ttl = to_timedelta(self.settings.access_token_ttl)
@@ -792,8 +802,9 @@ class OAuthServer:
                 "client_id": client["client_id"],
                 "user_id": user_id,
                 "agent_id": client.get("agent_id"),
-                "scopes": list(scopes),
+                "scopes": list(grant_scopes if grant_scopes is not None else scopes),
                 "resource": resource,
+                "auth_time": auth_time,
                 "expires_at": grant_expires,
                 "created_at": now,
             },
@@ -829,9 +840,10 @@ class OAuthServer:
                 "aud": client["client_id"],
                 "iat": int(now.timestamp()),
                 "exp": int((now + access_ttl).timestamp()),
-                "auth_time": int(now.timestamp()),
                 "jti": ctx.crypto.random_token(nbytes=16),
             }
+            if auth_time is not None:  # when the user signed in, not this token's time
+                id_claims["auth_time"] = int(auth_time.timestamp())
             if nonce:
                 id_claims["nonce"] = nonce
             response["id_token"] = self.keys.sign(
@@ -909,7 +921,7 @@ class OAuthServer:
             )
 
         try:
-            principal = await self.verify(ctx, token, None)
+            principal = await self.verify(ctx, token, self.local_audiences(ctx))
         except TokenRejected:
             return challenge("invalid_token", 401)
         if not principal.has_scopes("openid") or principal.user_id is None:

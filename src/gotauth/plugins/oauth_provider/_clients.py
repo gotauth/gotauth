@@ -63,6 +63,7 @@ def is_cimd_url(client_id: str) -> bool:
     """An https URL with a non-empty path, no fragment, no userinfo, no dot segments."""
     try:
         parts = urlsplit(client_id)
+        parts.port  # noqa: B018 - raises ValueError on a bad port
     except ValueError:
         return False
     return (
@@ -84,14 +85,26 @@ async def _system_resolver(host: str, port: int) -> list[str]:
     return sorted({str(info[4][0]) for info in infos})
 
 
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
 def _public_ip(address: str) -> bool:
+    """Globally routable only. NAT64 addresses are judged by the IPv4 address they
+    embed, which can be 127.0.0.1 or 169.254.169.254."""
     try:
         ip = ipaddress.ip_address(address)
     except ValueError:
         return False
-    if isinstance(ip, ipaddress.IPv6Address) and (
-        ip.ipv4_mapped is not None or ip.sixtofour is not None or ip.teredo is not None
-    ):
+    if isinstance(ip, ipaddress.IPv6Address):
+        if (
+            ip.ipv4_mapped is not None
+            or ip.sixtofour is not None
+            or ip.teredo is not None
+        ):
+            return False
+        if ip in _NAT64:
+            return _public_ip(str(ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)))
+    if not ip.is_global:
         return False
     return not (
         ip.is_private

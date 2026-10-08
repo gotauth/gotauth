@@ -426,3 +426,92 @@ def test_resource_normalization() -> None:
         "ftp://x/y",
     ):
         assert normalize_resource(bad) is None, bad
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_authorize_requires_redirect_uri() -> None:
+    w = await world()
+    response = await w.authorize(redirect_uri="")
+    assert (
+        response.status_code == 400 and "text/html" in response.headers["content-type"]
+    )
+
+
+async def test_malformed_verifier_is_invalid_grant() -> None:
+    w = await world()
+    code = await w.code()
+    response = await w.exchange(code, code_verifier="short!")
+    assert response.status_code == 400 and response.json()["error"] == "invalid_grant"
+
+
+async def test_narrowing_on_refresh_does_not_shrink_the_grant() -> None:
+    w = await world()
+    tokens = (await w.exchange(await w.code(scope="openid profile email"))).json()
+    narrow = (
+        await w.token(
+            grant_type="refresh_token",
+            refresh_token=tokens["refresh_token"],
+            scope="openid",
+        )
+    ).json()
+    assert narrow["scope"] == "openid"
+    full = (
+        await w.token(
+            grant_type="refresh_token",
+            refresh_token=narrow["refresh_token"],
+            scope="openid profile email",
+        )
+    ).json()
+    assert set(full["scope"].split()) == {"openid", "profile", "email"}
+
+
+async def test_id_token_auth_time_is_the_sign_in_time() -> None:
+    w = await world()
+    signed_in_at = int(w.clock.now().timestamp())
+    w.clock.advance("2h")
+    tokens = (await w.exchange(await w.code(scope="openid"))).json()
+    first = jwt.decode(tokens["id_token"], options={"verify_signature": False})
+    assert first["auth_time"] == signed_in_at
+    w.clock.advance("1h")
+    refreshed = (
+        await w.token(grant_type="refresh_token", refresh_token=tokens["refresh_token"])
+    ).json()
+    second = jwt.decode(refreshed["id_token"], options={"verify_signature": False})
+    assert second["auth_time"] == signed_in_at
+
+
+@pytest.mark.parametrize("ip", ["100.64.1.1", "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe"])
+@respx.mock
+async def test_cimd_rejects_shared_and_nat64_addresses(ip: str) -> None:
+    respx.get(url__regex=r".*").mock(return_value=httpx.Response(200, json=document()))
+    w = await cimd_world([ip])
+    assert (await authorize_cimd(w)).status_code == 400
+
+
+async def test_cimd_bad_port_is_an_error_page() -> None:
+    w = await world()
+    response = await w.http.get(
+        "/oauth2/authorize",
+        params={
+            "response_type": "code",
+            "client_id": "https://client.example.com:99999/c.json",
+            "redirect_uri": "http://localhost:3000/cb",
+            "code_challenge": pkce()[1],
+            "code_challenge_method": "S256",
+        },
+    )
+    assert response.status_code == 400
+
+
+async def test_userinfo_refuses_tokens_for_other_resources() -> None:
+    w = await world()
+    tokens = (
+        await w.exchange(await w.code(scope="openid email", resource=RESOURCE))
+    ).json()
+    response = await w.http.get(
+        "/oauth2/userinfo",
+        headers={"authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert response.status_code == 401

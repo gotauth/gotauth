@@ -40,7 +40,7 @@ Server-side only (`auth.api.call(...)`): `create_oauth_client`, `list_oauth_clie
   `issuer`, the access token `iss` and the `iss` on every redirect back to the client
   (RFC 9207), errors included.
 - **Redirect URIs**: `https`, or `http` on `localhost`, `127.0.0.1` or `[::1]`; exact
-  match, except that a loopback port may differ. A bad client or redirect URI gets an
+  match, except that a loopback port may differ. `redirect_uri` is always required. A bad client or redirect URI gets an
   error page, never a redirect.
 - **Resources** (RFC 8707): at most one per request, from `resources`; the token `aud`
   is that resource, or the issuer when none was asked for. A token for one MCP server
@@ -53,12 +53,21 @@ Server-side only (`auth.api.call(...)`): `create_oauth_client`, `list_oauth_clie
   on the next request. Remote resource servers that only check the JWT accept a revoked
   token until it expires (10 minutes by default); use O2's `introspect=True` when that
   is too long.
+- **Refresh scope narrowing** applies to the new access token only; the grant keeps
+  its scopes, so a later refresh can ask for them again.
+- **Revoking an access token** (RFC 7009) also revokes its refresh token, as section
+  2.1 allows: the grant is over.
+- **Userinfo** accepts only tokens for this server (`aud` = issuer or `base_url`); a
+  token bound to an MCP resource cannot read the user's profile.
+- **ID tokens** carry `auth_time` = when the user signed in (the session's creation),
+  kept through refreshes.
 - **Consent** is remembered per client, scopes and resource. A CIMD client on a
   loopback redirect always sees the screen again: any local program could claim it.
   The built-in page has no JavaScript and cannot be framed.
 - **CIMD**: an https `client_id` with a path is fetched after DNS resolution, from a
-  vetted public address only (private, loopback, link-local, unique-local, multicast
-  and IPv4-mapped addresses are refused), with no redirects, a 5 second timeout and a
+  vetted globally routable address only (private, shared, loopback, link-local,
+  unique-local, multicast and IPv4-mapped addresses are refused; NAT64 addresses are
+  judged by the IPv4 address they embed), with no redirects, a 5 second timeout and a
   5 KB limit. Valid documents are cached within 1 minute to 24 hours; failures are
   never cached.
 - **Keys** are created on first use; private keys are stored encrypted. A rotated key

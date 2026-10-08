@@ -1,11 +1,11 @@
-# GotAuth contracts (version 2)
+# GotAuth contracts (version 3)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 2
+CONTRACT_VERSION = 3
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -29,6 +29,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 1 (2026-10-07, [CCR 001](../ccr/001-unique-violation-keeps-transaction.md)):** section 3 now requires that a `UniqueViolation` leaves the surrounding transaction usable. The conformance suite checks it.
 
 **Version 2 (2026-10-07, [CCR 002](../ccr/002-auth-secondary-storage.md)):** `GotAuthInstance.secondary_storage` (section 13) exposes the configured `SecondaryStorage`, so plugins such as P1 can keep shared counters.
+
+**Version 3 (2026-10-08, [CCR 003](../ccr/003-oauth-auth-time.md)):** `oauth_code` and `oauth_token` (12.2) gain an optional `auth_time`, so ID tokens carry the time the user signed in.
 
 ---
 
@@ -736,6 +738,7 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 - `scopes`, `resource`
 - `code_challenge`
 - `nonce` (optional)
+- `auth_time` (optional; when the user signed in)
 - `expires_at` (now + 60s)
 
 **`oauth_token` (O1):**
@@ -744,6 +747,7 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 - `parent_id` -> oauth_token (optional; O4 delegation chains)
 - `client_id`, `user_id` (optional), `agent_id` (optional)
 - `scopes`, `resource`
+- `auth_time` (optional; carried through refreshes)
 - `expires_at`, `revoked_at` (optional)
 - `created_at`
 
