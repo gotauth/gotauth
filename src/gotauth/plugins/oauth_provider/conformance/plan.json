@@ -1,0 +1,23 @@
+{
+  "alias": "gotauth",
+  "description": "GotAuth OAuth 2.1 server and OIDC provider (code flow, PKCE S256)",
+  "server": {
+    "discoveryUrl": "https://op.example.test/api/auth/.well-known/openid-configuration"
+  },
+  "client": {
+    "client_id": "<printed by the app at startup>",
+    "client_secret": "<printed by the app at startup>",
+    "scope": "openid profile email"
+  },
+  "client2": {
+    "client_id": "<printed by the app at startup>",
+    "client_secret": "<printed by the app at startup>"
+  },
+  "test_plan": "oidcc-basic-certification-test-plan",
+  "variant": {
+    "server_metadata": "discovery",
+    "client_registration": "static_client",
+    "client_auth_type": "client_secret_basic",
+    "response_type": "code"
+  }
+}

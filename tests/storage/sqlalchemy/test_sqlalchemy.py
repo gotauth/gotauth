@@ -304,3 +304,18 @@ async def test_migrate_adds_working_constraints(
     await adapter.delete("owner", [Where("id", "o1")])
     assert await adapter.count("pet") == 0  # the added foreign key cascades
     await engine.dispose()
+
+
+def test_references_to_missing_models_are_plain_columns() -> None:
+    schema = {
+        "thing": ModelSchema(
+            name="thing",
+            fields={
+                "agent_id": Field(
+                    "string", required=False, references=Reference(model="agent")
+                )
+            },
+        )
+    }
+    table = metadata_for(schema).tables["auth_thing"]
+    assert not table.c.agent_id.foreign_keys
