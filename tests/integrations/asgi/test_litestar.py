@@ -3,7 +3,7 @@
 No ``from __future__ import annotations``: Litestar reads annotations at runtime.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from litestar import Litestar, get
@@ -132,3 +132,67 @@ async def test_well_known_mount_keeps_app_routes() -> None:
             "issuer": "http://localhost:8000"
         }
         assert (await http.get("/hello")).json() == {"hello": "world"}
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+def build_with(**overrides: Any) -> tuple[Any, Litestar]:
+    auth = make_auth(
+        email_password={"require_email_verification": False},
+        plugins=[api_key(allowed_scopes=["projects:read"])],
+        **overrides,
+    )
+    app = Litestar(
+        route_handlers=[me, principal_view, session_only, hello],
+        plugins=[GotAuthPlugin(auth)],
+    )
+    return auth, app
+
+
+async def test_sliding_refresh_cookie_is_sent() -> None:
+    from gotauth.testing import fake_clock
+
+    clock = fake_clock()
+    _, app = build_with(clock=clock)
+    async with AsyncTestClient(app=app, base_url="http://localhost.local:8000") as http:
+        await sign_up(http)
+        clock.advance("2d")
+        response = await http.get("/me")
+        assert response.status_code == 200
+        assert "gotauth.session_token=gas_" in response.headers.get("set-cookie", "")
+        clock.advance("2d")
+        guarded = await http.get("/session-only")
+        assert guarded.status_code == 200
+        assert "gotauth.session_token=gas_" in guarded.headers.get("set-cookie", "")
+
+
+async def test_works_under_an_outer_mount_and_drains_on_shutdown() -> None:
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
+
+    drained: list[bool] = []
+
+    async def drain() -> None:
+        drained.append(True)
+
+    auth = make_auth(email_password={"require_email_verification": False})
+    auth.drain = drain  # before the plugin registers its shutdown hook
+    inner = Litestar(route_handlers=[hello], plugins=[GotAuthPlugin(auth)])
+    # Litestar's own ASGI type differs from Starlette's; both are plain ASGI apps.
+    outer = Starlette(routes=[Mount("/v1", app=cast(Any, inner))])
+    async with AsyncTestClient(app=inner):  # runs the inner app's lifespan
+        pass
+    assert drained == [True]
+    transport = httpx.ASGITransport(app=outer)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost:8000"
+    ) as http:
+        response = await http.post(
+            "/v1/api/auth/sign-up/email",
+            json={"email": "ada@example.com", "password": PASSWORD},
+            headers=ORIGIN,
+        )
+        assert response.status_code == 200, response.text
+        encoded = await http.get("/v1/api/auth/sess%69on")  # percent-encoded path
+        assert encoded.status_code == 200

@@ -171,12 +171,14 @@ async def test_requires_and_requires_scopes() -> None:
         assert denied.json()["error"]["details"] == {"required": ["projects:read"]}
 
 
-async def test_bad_credentials_get_the_gotauth_error() -> None:
+async def test_bad_credentials_mean_anonymous_with_the_error_kept() -> None:
     _, app = build()
+    bad = {"x-api-key": "gak_" + "A" * 43}
     async with client(app) as http:
-        response = await http.get("/whoami", headers={"x-api-key": "gak_" + "A" * 43})
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "API_KEY_INVALID"
+        assert (await http.get("/whoami", headers=bad)).json()["authenticated"] is False
+        guarded = await http.get("/projects", headers=bad)
+    assert guarded.status_code == 401
+    assert guarded.json()["error"]["code"] == "API_KEY_INVALID"
 
 
 async def test_backend_failure_is_a_500_and_no_user() -> None:
@@ -227,3 +229,52 @@ def test_import_gotauth_imports_no_framework() -> None:
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     )
     assert result.stdout.strip() == "False"
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_sliding_refresh_cookie_reaches_app_responses() -> None:
+    from gotauth.testing import fake_clock
+
+    clock = fake_clock()
+    _, app = build(clock=clock)
+    async with client(app) as http:
+        await sign_up(http)
+        clock.advance("2d")  # past update_age: the next read slides the session
+        response = await http.get("/whoami")
+    assert response.json()["authenticated"] is True
+    assert "gotauth.session_token=gas_" in response.headers.get("set-cookie", "")
+
+
+async def test_bad_credentials_do_not_block_auth_or_public_routes() -> None:
+    _, app = build()
+    revoked = {"x-api-key": "gak_" + "A" * 43}
+    async with client(app) as http:
+        signed_up = await http.post(
+            "/api/auth/sign-up/email",
+            json={"email": "ada@example.com", "password": PASSWORD},
+            headers=revoked,
+        )
+        assert signed_up.status_code == 200
+        assert (await http.get("/hello", headers=revoked)).status_code == 200
+        http.cookies = httpx.Cookies()
+        guarded = await http.get("/projects", headers=revoked)
+        assert guarded.status_code == 401
+        assert guarded.json()["error"]["code"] == "API_KEY_INVALID"
+
+
+def test_lifespan_drains_on_shutdown() -> None:
+    from gotauth.integrations.asgi.starlette import gotauth_lifespan
+
+    auth, _ = build()
+    drained: list[bool] = []
+
+    async def drain() -> None:
+        drained.append(True)
+
+    auth.drain = drain
+    app = Starlette(routes=[], lifespan=gotauth_lifespan(auth))
+    with TestClient(app):
+        assert drained == []
+    assert drained == [True]

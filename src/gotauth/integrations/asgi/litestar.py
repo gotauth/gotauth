@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import unquote
 
 from litestar import Request, Response, asgi
 from litestar.config.app import AppConfig
@@ -29,12 +30,16 @@ from litestar.plugins import InitPluginProtocol
 
 from gotauth.contracts.core_schema import User
 from gotauth.contracts.errors import AuthError
+from gotauth.contracts.http import AuthResponse
 from gotauth.contracts.http_models import SessionWithUserOut
 from gotauth.contracts.principal import Principal
+from gotauth.core._http import set_cookie_header
 from gotauth.integrations.asgi._common import (
+    COOKIES_KEY,
     error_payload,
     headers_from,
     missing_scopes,
+    pending_cookies,
     resolve,
 )
 
@@ -66,7 +71,7 @@ async def _principal(
     state = cast(dict[str, Any], scope.setdefault("state", {}))
     if _STATE_KEY not in state:
         headers = cast(list[tuple[bytes, bytes]], scope.get("headers", []))
-        state[_STATE_KEY] = await resolve(_auth_of(connection), headers)
+        state[_STATE_KEY] = await resolve(_auth_of(connection), headers, scope)
     return cast(Principal | None, state[_STATE_KEY])
 
 
@@ -107,11 +112,18 @@ async def _provide_current_user(request: Request[Any, Any, Any]) -> User:
     headers = headers_from(cast(list[tuple[bytes, bytes]], scope.get("headers", [])))
     forwarded = {k: v for k, v in headers.items() if k in ("cookie", "authorization")}
     try:
-        found = await auth.api.call("get_session", headers=forwarded)
+        response = await auth.api.call(
+            "get_session", headers=forwarded, as_response=True
+        )
     except AuthError:
         raise
     except Exception as exc:
         raise AuthError("INTERNAL_ERROR", 500) from exc
+    out = cast(AuthResponse, response)
+    if out.cookies:  # a sliding refresh: _add_cookies puts them on the response
+        stored = cast(list[str], scope.setdefault(COOKIES_KEY, []))
+        stored.extend(set_cookie_header(cookie) for cookie in out.cookies)
+    found = out.body
     if found is None:
         raise AuthError("UNAUTHENTICATED", 401)
     session = (
@@ -120,6 +132,14 @@ async def _provide_current_user(request: Request[Any, Any, Any]) -> User:
         else SessionWithUserOut.model_validate(found)
     )
     return session.user
+
+
+async def _add_cookies(message: Any, scope: Any) -> None:  # Any: ASGI message, scope
+    """``before_send``: add a sliding session refresh's cookies to the response."""
+    if message["type"] == "http.response.start":
+        extra = [(b"set-cookie", value) for value in pending_cookies(scope)]
+        if extra:
+            message["headers"] = [*message.get("headers", []), *extra]
 
 
 def _handle_auth_error(_: Request[Any, Any, Any], exc: AuthError) -> Response[bytes]:
@@ -139,12 +159,24 @@ class GotAuthPlugin(InitPluginProtocol):
         auth_app = auth.asgi()
         well_known_app = auth.well_known()
 
-        def original(scope: Any) -> Any:  # Any: an ASGI scope
-            # Litestar strips the mount prefix and adds a trailing slash; GotAuth needs
-            # the request's own path, which raw_path keeps.
+        base = auth.config.base_path.rstrip("/")
+
+        def mounted(scope: Any, mount: str) -> Any:  # Any: an ASGI scope
+            # Litestar strips the mount path and adds a trailing slash. Hand the app
+            # its real path: the decoded raw_path when present (it keeps any outer
+            # root_path), else the mount path joined back on.
+            outer = str(scope.get("root_path", ""))
             raw = scope.get("raw_path")
-            path = raw.decode("latin-1") if isinstance(raw, bytes) else scope["path"]
-            return {**scope, "path": path, "root_path": ""}
+            if isinstance(raw, bytes):
+                full = unquote(raw.decode("latin-1"))
+            else:
+                rest = str(scope["path"]).strip("/")
+                full = outer + mount + (f"/{rest}" if rest else "")
+            return {
+                **scope,
+                "path": full,
+                "root_path": outer + (base if mount == base else ""),
+            }
 
         @asgi(
             path=auth.config.base_path.rstrip("/") or "/",
@@ -152,13 +184,13 @@ class GotAuthPlugin(InitPluginProtocol):
             copy_scope=True,
         )
         async def gotauth(scope: Any, receive: Any, send: Any) -> None:  # Any: ASGI
-            await auth_app(original(scope), receive, send)
+            await auth_app(mounted(scope, base), receive, send)
 
         # At "/.well-known", not "/": a Litestar mount at "/" takes every request,
         # app routes included. Every GotAuth well-known document lives below it.
         @asgi(path="/.well-known", is_mount=True, copy_scope=True)
         async def gotauth_well_known(scope: Any, receive: Any, send: Any) -> None:
-            await well_known_app(original(scope), receive, send)
+            await well_known_app(mounted(scope, "/.well-known"), receive, send)
 
         app_config.route_handlers.extend([gotauth, gotauth_well_known])
         app_config.dependencies.update(
@@ -173,5 +205,8 @@ class GotAuthPlugin(InitPluginProtocol):
         )
         handlers[AuthError] = _handle_auth_error
         app_config.state["gotauth"] = auth
+        app_config.before_send.append(_add_cookies)
+        # Mounted apps never see lifespan events: wait for deliveries here.
+        app_config.on_shutdown.append(auth.drain)
         app_config.signature_namespace.update({"Principal": Principal, "User": User})
         return app_config

@@ -15,7 +15,11 @@ from starlette.authentication import requires
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-from gotauth.integrations.asgi.starlette import gotauth_middleware, requires_scopes
+from gotauth.integrations.asgi.starlette import (
+    gotauth_lifespan,
+    gotauth_middleware,
+    requires_scopes,
+)
 
 
 @requires("authenticated")
@@ -36,6 +40,7 @@ app = Starlette(
         Mount("/", app=auth.well_known()),  # last, so your routes keep priority
     ],
     middleware=[gotauth_middleware(auth)],
+    lifespan=gotauth_lifespan(auth),  # waits for background deliveries on shutdown
 )
 ```
 
@@ -47,8 +52,14 @@ app = Starlette(
 - Sessions have full rights, which Starlette's `@requires("projects:read")` cannot
   express; use `requires_scopes(...)`, which lets sessions through and answers 401 or
   403 `INSUFFICIENT_SCOPE` (with `details.required`) in GotAuth's error shape.
-- A bad credential answers with the GotAuth error (for example 401
-  `API_KEY_INVALID`); an unexpected failure is 500 `INTERNAL_ERROR`, never a user.
+- Requests under `base_path` skip the middleware: the mounted auth app authenticates
+  itself, so sign-in and sign-up work even when a stale credential is sent.
+- A bad or rejected credential (an unknown key, a banned user) makes the request
+  anonymous, so public routes still answer; `requires_scopes` then answers with that
+  error (for example 401 `API_KEY_INVALID`). An unexpected failure is 500
+  `INTERNAL_ERROR`, never a user.
+- When reading the session slides it, the refreshed cookie is added to your route's
+  response, so active users stay signed in.
 
 ## Litestar (`pip install "gotauth[litestar]"`)
 
@@ -79,3 +90,7 @@ app = Litestar(route_handlers=[me, projects], plugins=[GotAuthPlugin(auth)])
 - Dependencies: `principal` (`Principal | None`) and `current_user` (`User`, 401
   without a session). Guards: `requires_session` and `requires_scopes(*scopes)`.
 - `AuthError` is rendered in GotAuth's error shape.
+- A sliding session refresh's cookie is added to the response (`before_send`), and
+  `auth.drain()` runs on shutdown.
+- The mounts rebuild the request path from `raw_path` (Litestar strips the mount
+  path), so the app also works when mounted under another ASGI app.

@@ -25,7 +25,8 @@ Example::
 from __future__ import annotations
 
 import functools
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from starlette.authentication import (
@@ -38,24 +39,35 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import HTTPConnection
 from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocket
 
 from gotauth.contracts.errors import AuthError
 from gotauth.contracts.principal import Principal
-from gotauth.integrations.asgi._common import error_payload, missing_scopes, resolve
+from gotauth.integrations.asgi._common import (
+    error_payload,
+    missing_scopes,
+    pending_cookies,
+    resolve,
+)
 
 if TYPE_CHECKING:
     from gotauth.contracts.config import GotAuthInstance as GotAuth
 
 __all__ = [
     "GotAuthBackend",
+    "GotAuthMiddleware",
     "GotAuthUser",
+    "gotauth_lifespan",
     "gotauth_middleware",
     "on_error",
     "requires_scopes",
 ]
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+
+ERROR_KEY = "gotauth.auth_error"
+"""Scope key holding the error of a rejected credential (the user is anonymous)."""
 
 
 class GotAuthUser(BaseUser):
@@ -95,8 +107,9 @@ class _GotAuthFailure(AuthenticationError):
 class GotAuthBackend(AuthenticationBackend):
     """Resolves the principal with ``auth.get_principal`` for HTTP and WebSockets.
 
-    No credential: Starlette's anonymous user. A bad credential: ``on_error`` answers
-    with the GotAuth error. An unexpected failure: 500 ``INTERNAL_ERROR``, never a user.
+    No credential, or a bad or rejected one: Starlette's anonymous user (the error is
+    kept for ``requires_scopes``). An unexpected failure: 500 ``INTERNAL_ERROR``, never
+    a user.
     """
 
     def __init__(self, auth: GotAuth) -> None:
@@ -105,9 +118,15 @@ class GotAuthBackend(AuthenticationBackend):
     async def authenticate(
         self, conn: HTTPConnection
     ) -> tuple[AuthCredentials, BaseUser] | None:
+        scope = cast(dict[str, Any], conn.scope)
         try:
-            principal = await resolve(self._auth, conn.scope.get("headers", []))
+            principal = await resolve(self._auth, scope.get("headers", []), scope)
         except AuthError as error:
+            if error.status in (401, 403):
+                # A bad or rejected credential: anonymous here, so public routes still
+                # answer; requires_scopes reports this error.
+                scope[ERROR_KEY] = error
+                return None
             raise _GotAuthFailure(error) from error
         if principal is None:
             return None
@@ -129,11 +148,60 @@ def on_error(conn: HTTPConnection, exc: AuthenticationError) -> Response:
     return Response(content=payload, status_code=status, headers=headers)
 
 
+class GotAuthMiddleware:
+    """``AuthenticationMiddleware`` with the GotAuth backend, plus two things it cannot
+    do: requests under ``base_path`` skip it (the mounted auth app authenticates
+    itself), and a sliding session refresh's cookie is added to the response."""
+
+    def __init__(self, app: ASGIApp, auth: GotAuth) -> None:
+        self._app = app
+        self._base = auth.config.base_path.rstrip("/")
+        self._authenticated = AuthenticationMiddleware(
+            app, backend=GotAuthBackend(auth), on_error=on_error
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self._app(scope, receive, send)
+            return
+        path = str(scope.get("path", ""))
+        root = str(scope.get("root_path", ""))
+        if root and path.startswith(root):
+            path = path[len(root) :]
+        if self._base and (path == self._base or path.startswith(self._base + "/")):
+            await self._app(scope, receive, send)
+            return
+
+        async def send_with_cookies(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                extra = [(b"set-cookie", value) for value in pending_cookies(scope)]
+                if extra:
+                    message = {
+                        **message,
+                        "headers": [*message.get("headers", []), *extra],
+                    }
+            await send(message)
+
+        await self._authenticated(scope, receive, send_with_cookies)
+
+
 def gotauth_middleware(auth: GotAuth) -> Middleware:
-    """``AuthenticationMiddleware`` with the GotAuth backend and error handler."""
-    return Middleware(
-        AuthenticationMiddleware, backend=GotAuthBackend(auth), on_error=on_error
-    )
+    """The GotAuth middleware for ``Starlette(middleware=[...])``."""
+    return Middleware(GotAuthMiddleware, auth=auth)
+
+
+def gotauth_lifespan(
+    auth: GotAuth,
+) -> Callable[[Any], AbstractAsyncContextManager[None]]:
+    """A ``Starlette(lifespan=...)`` that waits for background email and event
+    deliveries (``auth.drain()``) on shutdown."""
+
+    @asynccontextmanager
+    async def lifespan(_: Any) -> AsyncGenerator[None]:  # Any: the app
+        yield
+        await auth.drain()
+
+    return lifespan
 
 
 def _error_response(error: AuthError) -> Response:
@@ -160,7 +228,12 @@ def requires_scopes(*scopes: str) -> Callable[[F], F]:
                 raise TypeError(msg)
             user = conn.user if "user" in conn.scope else None
             if not isinstance(user, GotAuthUser):
-                error = AuthError("UNAUTHENTICATED", 401)
+                rejected = conn.scope.get(ERROR_KEY)
+                error = (
+                    rejected
+                    if isinstance(rejected, AuthError)
+                    else AuthError("UNAUTHENTICATED", 401)
+                )
             else:
                 missing = missing_scopes(user.principal, wanted)
                 error = (
