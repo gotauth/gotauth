@@ -1,6 +1,9 @@
-"""Starlette and Litestar integration.
+"""Starlette and Litestar integration (work package A2).
 
-Skeleton created by work package F1. Work package A2 implements it.
+Import the framework module you use; this package itself imports neither::
+
+    from gotauth.integrations.asgi.starlette import gotauth_middleware, requires_scopes
+    from gotauth.integrations.asgi.litestar import GotAuthPlugin, requires_scopes
 """
 
 from __future__ import annotations
