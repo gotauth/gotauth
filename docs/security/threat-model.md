@@ -19,7 +19,7 @@ Test paths are relative to the repository root. `sec/` is short for `tests/secur
 **Common controls** (apply to every flow below):
 - **Hashed secrets.** Every bearer secret is stored only as a hash (CONTRACTS 7, 8). Test: `sec/test_raw_tokens.py::test_full_scenario_leaves_no_secret_behind`, with a self-test `test_scan_catches_a_raw_token_stored_on_purpose`.
 - **Origin check and content type.** Cookie writes need a trusted `Origin` or `Referer`, and JSON endpoints refuse other content types (10.1). Tests: `sec/test_requests.py::test_cookie_posts_need_a_trusted_origin`, `test_form_posts_to_json_endpoints_are_refused`.
-- **Rate limits.** On by default, and they ignore `X-Forwarded-For` unless `trusted_proxies` is set (10.2). Tests: `sec/test_limits_and_replay.py::test_sign_in_limit_with_retry_after_ignores_spoofed_ips`, `test_per_email_limits_hold_across_rotating_ips`.
+- **Rate limits.** On by default, and they ignore `X-Forwarded-For` unless `trusted_proxies` is set (10.2). Tests: `sec/test_limits_and_replay.py::test_sign_in_limit_with_retry_after`, `test_forwarded_ips_count_only_from_trusted_proxies`, `test_per_email_limits_hold_across_rotating_ips`.
 - **Errors.** No input values in errors, no 500 with details (6). Tests: `sec/test_fuzz.py::test_every_endpoint_survives_fuzzed_input`, `tests/core/test_pipeline.py::test_unexpected_errors_are_500_without_details`.
 - **Redirects.** Every redirect parameter goes through `validate_redirect` (10.1). Tests: `sec/test_requests.py::test_open_redirects_are_refused`, `test_wildcard_does_not_match_the_bare_domain_or_lookalikes`.
 

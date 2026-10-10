@@ -13,11 +13,26 @@ import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from gotauth.contracts import JWT_PREFIX, TOKEN_PREFIXES
 from gotauth.storage.sqlalchemy import create_missing, sqlalchemy_adapter
 
-from .conftest import PASSWORD, REDIRECT, RESOURCE, full_app, oauth_client, oauth_code
+from .conftest import (
+    PASSWORD,
+    RESOURCE,
+    full_app,
+    oauth_client,
+    oauth_code,
+    oauth_tokens,
+)
 
-PREFIXED = re.compile(r"\b(gas|gak|gar|gac|gav|gcs)_[A-Za-z0-9_-]{20,}")
+# Every registered token prefix, plus JWTs (O1 access and ID tokens) in their
+# three-part shape, so a base64 value that happens to start with "eyJ" is no match.
+_B64 = "[A-Za-z0-9_-]"
+_PREFIXES = "|".join(re.escape(p) for p in TOKEN_PREFIXES.values())
+PREFIXED = re.compile(
+    rf"(?<!{_B64})(({_PREFIXES}){_B64}{{20,}}"
+    rf"|{re.escape(JWT_PREFIX)}{_B64}+\.{_B64}+\.{_B64}+)"
+)
 
 
 def scan(
@@ -46,6 +61,8 @@ def test_scan_catches_a_raw_token_stored_on_purpose() -> None:
     assert scan({"session": [{"token_hash": token}]}, "", [token])
     assert scan({}, f"user signed in with {token}", [])
     assert scan({"x": [{"code": "482913"}]}, "", ["482913"])
+    assert scan({"oauth_token": [{"value": "eyJhbGci.eyJzdWIi.c2ln"}]}, "", [])
+    assert scan({"jwk": [{"private_key_enc": "v1.eyJabc.def"}]}, "", []) == []
     assert scan({"session": [{"token_hash": "f" * 64}]}, "", [token]) == []
 
 
@@ -75,16 +92,8 @@ async def test_full_scenario_leaves_no_secret_behind(
         client_id, client_secret = await oauth_client(app, "confidential")
         assert client_secret is not None
         code, verifier = await oauth_code(http, client_id, resource=RESOURCE)
-        tokens = await http.post(
-            "/oauth2/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "code_verifier": verifier,
-                "redirect_uri": REDIRECT,
-                "client_id": client_id,
-                "client_secret": client_secret,
-            },
+        tokens = await oauth_tokens(
+            http, client_id, code, verifier, client_secret=client_secret
         )
         await http.post(
             "/request-password-reset",
@@ -97,6 +106,8 @@ async def test_full_scenario_leaves_no_secret_behind(
             client_secret,
             code,
             tokens.json()["refresh_token"],
+            tokens.json()["access_token"],
+            tokens.json()["id_token"],
             app.last_token("reset_password"),
         ]
     tables = {name: await app.auth.database.find_many(name) for name in app.auth.schema}

@@ -14,7 +14,13 @@ import httpx
 from gotauth.contracts import ProviderUser
 from gotauth.plugins.api_key import api_key
 from gotauth.plugins.oauth_provider import oauth_provider
-from gotauth.testing import fake_clock, fake_mailer, fake_oauth_provider, make_auth
+from gotauth.testing import (
+    fake_clock,
+    fake_mailer,
+    fake_oauth_provider,
+    make_auth,
+    make_client,
+)
 
 PASSWORD = "correct horse battery"
 RESOURCE = "https://mcp.example.com/mcp"
@@ -27,18 +33,12 @@ class App:
     mailer: Any  # Any: CapturingMailer
     clock: Any  # Any: ManualClock
 
-    def client(
-        self, *, ip: str = "127.0.0.1", origin: bool = True
-    ) -> httpx.AsyncClient:
-        """A browser-like client; ``ip`` is the TCP peer address the app sees."""
-        config = self.auth.config
-        return httpx.AsyncClient(
-            transport=httpx.ASGITransport(
-                app=self.auth.asgi(), root_path=config.base_path, client=(ip, 51234)
-            ),
-            base_url=config.base_url.rstrip("/") + config.base_path,
-            headers={"origin": config.base_url.rstrip("/")} if origin else {},
-        )
+    def client(self, *, origin: bool = True) -> httpx.AsyncClient:
+        """``make_client``, optionally without its ``Origin`` header."""
+        http = make_client(self.auth)
+        if not origin:
+            del http.headers["origin"]
+        return http
 
     def last_token(self, kind: str, email: str = "ada@example.com") -> str:
         """The ``token`` query value of the newest email of a kind."""
@@ -129,3 +129,18 @@ async def oauth_code(
     )
     code = parse_qs(urlsplit(consent.headers["location"]).query)["code"][0]
     return code, verifier
+
+
+async def oauth_tokens(
+    http: httpx.AsyncClient, client_id: str, code: str, verifier: str, **form: str
+) -> httpx.Response:
+    """Exchange a code at ``/oauth2/token``; ``form`` adds or overrides fields."""
+    body = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "code_verifier": verifier,
+        "redirect_uri": REDIRECT,
+        "client_id": client_id,
+        **form,
+    }
+    return await http.post("/oauth2/token", data=body)

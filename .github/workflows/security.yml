@@ -54,6 +54,7 @@ jobs:
       # Memory, SQLite (in memory and on file) and Postgres run the same suite.
       # A skipped Postgres class would hide a missing backend, so it fails the job.
       - name: Conformance (memory, SQLite, Postgres) and tests/security
+        shell: bash # -eo pipefail, so a pytest failure is not hidden by tee
         run: |
           uv run pytest tests/storage tests/security -m "not timing" -rs | tee pytest.log
           if grep -q "GOTAUTH_TEST_POSTGRES_URL is not set" pytest.log; then

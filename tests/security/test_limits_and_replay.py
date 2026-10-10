@@ -4,18 +4,33 @@ from __future__ import annotations
 
 import pytest
 
-from .conftest import PASSWORD, REDIRECT, full_app, oauth_client, oauth_code
+from .conftest import PASSWORD, App, full_app, oauth_client, oauth_code, oauth_tokens
+
+XFF = {"ip_headers": ("x-forwarded-for",)}
 
 
-async def test_sign_in_limit_with_retry_after_ignores_spoofed_ips() -> None:
+async def statuses_with_rotating_xff(
+    app: App, path: str, body: dict[str, str]
+) -> list[int]:
+    """Send 11 requests, each with a different X-Forwarded-For address."""
+    async with app.client() as http:
+        return [
+            (
+                await http.post(
+                    path, json=body, headers={"x-forwarded-for": f"198.51.100.{i + 1}"}
+                )
+            ).status_code
+            for i in range(11)
+        ]
+
+
+async def test_sign_in_limit_with_retry_after() -> None:
     app = full_app()
     async with app.client() as http:
         responses = [
             await http.post(
                 "/sign-in/email",
                 json={"email": f"user{i}@example.com", "password": "wrong password"},
-                # No trusted_proxies, so the header must be ignored.
-                headers={"x-forwarded-for": f"203.0.113.{i}"},
             )
             for i in range(6)
         ]
@@ -23,6 +38,23 @@ async def test_sign_in_limit_with_retry_after_ignores_spoofed_ips() -> None:
     limited = responses[-1]
     assert int(limited.headers["retry-after"]) > 0
     assert limited.json()["error"]["code"] == "RATE_LIMITED"
+
+
+async def test_forwarded_ips_count_only_from_trusted_proxies() -> None:
+    # The header is configured but the peer (127.0.0.1) is not a trusted proxy, so
+    # rotating the header must not spread the requests over several IPs.
+    path = "/request-password-reset"
+    untrusted = full_app(advanced=XFF)
+    statuses = await statuses_with_rotating_xff(
+        untrusted, path, {"email": "x@example.com", "redirect_to": "/reset"}
+    )
+    assert statuses[:5] == [200] * 5 and statuses[5] == 429
+    # Control: once the peer is trusted, each address gets its own window.
+    trusted = full_app(advanced={**XFF, "trusted_proxies": ("127.0.0.1",)})
+    statuses = await statuses_with_rotating_xff(
+        trusted, path, {"email": "x@example.com", "redirect_to": "/reset"}
+    )
+    assert statuses[:10] == [200] * 10
 
 
 @pytest.mark.parametrize(
@@ -35,12 +67,11 @@ async def test_sign_in_limit_with_retry_after_ignores_spoofed_ips() -> None:
 async def test_per_email_limits_hold_across_rotating_ips(
     path: str, body: dict[str, str]
 ) -> None:
-    app = full_app()
-    statuses: list[int] = []
-    for i in range(11):
-        async with app.client(ip=f"198.51.100.{i + 1}") as http:
-            response = await http.post(path, json={"email": "ada@example.com", **body})
-            statuses.append(response.status_code)
+    # Distinct client IPs as GotAuth resolves them, through a trusted proxy.
+    app = full_app(advanced={**XFF, "trusted_proxies": ("127.0.0.1",)})
+    statuses = await statuses_with_rotating_xff(
+        app, path, {"email": "ada@example.com", **body}
+    )
     assert 429 not in statuses[:10]
     assert statuses[10] == 429
 
@@ -81,15 +112,8 @@ async def test_a_replayed_code_revokes_what_it_produced() -> None:
         await app.verified_user(http)
         client_id, _ = await oauth_client(app)
         code, verifier = await oauth_code(http, client_id)
-        exchange = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "code_verifier": verifier,
-            "redirect_uri": REDIRECT,
-            "client_id": client_id,
-        }
-        tokens = (await http.post("/oauth2/token", data=exchange)).json()
-        replay = await http.post("/oauth2/token", data=exchange)
+        tokens = (await oauth_tokens(http, client_id, code, verifier)).json()
+        replay = await oauth_tokens(http, client_id, code, verifier)
     assert replay.json()["error"] == "invalid_grant"
     result = await app.auth.api.call(
         "verify_access_token", body={"token": tokens["access_token"]}
@@ -103,18 +127,7 @@ async def test_a_replayed_refresh_token_revokes_the_family() -> None:
         await app.verified_user(http)
         client_id, _ = await oauth_client(app)
         code, verifier = await oauth_code(http, client_id)
-        first = (
-            await http.post(
-                "/oauth2/token",
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "code_verifier": verifier,
-                    "redirect_uri": REDIRECT,
-                    "client_id": client_id,
-                },
-            )
-        ).json()
+        first = (await oauth_tokens(http, client_id, code, verifier)).json()
 
         async def refresh(token: str) -> dict[str, str]:
             form = {

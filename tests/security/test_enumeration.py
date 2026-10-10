@@ -21,10 +21,11 @@ async def test_same_status_and_body_for_known_and_unknown_emails() -> None:
     async with app.client() as http:
         await app.verified_user(http)
         http.cookies.clear()
+        # Sign-up last: it creates the unknown account.
         cases = [
-            ("/sign-up/email", {"password": PASSWORD}),
             ("/send-verification-email", {}),
             ("/request-password-reset", {"redirect_to": "/reset"}),
+            ("/sign-up/email", {"password": PASSWORD}),
         ]
         for path, extra in cases:
             known = await http.post(path, json={"email": "ada@example.com", **extra})

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
@@ -19,10 +20,24 @@ from .conftest import full_app
 
 MARKER = "zqxmarker"
 _PARAM = re.compile(r"\{(\w+)\}")
+# Endpoints that can end the test's session or delete its fixtures run last, so every
+# other session endpoint is fuzzed past the auth check.
+LAST = ("delete_api_key", "delete_user", "sign_out")
 
 
 def endpoints(auth: Any) -> list[Endpoint[Any, Any]]:  # Any: GotAuth
-    return [e for plugin in auth.plugins for e in plugin.endpoints if not e.server_only]
+    """Every HTTP endpoint, the session-ending ones last in ``LAST`` order."""
+    found = [
+        e
+        for plugin in auth.plugins
+        for e in (*plugin.endpoints, *plugin.well_known_endpoints)
+        if not e.server_only
+    ]
+    return sorted(found, key=lambda e: LAST.index(e.id) + 1 if e.id in LAST else 0)
+
+
+def is_well_known(endpoint: Endpoint[Any, Any]) -> bool:
+    return endpoint.path.startswith("/.well-known/") and "{base_path}" in endpoint.path
 
 
 values = st.one_of(
@@ -46,17 +61,16 @@ def problems(endpoint: Endpoint[Any, Any], response: httpx.Response) -> list[str
     found: list[str] = []
     if response.status_code >= 500:
         found.append(f"{endpoint.id}: HTTP {response.status_code}")
-    if response.status_code >= 400 and response.headers.get(
-        "content-type", ""
-    ).startswith("application/json"):
+    if response.status_code < 400:
+        return found
+    # Any content type: an HTML error page that prints input is reflected XSS.
+    if MARKER in response.text:
+        found.append(f"{endpoint.id}: input echoed in the error")
+    if response.headers.get("content-type", "").startswith("application/json"):
         body = response.json()
         bearer = response.headers.get("www-authenticate", "").startswith("Bearer ")
         if endpoint.error_format == "oauth" or bearer:  # RFC 6749 / RFC 6750
-            if (
-                not isinstance(body, dict)
-                or "error" not in body
-                or not isinstance(body["error"], str)
-            ):
+            if not (isinstance(body, dict) and isinstance(body.get("error"), str)):
                 found.append(f"{endpoint.id}: not an RFC 6749 error")
         elif not (
             isinstance(body, dict)
@@ -64,15 +78,17 @@ def problems(endpoint: Endpoint[Any, Any], response: httpx.Response) -> list[str
             and "code" in body["error"]
         ):
             found.append(f"{endpoint.id}: not a section 6 error")
-        if MARKER in json.dumps(body):
-            found.append(f"{endpoint.id}: input echoed in the error")
     return found
 
 
 async def send(
-    http: httpx.AsyncClient, endpoint: Endpoint[Any, Any], body: dict[str, Any]
-) -> httpx.Response:  # Any: JSON
-    path = _PARAM.sub("x", endpoint.path)
+    http: httpx.AsyncClient,
+    endpoint: Endpoint[Any, Any],
+    body: dict[str, Any],  # Any: JSON
+    params: Mapping[str, str] | None = None,
+) -> httpx.Response:
+    """Send ``body`` as the endpoint expects it; ``params`` fill the path."""
+    path = _PARAM.sub(lambda m: (params or {}).get(m.group(1), "x"), endpoint.path)
     if endpoint.method == "GET":
         query = {
             k: json.dumps(v) if not isinstance(v, str) else v for k, v in body.items()
@@ -92,12 +108,26 @@ async def send(
 @given(data=st.data())
 async def test_every_endpoint_survives_fuzzed_input(data: st.DataObject) -> None:
     app = full_app(rate_limit={"enabled": False})
-    targets = endpoints(app.auth)
-    async with app.client() as http:
+    config = app.auth.config
+    root = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app.auth.well_known()),
+        base_url=config.base_url.rstrip("/"),
+    )
+    async with app.client() as http, root:
         await app.verified_user(http)  # a session, so session endpoints get past auth
-        for endpoint in targets:
+        key = await http.post("/api-keys", json={"name": "fuzz"})
+        params = {
+            "provider": "fake",
+            "id": key.json()["api_key"]["id"],
+            "base_path": config.base_path,
+        }
+        for endpoint in endpoints(app.auth):
+            if endpoint.id == LAST[0]:
+                session = await http.get("/session")
+                assert session.json() is not None, "the session ended before LAST"
             body = data.draw(bodies(endpoint), label=endpoint.id)
-            response = await send(http, endpoint, body)
+            client = root if is_well_known(endpoint) else http
+            response = await send(client, endpoint, body, params)
             assert problems(endpoint, response) == []
 
 
@@ -127,3 +157,11 @@ async def test_broken_bodies_are_400s(bad: bytes) -> None:
             "/sign-in/email", content=bad, headers={"content-type": "application/json"}
         )
     assert response.status_code == 400
+
+
+def test_the_harness_catches_input_echoed_in_an_html_page() -> None:
+    page = httpx.Response(
+        400, html=f"<p>Unknown client {MARKER}abc</p>"
+    )  # reflected XSS shape
+    endpoint = Endpoint("page", "GET", "/page", None)  # type: ignore[arg-type]
+    assert problems(endpoint, page) == ["page: input echoed in the error"]

@@ -22,7 +22,16 @@ import pytest
 import respx
 from cryptography.hazmat.primitives import serialization
 
-from .conftest import REDIRECT, RESOURCE, App, full_app, oauth_client, oauth_code, pkce
+from .conftest import (
+    REDIRECT,
+    RESOURCE,
+    App,
+    full_app,
+    oauth_client,
+    oauth_code,
+    oauth_tokens,
+    pkce,
+)
 
 
 def _b64(data: bytes) -> str:
@@ -37,17 +46,7 @@ def server_of(app: App) -> Any:  # Any: the plugin's private server object
 async def issued(app: App, http: httpx.AsyncClient) -> dict[str, Any]:  # Any: JSON
     client_id, _ = await oauth_client(app)
     code, verifier = await oauth_code(http, client_id, resource=RESOURCE)
-    response = await http.post(
-        "/oauth2/token",
-        data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "code_verifier": verifier,
-            "redirect_uri": REDIRECT,
-            "client_id": client_id,
-        },
-    )
-    return response.json()
+    return (await oauth_tokens(http, client_id, code, verifier)).json()
 
 
 async def accepted(app: App, token: str) -> bool:
@@ -96,15 +95,8 @@ async def test_code_is_bound_to_its_redirect_uri() -> None:
         await app.verified_user(http)
         client_id, _ = await oauth_client(app)
         code, verifier = await oauth_code(http, client_id)
-        response = await http.post(
-            "/oauth2/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "code_verifier": verifier,
-                "redirect_uri": REDIRECT + "/other",
-                "client_id": client_id,
-            },
+        response = await oauth_tokens(
+            http, client_id, code, verifier, redirect_uri=REDIRECT + "/other"
         )
     assert response.json()["error"] == "invalid_grant"
 

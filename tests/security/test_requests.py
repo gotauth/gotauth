@@ -92,7 +92,7 @@ async def test_oauth_consent_needs_a_trusted_origin() -> None:
         "/\\evil.example.com",
         "https:evil.example.com",
         "javascript:alert(1)",
-        "https://user@localhost:8000/x",
+        "http://user@localhost:8000/x",
         "https://evil.example.com/x",
         "http://evil.example.com/x",
         " /x",
