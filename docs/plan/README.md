@@ -274,6 +274,7 @@ Agents load these skills with the Skill tool before starting, and list them in t
 | D2 part 1 | done | `f14b106` | shadcn registry: typed client (core + API keys), `useSession`, WebAuthn helpers, SignInForm, SignUpForm, SocialButtons, UserButton, SessionList, ApiKeyManager; Next.js 16 and Vite 8 fixtures build. `code-review`: 8 findings, all fixed. Part 2 waits for P2, P3, P5, O1 |
 | A1 | done | `bbcd86b` | FastAPI integration: router with full OpenAPI (custom APIRoute, validation stays 400), `current_user`/`optional_user`/`current_session`/`current_principal`/`api_key_principal`, `require()`, exception handlers, `check_app`. `code-review`: 4 findings, all fixed |
 | A2 | done | `290f108` | Starlette backend, middleware, `requires_scopes`, lifespan; Litestar plugin with mounts at `base_path` and `/.well-known`, dependencies, guards, refresh cookies and shutdown drain. `code-review`: 5 findings, all fixed |
-| O1, Q1 | not started | | Wave 2 |
+| O1 | done | `91b4b5c` | OAuth 2.1 server + OIDC provider: code + PKCE, consent (page, own page, JSON), refresh rotation, client credentials, ES256 tokens and key rotation, introspection, revocation, userinfo, discovery, CIMD behind an SSRF guard, RFC 8707 resources, optional DCR; conformance app for Q1. Accepted CCR 003 (`auth_time`), `CONTRACT_VERSION` 3. `code-review`: 8 findings, 7 fixed, 1 documented; `security-review`: none |
+| Q1 | not started | | Wave 2 |
 | P2, P3, P4, P5, P6, O2, O3, I1, G2, G4, Q2, G5 | not started | | Wave 3 |
 | O4, E1, A3, S2, B1, X | not started | | Only after the post-launch test |
