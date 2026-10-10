@@ -1,0 +1,108 @@
+# Security checks (work package Q1): adapter conformance on every backend, the
+# security suite, a dependency audit, and the timing tests in their own job.
+# Actions are pinned by commit SHA; the comment names the release.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1" # Mondays: new advisories can appear without a code change
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep equal to the uv image tag in docker/dev.Dockerfile.
+  UV_VERSION: "0.12.22"
+  FORCE_COLOR: "1"
+
+jobs:
+  conformance:
+    name: Adapter conformance and security tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gotauth
+          POSTGRES_PASSWORD: gotauth
+          POSTGRES_DB: gotauth
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gotauth -d gotauth"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      GOTAUTH_TEST_POSTGRES_URL: postgresql://gotauth:gotauth@localhost:5432/gotauth
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked --all-extras
+      # Memory, SQLite (in memory and on file) and Postgres run the same suite.
+      # A skipped Postgres class would hide a missing backend, so it fails the job.
+      - name: Conformance (memory, SQLite, Postgres) and tests/security
+        shell: bash # -eo pipefail, so a pytest failure is not hidden by tee
+        run: |
+          uv run pytest tests/storage tests/security -m "not timing" -rs | tee pytest.log
+          if grep -q "GOTAUTH_TEST_POSTGRES_URL is not set" pytest.log; then
+            echo "::error::the Postgres conformance tests were skipped"
+            exit 1
+          fi
+
+  audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Install every extra (fails if uv.lock is out of date)
+        run: uv sync --locked --all-extras
+      # Audits the locked environment; gotauth itself is installed editable.
+      - name: Audit
+        run: uv run pip-audit --skip-editable --progress-spinner off
+
+  timing:
+    name: Timing tests (not a merge blocker)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Noisy on shared runners: reported, not required (Q1 brief). Make it required
+    # once it has been stable for a month.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked --all-extras
+      - name: Timing tests (up to 3 attempts)
+        run: |
+          for attempt in 1 2 3; do
+            if uv run pytest tests/security -m timing -p no:randomly -rxX; then
+              exit 0
+            fi
+            echo "attempt $attempt failed"
+          done
+          exit 1
