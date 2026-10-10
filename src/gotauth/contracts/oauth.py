@@ -146,6 +146,8 @@ OAUTH_CODE_MODEL = ModelSchema(
         resource=Field("string", required=False),
         code_challenge=Field("string"),
         nonce=Field("string", required=False),
+        # When the user signed in (the session's created_at), for the ID token.
+        auth_time=Field("datetime", required=False),
         expires_at=Field("datetime"),  # now + 60s
     ),
 )
@@ -163,6 +165,8 @@ OAUTH_TOKEN_MODEL = ModelSchema(
         agent_id=Field("string", required=False),
         scopes=Field("string_list"),
         resource=Field("string", required=False),
+        # Carried from the code through refreshes, for ID tokens (CCR 003).
+        auth_time=Field("datetime", required=False),
         expires_at=Field("datetime"),
         revoked_at=Field("datetime", required=False),
         created_at=Field("datetime"),

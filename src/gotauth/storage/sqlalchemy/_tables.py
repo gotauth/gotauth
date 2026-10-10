@@ -89,7 +89,9 @@ def _column_type(field: Field) -> TypeEngine[Any]:  # Any: column values
 
 def _column(name: str, field: Field, schema: Schema, table_prefix: str) -> Column[Any]:
     args: list[Any] = []
-    if field.references is not None:
+    # A reference to a model outside the schema (for example oauth_client.agent_id
+    # without the agent plugin) is a plain column, as in the memory adapter.
+    if field.references is not None and field.references.model in schema:
         target = schema[field.references.model]
         args.append(
             ForeignKey(
