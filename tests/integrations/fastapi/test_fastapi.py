@@ -4,6 +4,7 @@ No ``from __future__ import annotations``: FastAPI resolves the route annotation
 including aliases defined inside functions, at runtime.
 """
 
+import importlib.metadata
 import json
 import subprocess
 import sys
@@ -16,6 +17,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from packaging.requirements import Requirement
 
 from gotauth.contracts import (
     CORE_ENDPOINTS,
@@ -515,3 +517,14 @@ async def test_permission_lookup_failures_are_json_500s() -> None:
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "INTERNAL_ERROR"
     assert "database down" not in response.text
+
+
+def test_the_fastapi_extra_brings_form_support() -> None:
+    # The router declares form inputs (OAuth form posts), and FastAPI refuses those
+    # without python-multipart. The dev environment gets it through other extras, so
+    # check the published metadata instead of importing.
+    requires = [Requirement(r) for r in importlib.metadata.requires("gotauth") or []]
+    fastapi_extra = {
+        r.name for r in requires if r.marker and r.marker.evaluate({"extra": "fastapi"})
+    }
+    assert "python-multipart" in fastapi_extra, fastapi_extra
