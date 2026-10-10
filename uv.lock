@@ -1054,6 +1054,7 @@ bcrypt = [
 ]
 fastapi = [
     { name = "fastapi" },
+    { name = "python-multipart" },
 ]
 litestar = [
     { name = "litestar" },
@@ -1126,6 +1127,7 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pyjwt", specifier = ">=2.10" },
+    { name = "python-multipart", marker = "extra == 'fastapi'", specifier = ">=0.0.18" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=5.2" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sqlalchemy'", specifier = ">=2.0.36" },
     { name = "starlette", marker = "extra == 'starlette'", specifier = ">=0.46" },

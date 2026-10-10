@@ -51,7 +51,8 @@ dependencies = [
 [project.optional-dependencies]
 argon2 = ["argon2-cffi>=23.1"]
 bcrypt = ["bcrypt>=4.2"]
-fastapi = ["fastapi>=0.115"]
+# python-multipart: FastAPI needs it for routes with form inputs (OAuth form posts).
+fastapi = ["fastapi>=0.115", "python-multipart>=0.0.18"]
 litestar = ["litestar>=2.12"]
 mcp = ["fastmcp>=4", "mcp>=2"]
 passkey = ["webauthn>=3"]
