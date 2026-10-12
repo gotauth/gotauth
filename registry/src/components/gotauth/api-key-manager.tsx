@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table"
 import { useGotAuthClient } from "@/components/gotauth/gotauth-provider"
 import { FormMessage } from "@/components/gotauth/form-message"
-import type { ApiKeyOut, GotAuthError } from "@/lib/gotauth-client"
+import type { ApiKeyListOut, ApiKeyOut, GotAuthError, Result } from "@/lib/gotauth-client"
 
 /** Create, list and delete API keys. A new key is shown once and then dropped. */
 export function ApiKeyManager({
@@ -47,17 +47,26 @@ export function ApiKeyManager({
   const [copied, setCopied] = useState<"yes" | "failed" | null>(null)
   const [pending, setPending] = useState(false)
 
-  const load = useCallback(async () => {
-    const result = await client.apiKeys.listApiKeys(
-      organizationId ? { organization_id: organizationId } : {},
-    )
+  const fetchKeys = useCallback(
+    () => client.apiKeys.listApiKeys(organizationId ? { organization_id: organizationId } : {}),
+    [client, organizationId],
+  )
+  const show = useCallback((result: Result<ApiKeyListOut>) => {
     if (result.error) setError(result.error)
     else setKeys(result.data.api_keys)
-  }, [client, organizationId])
+  }, [])
+  const load = useCallback(async () => show(await fetchKeys()), [fetchKeys, show])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    // State is set in the callback, so it never changes during the effect itself.
+    let live = true
+    void fetchKeys().then((result) => {
+      if (live) show(result)
+    })
+    return () => {
+      live = false
+    }
+  }, [fetchKeys, show])
 
   function onOpenChange(next: boolean) {
     setOpen(next)
@@ -119,7 +128,7 @@ export function ApiKeyManager({
                 <DialogHeader>
                   <DialogTitle>Copy your new key</DialogTitle>
                   <DialogDescription>
-                    This is the only time it's shown. Store it somewhere safe.
+                    This is the only time it is shown. Store it somewhere safe.
                   </DialogDescription>
                 </DialogHeader>
                 <Alert>
@@ -148,7 +157,7 @@ export function ApiKeyManager({
               <form className="grid gap-4" onSubmit={(event) => void create(event)}>
                 <DialogHeader>
                   <DialogTitle>Create an API key</DialogTitle>
-                  <DialogDescription>Give it a name you'll recognize later.</DialogDescription>
+                  <DialogDescription>Give it a name you will recognize later.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-2">
                   <Label htmlFor={`${id}-name`}>Name</Label>
