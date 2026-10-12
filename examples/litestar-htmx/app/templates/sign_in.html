@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+  <h1>Sign in</h1>
+  <form hx-post="/api/auth/sign-in/email" hx-swap="none" data-done="redirect" data-to="/">
+    <label>Email <input name="email" type="email" autocomplete="email" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <button>Sign in</button>
+  </form>
+  <p>No account? <a href="/sign-up">Create one</a>.</p>
+{% endblock %}

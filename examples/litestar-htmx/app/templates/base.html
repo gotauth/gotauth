@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}GotAuth + Litestar{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@2.0.11/dist/htmx.min.js"
+          integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg"
+          crossorigin="anonymous"></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body hx-ext="gotauth-json">
+  <header>
+    <nav><a href="/">Home</a> <a href="/keys">API keys</a></nav>
+    {% if session %}
+      <span>{{ session.user.email }}</span>
+      <button hx-post="/api/auth/sign-out" hx-swap="none" data-done="redirect" data-to="/">Sign out</button>
+    {% else %}
+      <a href="/sign-in">Sign in</a>
+    {% endif %}
+  </header>
+  <main>
+    <p id="message" role="alert"></p>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

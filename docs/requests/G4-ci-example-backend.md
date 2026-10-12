@@ -8,8 +8,8 @@
 
 ## What
 Add a CI job for Python example backends. They are separate uv projects, not part of the root project, so `poe test` never runs their tests:
-- `examples/fastapi-nextjs/backend/` now
-- `examples/litestar-htmx/` and O2's `examples/fastmcp-server/` later
+- `examples/fastapi-nextjs/backend/` and `examples/litestar-htmx/` now
+- O2's `examples/fastmcp-server/` later
 
 The frontends are already covered by the `node` job.
 
@@ -21,7 +21,7 @@ The frontends are already covered by the `node` job.
     strategy:
       fail-fast: false
       matrix:
-        project: [examples/fastapi-nextjs/backend]
+        project: [examples/fastapi-nextjs/backend, examples/litestar-htmx]
     services:
       postgres: # same service block as the test job
     env:
