@@ -1,0 +1,66 @@
+# Release of the npm package "gotauth" (registry/npm, the typed fetch client).
+# Push a tag js-vX.Y.Z whose version matches registry/npm/package.json.
+# Publishes with npm trusted publishing (OIDC) and provenance. Until a trusted
+# publisher is set up on npmjs.com, the "npm" environment's NPM_TOKEN secret is used
+# (npm only offers trusted publishing for a package that already exists).
+# Actions are pinned by commit SHA; the comment names the release.
+name: Release npm
+
+on:
+  push:
+    tags: ["js-v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish gotauth to npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/gotauth
+    permissions:
+      contents: read
+      id-token: write # trusted publishing and provenance
+    defaults:
+      run:
+        working-directory: registry
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Keep equal to the node image tag in docker/dev.Dockerfile.
+          node-version: "24.21.0"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+      - name: Enable pnpm (version from the "packageManager" field)
+        run: corepack enable pnpm
+      - name: Install (fails if pnpm-lock.yaml is out of date)
+        run: pnpm install --frozen-lockfile
+      - name: Tag and package version agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(node -p "require('./npm/package.json').version")"
+          if [ "$TAG" != "js-v$version" ]; then
+            echo "::error::tag $TAG does not match registry/npm/package.json version $version"
+            exit 1
+          fi
+      - name: Build and smoke-test the package
+        run: pnpm run build:npm
+      - name: Publish
+        working-directory: registry/npm
+        env:
+          # Empty once trusted publishing is set up; npm then uses OIDC.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance

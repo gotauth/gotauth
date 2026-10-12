@@ -63,3 +63,9 @@ Run in the dev container:
 ./dev.sh pnpm --dir registry test
 ./dev.sh pnpm --dir registry build
 ```
+
+## npm package `gotauth`
+
+`registry/npm/` publishes the typed fetch client (`src/lib/gotauth-client.ts`, the same file the registry items use) as the npm package `gotauth`. `pnpm build:npm` compiles it to `npm/dist/`, copies the root `LICENSE` and imports the result once as a smoke test; `pnpm check` runs it too.
+
+To release: set `version` in `npm/package.json`, merge, then push a tag `js-v<version>`. `.github/workflows/npm-release.yml` publishes it with provenance.

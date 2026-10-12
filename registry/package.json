@@ -13,8 +13,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "build": "shadcn build",
+    "build:npm": "node scripts/build-npm.mjs",
     "fixtures": "node scripts/install-fixtures.mjs && tsc --noEmit -p fixtures/next-app && tsc --noEmit -p fixtures/vite-react && next build fixtures/next-app && vite build fixtures/vite-react",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run fixtures"
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:npm && pnpm run fixtures"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

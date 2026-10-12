@@ -1,0 +1,15 @@
+{
+  // Compiles the registry's client (the single source) for the npm package "gotauth".
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "declaration": true,
+    "rootDir": "../src/lib",
+    "outDir": "dist",
+    "skipLibCheck": true
+  },
+  "files": ["../src/lib/gotauth-client.ts"]
+}

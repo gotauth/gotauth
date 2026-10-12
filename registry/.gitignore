@@ -1,2 +1,5 @@
 # Built by `pnpm build` (shadcn build).
 public/r/
+# Built by `pnpm build:npm` (the npm package "gotauth"; LICENSE is copied from the root).
+npm/dist/
+npm/LICENSE
