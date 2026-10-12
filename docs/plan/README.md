@@ -8,7 +8,7 @@
 >
 > All of it lives in your own database, as a library inside your FastAPI app.
 >
-> Strategy, positioning and marketing are in [`../build-plan.md`](../build-plan.md). This folder is the **engineering plan, split into work packages that several agents can build at the same time.**
+> The pitch, positioning and roadmap are in [`../build-plan.md`](../build-plan.md). This folder is the **engineering plan, split into work packages that several agents can build at the same time.**
 
 ## How parallel work is possible
 1. **Contracts first.** [CONTRACTS.md](CONTRACTS.md) defines every interface, including the exact shapes of calls between plugins (section 12.5). Phase 0 turns it into code and **freezes** it (milestone M0).
