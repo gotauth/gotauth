@@ -780,6 +780,7 @@ class GotAuth:
         if joined:
             return await self._with_hooks(ctx, endpoint, data)
         first_event = len(ctx.events)
+        first_deferred = len(ctx.deferred)
         try:
             async with self._database.transaction() as tx:
                 ctx.adapter = HookedAdapter(tx, self, ctx)
@@ -787,13 +788,41 @@ class GotAuth:
         except BaseException:
             new = ctx.events[first_event:]
             del ctx.events[first_event:]
+            del ctx.deferred[first_deferred:]  # rolled back: nothing to follow up
             # Failure events survive a rollback (CONTRACTS 14).
             self._publish([event for event in new if event.type == "sign_in.failed"])
             raise
         finally:
             ctx.adapter = self._database
         self._publish(ctx.events[first_event:])
+        works = ctx.deferred[first_deferred:]
+        del ctx.deferred[first_deferred:]
+        if works:
+            if is_localhost(self._config.base_url):
+                await self._run_deferred(ctx, works)
+            else:
+                # After the reply, so its duration does not show (CONTRACTS 9.1).
+                self.background(self._run_deferred(ctx, works))
         return result
+
+    async def _run_deferred(
+        self, ctx: RequestContext, works: list[Callable[[Any], Awaitable[None]]]
+    ) -> None:
+        """Run deferred work in order, each in a transaction of its own."""
+        for work in works:
+            first_event = len(ctx.events)
+            try:
+                async with self._database.transaction() as tx:
+                    ctx.adapter = HookedAdapter(tx, self, ctx)
+                    await work(ctx)
+            except Exception as exc:
+                del ctx.events[first_event:]
+                # Only the type: messages can carry tokens or addresses.
+                logger.warning("gotauth: deferred work failed (%s)", type(exc).__name__)
+                continue
+            finally:
+                ctx.adapter = self._database
+            self._publish(ctx.events[first_event:])
 
     async def _with_hooks(
         self, ctx: RequestContext, endpoint: Endpoint[Any, Any], data: Any
@@ -884,6 +913,7 @@ class GotAuth:
                 events=ctx.events if isinstance(ctx, RequestContext) else None,
                 cookies=ctx.cookies if isinstance(ctx, RequestContext) else None,
                 headers=ctx.headers if isinstance(ctx, RequestContext) else None,
+                deferred=ctx.deferred if isinstance(ctx, RequestContext) else None,
             )
             await self._check_access(call_ctx, endpoint)
             result = await self._execute(call_ctx, endpoint, data, joined=True)
@@ -894,6 +924,8 @@ class GotAuth:
                     )
                 for cookie in call_ctx.cookies:
                     ctx.set_cookie(cookie)
+                for work in call_ctx.deferred:
+                    ctx.defer(work)
         else:
             call_ctx = RequestContext(
                 auth=self, request=request, adapter=self._database, path_params=params

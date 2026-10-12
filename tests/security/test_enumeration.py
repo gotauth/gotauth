@@ -65,10 +65,6 @@ def test_welch_t_tells_equal_and_shifted_samples_apart() -> None:
     assert welch_t([x + 0.05 for x in base], base) > 4
 
 
-LEAK = pytest.mark.xfail(
-    reason="token rows are written in the request: docs/requests/Q1-C2-timing.md",
-    strict=True,
-)
 Body = Callable[[str, int], dict[str, Any]]  # Any: JSON
 
 
@@ -79,13 +75,11 @@ Body = Callable[[str, int], dict[str, Any]]  # Any: JSON
         pytest.param(
             "/request-password-reset",
             lambda e, _: {"email": e, "redirect_to": "/reset"},
-            marks=LEAK,
             id="reset",
         ),
         pytest.param(
             "/send-verification-email",
             lambda e, _: {"email": e},
-            marks=LEAK,
             id="verification",
         ),
         pytest.param(

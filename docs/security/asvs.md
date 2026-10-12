@@ -63,7 +63,7 @@ Test paths use `sec/` for `tests/security/`. Open gaps link their request files.
 | 6.8.3 | n.a. | No SAML (E1 later) | |
 | 6.8.4 | n.a. | No authentication-strength requirement on social providers | |
 
-The enumeration test also covers 6.3.8 (Level 3) for bodies, and for timing on sign-in. The reset and verification timing gap is [Q1-C2-timing](../requests/Q1-C2-timing.md).
+The enumeration tests also cover 6.3.8 (Level 3): bodies, and timing on sign-in, password reset and verification email.
 
 ## V7 Session Management
 

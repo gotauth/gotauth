@@ -5,6 +5,7 @@
 | From | Q1 (security tests) |
 | For | the integrator (needs a CCR), then C2; later P4 and P5 follow the same pattern |
 | Date | 2026-10-10 |
+| Status | Applied 2026-10-12 as [CCR 007](../ccr/007-deferred-work.md) (issue #3); the timing tests pass without `xfail` |
 | Found by | `tests/security/test_enumeration.py::test_timing_does_not_reveal_accounts` (`timing` marker) |
 
 ## What

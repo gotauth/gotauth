@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -173,6 +173,7 @@ class RequestContext:
         events: list[AuthEvent] | None = None,
         cookies: list[SetCookie] | None = None,
         headers: dict[str, str] | None = None,
+        deferred: list[Callable[[Any], Awaitable[None]]] | None = None,
     ) -> None:
         self._auth = auth
         self._request = request
@@ -183,6 +184,10 @@ class RequestContext:
         self.events: list[AuthEvent] = events if events is not None else []
         self.cookies: list[SetCookie] = cookies if cookies is not None else []
         self.headers: dict[str, str] = headers if headers is not None else {}
+        # Work to run after the commit (defer); shared with nested server calls.
+        self.deferred: list[Callable[[Any], Awaitable[None]]] = (
+            deferred if deferred is not None else []
+        )
 
     def __repr__(self) -> str:
         return f"RequestContext({self._request.method} {self._request.path})"
@@ -243,6 +248,10 @@ class RequestContext:
     def set_header(self, name: str, value: str) -> None:
         """Add a header to the response."""
         self.headers[name.lower()] = value
+
+    def defer(self, work: Callable[[Any], Awaitable[None]]) -> None:  # Any: context
+        """Queue ``work`` for after the commit (CONTRACTS 5)."""
+        self.deferred.append(work)
 
     async def emit(
         self, event_type: AuthEventType, **data: Any

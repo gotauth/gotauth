@@ -35,13 +35,12 @@ Test paths are relative to the repository root. `sec/` is short for `tests/secur
 | T | Reuse of a reset or verification link | Single use, hashed, kind-bound, expiry 1h / 24h (9) | `sec/test_limits_and_replay.py::test_verification_and_reset_tokens_work_once`, `tests/email_password/test_flows.py::test_concurrent_resets_with_one_token_succeed_once` |
 | R | User denies a password change | `password.changed` event and a security notice email (9, 14) | `tests/email_password/test_flows.py::test_change_password` |
 | I | Account enumeration by body or status | Same body for known and unknown emails (9.1) | `sec/test_enumeration.py::test_same_status_and_body_for_known_and_unknown_emails` |
-| I | Account enumeration by timing | Dummy hash on sign-in (9.1); background email (9) | `sec/test_enumeration.py::test_timing_does_not_reveal_accounts` (sign-in passes; reset and verification are xfail, see [Q1-C2-timing](../requests/Q1-C2-timing.md)) |
+| I | Account enumeration by timing | Dummy hash on sign-in (9.1); account-only work deferred until after the reply (9, CCR 007) | `sec/test_enumeration.py::test_timing_does_not_reveal_accounts` (reset, verification and sign-in) |
 | I | Password in logs or errors | Never logged or echoed (8) | `tests/email_password/test_flows.py::test_passwords_never_leak` |
 | D | Very long passwords as a CPU attack | Max 128 characters, checked before hashing (8) | `tests/email_password/test_flows.py::test_over_long_password_is_not_hashed` |
 | E | Session survives a password reset | Reset revokes all sessions by default (7) | `tests/email_password/test_flows.py::test_reset_password_revokes_sessions_by_default` |
 
 **Residual risk:**
-- The reset and verification timing gap ([Q1-C2-timing](../requests/Q1-C2-timing.md)).
 - No common or breached password check, and `change_email` without a fresh session ([Q1-C2-asvs-gaps](../requests/Q1-C2-asvs-gaps.md)).
 
 ## 2. Sessions (C3)

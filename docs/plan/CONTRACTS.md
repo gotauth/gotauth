@@ -1,11 +1,11 @@
-# GotAuth contracts (version 6)
+# GotAuth contracts (version 7)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 6
+CONTRACT_VERSION = 7
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -37,6 +37,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 5 (2026-10-12, [CCR 005](../ccr/005-change-email-fresh.md)):** `change_email` (13.1) needs a fresh session, like `change_password`.
 
 **Version 6 (2026-10-12, [CCR 006](../ccr/006-session-lifetime.md)):** `SessionConfig.absolute_lifetime` (section 7, default `"30d"`) caps every session at `created_at` plus that, however often it slides; and a sign-in ends the session the request's cookie belonged to.
+
+**Version 7 (2026-10-12, [CCR 007](../ccr/007-deferred-work.md)):** `EndpointContext.defer(work)` (section 5) runs work after the request's transaction commits, off the response path outside localhost; C2 uses it so password reset and verification requests take the same time for every email (9.1).
 
 ---
 
@@ -323,6 +325,10 @@ class EndpointContext(Protocol):
     def set_cookie(self, cookie: SetCookie) -> None: ...
     def set_header(self, name: str, value: str) -> None: ...
     async def emit(self, event_type: AuthEventType, **data: Any) -> None: ...   # section 14
+    def defer(self, work: Callable[[EndpointContext], Awaitable[None]]) -> None: ...
+    # After the commit, in its own transaction (work gets a context bound to it).
+    # Off localhost: in the background, so the reply doesn't wait; on localhost:
+    # before the reply. Errors are logged by type only; a rolled-back request drops it.
 
 @dataclass(frozen=True)
 class HookPayload:
@@ -582,7 +588,8 @@ class EmailService(Protocol):                        # D1: renders templates, th
 ```
 - **`EmailConfig`:** `app_name` (default `"GotAuth"`), `from_address`, `templates` (overrides per kind), `render` (a callable replacing the renderer).
 - **Senders:** if no sender is configured and the app runs on localhost, the console sender is used. Otherwise any plugin with `requires_email=True`, or email + password with verification on, raises `ConfigError` at construction.
-- **Background delivery:** outside localhost, `EmailService.send` renders immediately (template errors still raise), then delivers on a background task and returns. Response time therefore doesn't reveal whether an account exists. `auth.drain()` waits for pending deliveries.
+- **Background delivery:** outside localhost, `EmailService.send` renders immediately (template errors still raise), then delivers on a background task and returns. `auth.drain()` waits for pending deliveries.
+- **Account-only work goes after the reply:** delivery alone is not enough, because writing the token row also takes time only for existing accounts. Endpoints bound by 9.1 do the lookup in the request and move the rest (credential checks, token rows, sending) into `ctx.defer(...)`, so response time doesn't reveal whether an account exists.
 - **Password reset links** point to the app's `redirect_to` page with `?token=gav_...`. That page then calls `POST /reset-password`. There is no GET reset endpoint.
 
 ### 9.1 Account enumeration rules

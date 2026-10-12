@@ -270,15 +270,20 @@ async def _send_verification_email(
 ) -> StatusOut:
     callback_url = _redirect(ctx, body.callback_url)
     row = await _find_user(ctx, body.email)
-    # Only password users: a user created through a social provider that did not
-    # verify the email was set up by whoever controls that provider account, and the
-    # email's owner must not be able to verify it for them by clicking a link.
-    if (
-        row is not None
-        and not row["email_verified"]
-        and await _credential(ctx, row["id"]) is not None
-    ):
-        await _send_verification(ctx, row["id"], row["email"], callback_url)
+    if row is not None and not row["email_verified"]:
+        user_id, email = row["id"], row["email"]
+
+        async def send(later: EndpointContext) -> None:
+            # Only password users: a user created through a social provider that
+            # did not verify the email was set up by whoever controls that provider
+            # account, and the email's owner must not be able to verify it for them
+            # by clicking a link.
+            if await _credential(later, user_id) is not None:
+                await _send_verification(later, user_id, email, callback_url)
+
+        # After the reply: work done only for existing accounts must not show in
+        # the response time (CONTRACTS 9.1).
+        ctx.defer(send)
     return StatusOut(status="ok")
 
 
@@ -343,16 +348,28 @@ async def _request_password_reset(
 ) -> StatusOut:
     redirect_to = _absolute(ctx, validate_redirect(body.redirect_to, ctx.auth.config))
     row = await _find_user(ctx, body.email)
-    if row is not None and await _credential(ctx, row["id"]) is not None:
-        token = await issue_token(
-            ctx, "reset_password", row["id"], _settings(ctx).reset_token_expires_in
-        )
-        await _send(
-            ctx,
-            "reset_password",
-            row["email"],
-            url=_with_query(redirect_to, token=token),
-        )
+    if row is not None:
+        user_id, email = row["id"], row["email"]
+
+        async def send(later: EndpointContext) -> None:
+            if await _credential(later, user_id) is None:
+                return
+            token = await issue_token(
+                later,
+                "reset_password",
+                user_id,
+                _settings(later).reset_token_expires_in,
+            )
+            await _send(
+                later,
+                "reset_password",
+                email,
+                url=_with_query(redirect_to, token=token),
+            )
+
+        # After the reply: work done only for existing accounts must not show in
+        # the response time (CONTRACTS 9.1).
+        ctx.defer(send)
     return StatusOut(status="ok")
 
 
