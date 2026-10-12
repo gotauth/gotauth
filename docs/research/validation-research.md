@@ -150,13 +150,9 @@ For scale on the TypeScript side: Better Auth gets about 12.0M npm downloads a w
 >
 > **Sources:** the GitHub REST and GraphQL APIs (through an authenticated `gh`), the Hacker News Algolia API, PyPI JSON, pypistats, OSV, the IETF datatracker API, modelcontextprotocol.io and the MCP spec repository, and project docs.
 >
-> **Raw snapshots:** [`raw/`](raw/).
-> - GitHub search, run, tree, repo and release responses and PyPI JSON are trimmed to the fields used here. Issue bodies and file contents are dropped.
-> - Everything else keeps the full response.
-> - All files are re-encoded as pretty-printed, ASCII-only JSON (non-ASCII characters as `\uXXXX` escapes). The data is unchanged.
-> - The MCP spec text is not copied; it is cited by commit instead.
+> **Raw snapshots:** the API responses were saved during the research but are not published here, because they copy other people's issues and discussions in bulk. Every query is listed exactly, so the data can be fetched again.
 >
-> **Reddit:** not covered. `www.reddit.com` returned 403 to both the JSON search and the HTML page. The PullPush archive used for r/FastAPI above returned 429 with a message that it does not offer free scraping to agents ([raw/pullpush-r-mcp-auth-429.json](raw/pullpush-r-mcp-auth-429.json)), so it was not retried. r/mcp evidence is therefore missing from G9.
+> **Reddit:** not covered. `www.reddit.com` returned 403 to both the JSON search and the HTML page. The PullPush archive used for r/FastAPI above returned 429 with a message that it does not offer free scraping to agents, so it was not retried. r/mcp evidence is therefore missing from G9.
 
 ### Corrections and updates to the sections above
 1. **CIMD claim (section "The MCP authorization gap").** The spec text confirms it, with a nuance:
@@ -187,18 +183,18 @@ For scale on the TypeScript side: Better Auth gets about 12.0M npm downloads a w
 
 ### 1. MCP auth demand (gate G9)
 **Repository check.**
-- FastMCP's repository is `PrefectHQ/fastmcp` per its [PyPI project URLs](https://pypi.org/pypi/fastmcp/json) (raw: [pypi-fastmcp.json](raw/pypi-fastmcp.json)).
+- FastMCP's repository is `PrefectHQ/fastmcp` per its [PyPI project URLs](https://pypi.org/pypi/fastmcp/json).
 - `modelcontextprotocol/python-sdk` has GitHub Discussions turned off (`has_discussions: false` from `GET /repos/modelcontextprotocol/python-sdk`), so it has issues only.
 
 **Exact queries** (window: created on or after 2025-10-03):
 
-| Source | Query | Raw file |
-|---|---|---|
-| GitHub issues | `GET https://api.github.com/search/issues?q=repo:<repo>+is:issue+<term>+created:>=2025-10-03&sort=reactions&order=desc&per_page=100` for `<repo>` in `PrefectHQ/fastmcp`, `modelcontextprotocol/python-sdk` and `<term>` in `auth`, `oauth`, `authentication`, `authorization` | `raw/gh-issues-<repo>-<term>.json` |
-| GitHub issues, all time (context only) | same, `q=repo:<repo>+is:issue+auth+OR+oauth+OR+authentication+OR+authorization`, `per_page=50` | `raw/gh-issues-<repo>-alltime.json` |
-| GitHub discussions | `gh api graphql`: `search(query: "repo:<repo> <term> created:>=2025-10-03", type: DISCUSSION, first: 100)` for `<term>` in `auth`, `oauth` | `raw/gh-discussions-<repo>-<term>.json` |
-| Hacker News | `https://hn.algolia.com/api/v1/search?query=<q>&tags=story&hitsPerPage=100&attributesToRetrieve=title,url,points,num_comments,created_at,author&attributesToHighlight=[]` for `<q>` in "MCP auth", "MCP OAuth", "FastMCP auth", "MCP authorization", "MCP authentication"; the 12-month files add `&numericFilters=created_at_i>1759449600` | `raw/hn-<q>.json`, `raw/hn-<q>-12m.json` |
-| r/mcp | `https://www.reddit.com/r/mcp/search.json?q=auth&restrict_sr=1&sort=top&t=year&limit=100` (403); `https://api.pullpush.io/reddit/search/submission/?subreddit=mcp&q=auth&size=100&after=1759449600&sort_type=score&sort=desc` (429) | `raw/pullpush-r-mcp-auth-429.json` |
+| Source | Query |
+|---|---|
+| GitHub issues | `GET https://api.github.com/search/issues?q=repo:<repo>+is:issue+<term>+created:>=2025-10-03&sort=reactions&order=desc&per_page=100` for `<repo>` in `PrefectHQ/fastmcp`, `modelcontextprotocol/python-sdk` and `<term>` in `auth`, `oauth`, `authentication`, `authorization` |
+| GitHub issues, all time (context only) | same, `q=repo:<repo>+is:issue+auth+OR+oauth+OR+authentication+OR+authorization`, `per_page=50` |
+| GitHub discussions | `gh api graphql`: `search(query: "repo:<repo> <term> created:>=2025-10-03", type: DISCUSSION, first: 100)` for `<term>` in `auth`, `oauth` |
+| Hacker News | `https://hn.algolia.com/api/v1/search?query=<q>&tags=story&hitsPerPage=100&attributesToRetrieve=title,url,points,num_comments,created_at,author&attributesToHighlight=[]` for `<q>` in "MCP auth", "MCP OAuth", "FastMCP auth", "MCP authorization", "MCP authentication"; the 12-month files add `&numericFilters=created_at_i>1759449600` |
+| r/mcp | `https://www.reddit.com/r/mcp/search.json?q=auth&restrict_sr=1&sort=top&t=year&limit=100` (403); `https://api.pullpush.io/reddit/search/submission/?subreddit=mcp&q=auth&size=100&after=1759449600&sort_type=score&sort=desc` (429) |
 
 **Counting rule.**
 - Take the union of the four keyword searches per repository and drop duplicates. That gives 225 FastMCP issues and 140 python-sdk issues.
