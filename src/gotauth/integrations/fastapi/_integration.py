@@ -130,7 +130,9 @@ class FastAPIIntegration:
         CurrentUser = Annotated[User, Depends(auth.fastapi.current_user)]
     """
 
-    def __init__(self, auth: GotAuth) -> None:
+    # Quoted: GotAuth is imported for type checking only, and this module has no
+    # `from __future__ import annotations`, so Python before 3.14 evaluates it.
+    def __init__(self, auth: "GotAuth") -> None:
         self._auth = auth
 
     # ------------------------------------------------------------ router

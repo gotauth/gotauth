@@ -16,6 +16,13 @@ FIXTURES = Path(__file__).parent / "fixtures"
 SCORE70 = FIXTURES / "score70"
 
 
+@pytest.fixture(autouse=True)
+def plain_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Python 3.14's argparse colors usage messages when FORCE_COLOR is set (CI sets it);
+    # PYTHON_COLORS=0 takes precedence, so the tests compare plain text.
+    monkeypatch.setenv("PYTHON_COLORS", "0")
+
+
 def run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, str, str]:
     code = main(list(argv))
     captured = capsys.readouterr()
