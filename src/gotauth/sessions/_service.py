@@ -77,6 +77,8 @@ class DefaultSessionService:
             lifetime = to_timedelta(config.expires_in)
         else:
             lifetime = to_timedelta(config.short_expires_in)
+        if config.absolute_lifetime is not None:
+            lifetime = min(lifetime, to_timedelta(config.absolute_lifetime))
         # Always a new token: a token from the request is never reused (fixation).
         token = ctx.crypto.random_token(SESSION_PREFIX)
         user_agent = ctx.request.headers.get("user-agent")
@@ -211,6 +213,10 @@ class DefaultSessionService:
             return None
         lifetime = config.expires_in if row["remember_me"] else config.short_expires_in
         expires_at = max(row["expires_at"], now + to_timedelta(lifetime))
+        if config.absolute_lifetime is not None:
+            # Sliding never moves past the absolute lifetime (ASVS 7.3.2).
+            cap = row["created_at"] + to_timedelta(config.absolute_lifetime)
+            expires_at = max(row["expires_at"], min(expires_at, cap))
         # Compare-and-set on updated_at: concurrent reads refresh once.
         return await ctx.adapter.update(
             "session",

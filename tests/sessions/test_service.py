@@ -169,6 +169,8 @@ async def test_expiry_and_refresh_properties(
         if explicit is not None and refreshed:
             # a session that slides gets the normal lifetime, never shorter
             assert after["expires_at"] >= before["expires_at"]
+        # never past the absolute lifetime (30 days by default)
+        assert after["expires_at"] <= after["created_at"] + timedelta(days=30)
 
 
 async def test_explicit_lifetime_shorter_than_update_age_never_slides() -> None:
@@ -393,3 +395,25 @@ async def test_principal_copies_active_organization_id() -> None:
     assert principal.via == "session"
     assert principal.credential_id == created.session.id
     assert principal.scopes is None
+
+
+async def test_sliding_never_passes_the_absolute_lifetime() -> None:
+    # ASVS 7.3.2: a session used every day still ends 30 days after sign-in.
+    ctx = session_ctx()
+    created = await ctx.sessions.create(ctx, await new_user(ctx))
+    for _ in range(29):
+        ctx.clock.advance("1d")
+        assert await ctx.sessions.get(ctx, created.token) is not None
+    found = await ctx.sessions.get(ctx, created.token)
+    assert found is not None
+    assert found.session.expires_at == created.session.created_at + timedelta(days=30)
+    ctx.clock.advance("1d")
+    assert await ctx.sessions.get(ctx, created.token) is None
+
+
+async def test_absolute_lifetime_can_be_turned_off() -> None:
+    ctx = session_ctx(session_config={"absolute_lifetime": None})
+    created = await ctx.sessions.create(ctx, await new_user(ctx))
+    for _ in range(40):
+        ctx.clock.advance("1d")
+        assert await ctx.sessions.get(ctx, created.token) is not None

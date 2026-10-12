@@ -17,7 +17,7 @@ Test paths use `sec/` for `tests/security/`. Open gaps link their request files.
 | Chapter | met | partial | not met | pending | app | n.a. |
 |---|---|---|---|---|---|---|
 | V6 Authentication | 18 | 1 | 4 | 9 | 0 | 3 |
-| V7 Session Management | 10 | 6 | 1 | 0 | 1 | 0 |
+| V7 Session Management | 13 | 4 | 0 | 0 | 1 | 0 |
 | V8 Authorization | 5 | 0 | 0 | 1 | 1 | 0 |
 | V9 Self-contained Tokens | 7 | 0 | 0 | 0 | 0 | 0 |
 | V10 OAuth and OIDC | 25 | 1 | 1 | 0 | 0 | 2 |
@@ -69,22 +69,22 @@ The enumeration test also covers 6.3.8 (Level 3) for bodies, and for timing on s
 
 **Session policy** (what 7.1.1 and 7.1.2 ask to be documented):
 - **Inactivity timeout:** `expires_in`, 7 days by default, extended on use once per `update_age` (1 day).
-- **Absolute lifetime:** none yet. A session used at least once a week never ends. See [Q1-C3-asvs-gaps](../requests/Q1-C3-asvs-gaps.md).
+- **Absolute lifetime:** `absolute_lifetime`, 30 days by default. No session outlives `created_at` plus that, however often it is used.
 - **"Remember me" off:** `short_expires_in`, 1 day.
 - **Concurrent sessions:** no limit. Users see their sessions with `list_sessions` and end them with `revoke_session` or `revoke_other_sessions`.
 - **Cookie cache:** off by default. When on, a revoked session keeps working for at most `cookie_cache.max_age`, 5 minutes and capped at 5.
 
 | Id | Status | Where | Test or note |
 |---|---|---|---|
-| 7.1.1 | partial | Policy above; CONTRACTS 7 | No absolute lifetime (7.3.2) |
+| 7.1.1 | met | Policy above; CONTRACTS 7 | |
 | 7.1.2 | met | Policy above | No limit, by design |
 | 7.1.3 | partial | Social login sessions are independent of the provider's session; O1 has no logout endpoint | Documented here only |
 | 7.2.1 | met | Every token is checked against the database (or the HMAC cache) | `tests/sessions/test_service.py::test_get_rejects_foreign_prefixes_and_unknown_tokens` |
 | 7.2.2 | met | Random per-session tokens | `tests/sessions/test_service.py::test_each_create_makes_a_new_token_even_when_one_is_presented` |
 | 7.2.3 | met | 256 bits from `secrets` | `tests/crypto/test_kit.py` |
-| 7.2.4 | partial | Sign-in always issues a new token (`sec/test_requests.py::test_a_planted_session_cookie_is_never_adopted`) | The session presented at sign-in is not ended. [Q1-C3-asvs-gaps](../requests/Q1-C3-asvs-gaps.md) |
+| 7.2.4 | met | Sign-in always issues a new token and revokes the session the request's cookie belonged to | `sec/test_requests.py::test_a_planted_session_cookie_is_never_adopted`, `tests/sessions/test_http.py::test_signing_in_again_ends_the_presented_session` |
 | 7.3.1 | met | `expires_in`, sliding | `tests/sessions/test_service.py::test_expiry_and_refresh_properties` |
-| 7.3.2 | not met | C3 | [Q1-C3-asvs-gaps](../requests/Q1-C3-asvs-gaps.md) |
+| 7.3.2 | met | `sessions.absolute_lifetime`, 30 days by default | `tests/sessions/test_service.py::test_sliding_never_passes_the_absolute_lifetime` |
 | 7.4.1 | met | `sign_out` and `revoke_session` delete the row | `tests/email_password/test_flows.py::test_sign_out`, `tests/sessions/test_http.py::test_revoked_bearer_is_unauthenticated` |
 | 7.4.2 | partial | Deleting a user ends their sessions (`tests/sessions/test_service.py::test_sessions_of_deleted_users_are_not_returned`) | Disabling (bans) is pending P6 |
 | 7.4.3 | met | `change_password(revoke_other_sessions=True)`; reset ends all sessions by default | `tests/email_password/test_flows.py::test_reset_password_revokes_sessions_by_default` |
