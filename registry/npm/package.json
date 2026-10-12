@@ -1,0 +1,26 @@
+{
+  "name": "gotauth",
+  "version": "0.0.1",
+  "description": "Typed fetch client for GotAuth, open-source auth for Python AI backends",
+  "keywords": ["auth", "authentication", "fastapi", "api-keys", "oauth", "mcp", "sessions"],
+  "homepage": "https://gotauth.dev",
+  "bugs": "https://github.com/gotauth/gotauth/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gotauth/gotauth.git",
+    "directory": "registry/npm"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/gotauth-client.d.ts",
+      "default": "./dist/gotauth-client.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  }
+}
