@@ -1,0 +1,77 @@
+# Deploys the landing page (apps/landing) to cPanel over FTPS when it changes on main.
+# Off until the repository variable LANDING_DEPLOY is "true". Setup and the manual
+# way are in apps/landing/README.md, "Deploy to cPanel".
+# Actions are pinned by commit SHA; the comment names the release.
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/landing/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: landing-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and upload to cPanel
+    if: vars.LANDING_DEPLOY == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: landing
+      url: https://gotauth.ablacky.com
+    defaults:
+      run:
+        working-directory: apps/landing
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      # The waitlist form is configured at build time (see README.md).
+      PUBLIC_WAITLIST_ENDPOINT: ${{ vars.PUBLIC_WAITLIST_ENDPOINT }}
+      PUBLIC_WAITLIST_HONEYPOT: ${{ vars.PUBLIC_WAITLIST_HONEYPOT }}
+      PUBLIC_WAITLIST_FIELDS: ${{ vars.PUBLIC_WAITLIST_FIELDS }}
+      PUBLIC_WAITLIST_PROVIDER: ${{ vars.PUBLIC_WAITLIST_PROVIDER }}
+      PUBLIC_CONTACT_EMAIL: ${{ vars.PUBLIC_CONTACT_EMAIL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Keep equal to the node image tag in docker/dev.Dockerfile.
+          node-version: "24.21.0"
+          package-manager-cache: false
+      - name: Enable pnpm (version from the "packageManager" field)
+        run: corepack enable pnpm
+      - name: Install (fails if pnpm-lock.yaml is out of date)
+        run: pnpm install --frozen-lockfile
+      - name: Build and check (the same checks as CI)
+        run: pnpm run check
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - name: Upload over FTPS
+        env:
+          FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          LFTP_PASSWORD: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          # The FTP account's home should be the site's document root, so "/" is it.
+          FTP_DIR: ${{ vars.CPANEL_FTP_DIR || '/' }}
+        run: |
+          # TLS is required and the certificate must be valid: use the server's own
+          # hostname (cPanel shows it under "FTP Accounts", "Configure FTP Client").
+          # --delete removes files that are no longer built; .well-known/ (AutoSSL
+          # certificate checks) and cgi-bin/ are left alone.
+          lftp -c "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate true;
+            set net:max-retries 2;
+            open -u \"$FTP_USER\" --env-password \"$FTP_HOST\";
+            mirror --reverse --delete --verbose=1 \
+              --exclude-glob .well-known/ --exclude-glob cgi-bin/ \
+              dist \"$FTP_DIR\""

@@ -10,7 +10,7 @@
 | Allowed new deps | `astro` and official Astro integrations (e.g. sitemap) as devDependencies in `apps/landing/package.json`. No UI kits, analytics or tracking scripts |
 
 ## Goal
-A fast, accessible static page on gotauth.dev that states the pitch and collects waitlist emails, so the Phase 0 demand test can run (>= 30 signups is one way to pass it).
+A fast, accessible static page on gotauth.ablacky.com that states the pitch and collects waitlist emails, so the Phase 0 demand test can run (>= 30 signups is one way to pass it).
 
 ## Build
 - Astro, `output: "static"`, its own `package.json` with a pinned `packageManager` and its own `pnpm-lock.yaml`. All Node commands in Docker: `./dev.sh pnpm --dir apps/landing build`; dev server via `docker compose run --rm --service-ports dev pnpm --dir apps/landing dev --host 0.0.0.0`.
@@ -27,7 +27,7 @@ A fast, accessible static page on gotauth.dev that states the pitch and collects
 - Own visual identity, not a template look: no stock illustrations or gradient blobs. System fonts or self-hosted fonts (no Google Fonts requests), light and dark via `prefers-color-scheme`, `prefers-reduced-motion` respected, works from 320px wide.
 - No cookies, no analytics, no third-party scripts. Meta description, Open Graph image (static PNG), favicon, `robots.txt`, sitemap.
 - `apps/landing/README.md`: dev, build, env vars, deploy.
-  - Cloudflare Pages: build `pnpm --dir apps/landing build`, output `apps/landing/dist`, set `PUBLIC_WAITLIST_ENDPOINT`, custom domain gotauth.dev.
+  - Cloudflare Pages: build `pnpm --dir apps/landing build`, output `apps/landing/dist`, set `PUBLIC_WAITLIST_ENDPOINT`, custom domain gotauth.ablacky.com.
   - GitHub Pages as the alternative: needs a workflow in `.github/`, so file `docs/requests/G1-pages-workflow.md` with the YAML instead of adding it.
 
 ## Acceptance tests

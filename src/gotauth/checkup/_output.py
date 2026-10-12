@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 TOOL_NAME: Final = "gotauth check"
-INFORMATION_URI: Final = "https://gotauth.dev/check"
+INFORMATION_URI: Final = "https://gotauth.ablacky.com/check"
 JSON_SCHEMA_VERSION: Final = 1
 """Version of the ``--json`` output. It changes only when a field changes meaning or
 goes away; new fields may appear without a bump."""

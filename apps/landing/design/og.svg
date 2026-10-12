@@ -10,6 +10,6 @@
   <text x="80" y="430" font-family="DejaVu Sans, Arial, sans-serif" font-size="40" fill="#1b1a17">Open-source auth for Python AI backends.</text>
   <text x="80" y="484" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" fill="#545047">Users, sessions, 2FA, passkeys, orgs, API keys, agents and an</text>
   <text x="80" y="522" font-family="DejaVu Sans, Arial, sans-serif" font-size="27" fill="#545047">OAuth 2.1 server for MCP. All in your own database.</text>
-  <text x="80" y="582" font-family="DejaVu Sans Mono, monospace" font-size="24" fill="#0b6545">gotauth.dev</text>
+  <text x="80" y="582" font-family="DejaVu Sans Mono, monospace" font-size="24" fill="#0b6545">gotauth.ablacky.com</text>
   <text x="1120" y="582" text-anchor="end" font-family="DejaVu Sans Mono, monospace" font-size="24" fill="#545047">MIT  |  in development</text>
 </svg>

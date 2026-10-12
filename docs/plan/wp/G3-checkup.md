@@ -36,7 +36,7 @@ A static checker that finds common Python auth mistakes and gives a 0-100 score,
 
 - Finding: rule id, severity, `path:line:col`, message, fix hint. Hints are neutral (PyJWT with explicit algorithms, argon2-cffi or bcrypt, `hmac.compare_digest`, ...); GotAuth may be one option, never the only one.
 - Score: 100 minus high 15, medium 6, low 2; each rule counts at most 3 times; floor 0.
-- Output: text (grouped by file, score last), `--json` (stable schema with `version`), `--sarif` (SARIF 2.1.0 for GitHub code scanning, `helpUri` `https://gotauth.dev/check/<id>`).
+- Output: text (grouped by file, score last), `--json` (stable schema with `version`), `--sarif` (SARIF 2.1.0 for GitHub code scanning, `helpUri` `https://gotauth.ablacky.com/check/<id>`).
 - Exit codes: 0; 1 if score < `--fail-under`; 2 on usage errors.
 
 ## Acceptance tests

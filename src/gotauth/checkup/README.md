@@ -4,7 +4,7 @@ A static scanner for risky hand-written Python auth code. It gives a score from 
 
 - It reads and parses files with `ast` only. It never imports or runs the scanned code, opens no network connection and sends no telemetry.
 - It needs only the standard library, so `uvx gotauth check` works without any extras.
-- Rules: see [Rules](#rules) below. The docs site will publish one page per rule at `https://gotauth.dev/check/<id>` (work package G2).
+- Rules: see [Rules](#rules) below. The docs site will publish one page per rule at `https://gotauth.ablacky.com/check/<id>` (work package G2).
 
 ## Usage
 
@@ -93,7 +93,7 @@ Heuristic rules (GA005 to GA007) stay at medium so a false positive costs little
 
 - **Text:** findings grouped by file with a fix hint each, then a summary line and `Score: N/100` last.
 - **JSON:** `{"version": 1, "tool", "score", "summary", "findings", "skipped"}`. Each finding has `rule_id`, `severity`, `path`, `line`, `column` (1-based), `end_line`, `end_column` (just after the end, as in SARIF), `message`, `hint`, `help_uri` and `fingerprint`. Messages never contain the secret value.
-- **SARIF 2.1.0:** `$schema`, `version`, one run with `tool.driver.rules` (id, name, descriptions, help, `helpUri` `https://gotauth.dev/check/<id>`, level, `security-severity`), results with `ruleId`, `ruleIndex`, `level`, `message`, `locations` (relative to `%SRCROOT%`) and `partialFingerprints`. Skipped files appear as tool execution notifications. Validated against the SARIF 2.1.0 JSON schema.
+- **SARIF 2.1.0:** `$schema`, `version`, one run with `tool.driver.rules` (id, name, descriptions, help, `helpUri` `https://gotauth.ablacky.com/check/<id>`, level, `security-severity`), results with `ruleId`, `ruleIndex`, `level`, `message`, `locations` (relative to `%SRCROOT%`) and `partialFingerprints`. Skipped files appear as tool execution notifications. Validated against the SARIF 2.1.0 JSON schema.
 
 GitHub Actions example:
 

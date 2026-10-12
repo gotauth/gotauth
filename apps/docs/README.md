@@ -1,6 +1,6 @@
 # Docs site
 
-The documentation site for `gotauth.dev/docs`, with `llms.txt`, Markdown copies of every page and the API reference. Work package G2 owns this folder and records its choices here.
+The documentation site for `gotauth.ablacky.com/docs`, with `llms.txt`, Markdown copies of every page and the API reference. Work package G2 owns this folder and records its choices here.
 
 - Generator: Material for MkDocs or Zensical, decided by G2 at build time. The Python dependencies are in the `docs` dependency group: `./dev.sh uv sync --locked --all-extras --group docs`.
 - API reference from the Google-style docstrings through mkdocstrings.

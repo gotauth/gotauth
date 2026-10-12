@@ -10,7 +10,7 @@ Vite 8, Tailwind CSS 4.3 and shadcn CLI 4.21 (checked 2026-10-07).
 Add the registry to the app's `components.json`, then add items by name:
 
 ```json
-{ "registries": { "@gotauth": "https://gotauth.dev/r/{name}.json" } }
+{ "registries": { "@gotauth": "https://gotauth.ablacky.com/r/{name}.json" } }
 ```
 
 ```bash

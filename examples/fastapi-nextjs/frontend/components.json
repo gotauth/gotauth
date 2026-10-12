@@ -18,6 +18,6 @@
   },
   "iconLibrary": "lucide",
   "registries": {
-    "@gotauth": "https://gotauth.dev/r/{name}.json"
+    "@gotauth": "https://gotauth.ablacky.com/r/{name}.json"
   }
 }

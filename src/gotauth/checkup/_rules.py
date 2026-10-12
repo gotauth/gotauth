@@ -29,7 +29,7 @@ SEVERITY_WEIGHTS: Final[dict[Severity, int]] = {"high": 15, "medium": 6, "low": 
 MAX_COUNTED_PER_RULE: Final = 3
 """How many findings of the same rule count towards the score."""
 
-HELP_URI_BASE: Final = "https://gotauth.dev/check/"
+HELP_URI_BASE: Final = "https://gotauth.ablacky.com/check/"
 
 
 @dataclass(frozen=True, slots=True)

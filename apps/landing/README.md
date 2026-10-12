@@ -1,6 +1,6 @@
-# gotauth.dev landing page
+# gotauth.ablacky.com landing page
 
-The static landing page and waitlist for [gotauth.dev](https://gotauth.dev): the pitch, the "Why now" evidence, three planned-API code snippets, the "Why not X?" comparison and a waitlist form. Work package G1.
+The static landing page and waitlist for [gotauth.ablacky.com](https://gotauth.ablacky.com): the pitch, the "Why now" evidence, three planned-API code snippets, the "Why not X?" comparison and a waitlist form. Work package G1.
 
 - No cookies, no analytics, no third-party scripts, styles or fonts. The only third-party request is the waitlist form posting to the form service you configure.
 - Works without JavaScript. A small inline script improves the form (inline errors and a success message without leaving the page).
@@ -15,7 +15,7 @@ Checked on 2026-10-03.
 | Astro | 7.3.5 | `package.json` (exact), `pnpm-lock.yaml` |
 | @astrojs/sitemap | 3.7.4 | `package.json` (exact), `pnpm-lock.yaml` |
 | pnpm | 12.8.1 | `packageManager` in `package.json` (the dev image pins the same) |
-| Node | 24 | `engines` in `package.json`, `.node-version` (for Cloudflare Pages) |
+| Node | 24 | `engines` in `package.json`, `.node-version` (for hosts that read it) |
 
 This is a standalone pnpm project with its own lockfile (there is no root workspace). `pnpm-workspace.yaml` exists only to hold `allowBuilds` (esbuild's install script), which pnpm 12 reads from that file.
 
@@ -30,7 +30,7 @@ This is a standalone pnpm project with its own lockfile (there is no root worksp
 | `src/lib/code.ts` | Code highlighting theme (see "Code highlighting" below) |
 | `src/styles/global.css` | All styles and the color tokens for both themes |
 | `src/pages/thanks.astro` | `/thanks/`, for form services that redirect after a post |
-| `public/` | Favicon, Open Graph image, `robots.txt`, Cloudflare `_headers` |
+| `public/` | Favicon, Open Graph image, `robots.txt`, `.htaccess` (Apache headers, HTTPS, 404) |
 | `design/` | SVG sources of `og.png` and `apple-touch-icon.png` |
 | `scripts/check-dist.mjs` | Acceptance checks on the built site |
 | `scripts/check-contrast.mjs` | WCAG contrast checks for every color pair, both themes |
@@ -82,10 +82,10 @@ The form is a plain `<form method="post">` with an `email` field and a hidden ho
 | Extra fields | none | `access_key=<key>` (a public key, meant to be in the HTML) |
 | Honeypot | `_gotcha` (filled: silently ignored) | `botcheck` (still supported; their docs now prefer hCaptcha) |
 | With JavaScript | JSON response, inline success message | JSON response, inline success message |
-| Without JavaScript | Formspree's own confirmation page; a custom redirect needs a paid plan | Can redirect to `https://gotauth.dev/thanks/` with a `redirect` field |
+| Without JavaScript | Formspree's own confirmation page; a custom redirect needs a paid plan | Can redirect to `https://gotauth.ablacky.com/thanks/` with a `redirect` field |
 | Tracking | Non-JS posts go through a Google reCAPTCHA page by default. Turn reCAPTCHA off in the form's Settings, under "Spam protection" (allowed on every plan) | No CAPTCHA unless you add one |
 
-On Formspree's free plan the archive keeps 30 days, so keep the notification emails (or export the list) to keep older signups. Neither service needs a script or cookie on gotauth.dev.
+On Formspree's free plan the archive keeps 30 days, so keep the notification emails (or export the list) to keep older signups. Neither service needs a script or cookie on gotauth.ablacky.com.
 
 ### Removing someone from the list
 
@@ -112,7 +112,7 @@ Web3Forms:
 ```bash
 PUBLIC_WAITLIST_ENDPOINT=https://api.web3forms.com/submit
 PUBLIC_WAITLIST_HONEYPOT=botcheck
-PUBLIC_WAITLIST_FIELDS=access_key=<key>&subject=GotAuth%20waitlist&redirect=https%3A%2F%2Fgotauth.dev%2Fthanks%2F
+PUBLIC_WAITLIST_FIELDS=access_key=<key>&subject=GotAuth%20waitlist&redirect=https%3A%2F%2Fgotauth.ablacky.com%2Fthanks%2F
 PUBLIC_WAITLIST_PROVIDER=Web3Forms
 ```
 
@@ -131,30 +131,50 @@ PUBLIC_WAITLIST_PROVIDER=Web3Forms
 
 Set `RESPONSE` on the mock to try each answer the script handles: `formspree` (the default, `200 {"ok": true}`), `web3forms` (`200 {"success": true}`), `reject` (`200 {"success": false}`, which the form must show as "not saved") and `text` (a plain-text 200, treated as success).
 
-## Deploy
+## Deploy to cPanel
 
-`.dev` domains are on the HSTS preload list, so gotauth.dev only works over HTTPS. Both hosts below issue certificates for custom domains.
+The site is static: `pnpm build` writes everything to `dist/`, and any web server can serve that folder. It runs at **https://gotauth.ablacky.com** on cPanel (Apache). `public/.htaccess` ends up in `dist/` and sets HTTPS, the security headers, caching, compression and the 404 page. The Content-Security-Policy is a `<meta>` tag in every page, so it needs nothing from the server.
 
-### Cloudflare Pages (recommended)
+### One-time setup in cPanel
+1. **Create the subdomain.** cPanel -> Domains -> Create A New Domain:
+   - domain `gotauth.ablacky.com`
+   - untick "Share document root"
+   - document root, for example `gotauth.ablacky.com` (a folder in your home directory)
 
-1. Cloudflare dashboard -> Workers & Pages -> Create -> Pages -> connect the `gotauth/gotauth` repository.
-2. Build settings:
-   - Production branch: `main`
-   - Framework preset: Astro (or None)
-   - Root directory (advanced): `apps/landing`
-   - Build command: `pnpm build`
-   - Build output directory: `dist`
-3. Environment variables (Production, and Preview if previews should have a working form): `PUBLIC_WAITLIST_ENDPOINT` and the other `PUBLIC_` variables from the table above. Add `PNPM_VERSION=12.8.1` too; Cloudflare's v3 build image ships pnpm 10.11 and Node 22.16 by default. Node 24 comes from `.node-version`.
-4. Save and deploy. Every pull request then gets a preview URL, which is where to run Lighthouse.
-5. Custom domains -> Set up a custom domain -> `gotauth.dev`. With the domain's DNS on Cloudflare the record is added for you; otherwise add the CNAME it shows. Add `www.gotauth.dev` as well if you want it, and redirect it to the apex with a Redirect Rule.
+   If the DNS for `ablacky.com` is hosted on this cPanel, the DNS record is created for you. If it is hosted elsewhere, add an `A` record for `gotauth` pointing to the server's IP (cPanel shows it under "Shared IP Address" or "Dedicated IP"), or a `CNAME` to the server's hostname.
+2. **HTTPS.** cPanel -> SSL/TLS Status -> select `gotauth.ablacky.com` -> Run AutoSSL. The certificate is usually issued within minutes once the DNS record resolves. Until then, the `.htaccess` redirect sends visitors to an HTTPS address that has no valid certificate.
+3. **Waitlist form (optional).** Create a form on [Formspree](https://formspree.io) or [Web3Forms](https://web3forms.com) and note the values from "Environment variables" above. Use `https://gotauth.ablacky.com/thanks/` as the redirect address. Without a form backend the page shows "Waitlist opens soon".
 
-The brief's repo-root form of the same settings also works: root directory empty, build command `pnpm --dir apps/landing install --frozen-lockfile && pnpm --dir apps/landing build`, output directory `apps/landing/dist`, plus `NODE_VERSION=24` and `PNPM_VERSION=12.8.1`. Neither form has been tried on Cloudflare yet; check the first deploy's build log for the Node and pnpm versions.
+### Build
+From the repository root, in the dev container:
 
-`public/_headers` sets security headers on Cloudflare (`X-Frame-Options: DENY`, `nosniff`, a strict referrer policy, a locked-down `Permissions-Policy`) and long cache lifetimes for hashed assets. The Content-Security-Policy itself is a `<meta>` tag in every page, so it works on any host.
+```bash
+cp apps/landing/.env.example apps/landing/.env    # optional: fill in the PUBLIC_WAITLIST_* values
+./dev.sh pnpm --dir apps/landing install --frozen-lockfile
+./dev.sh pnpm --dir apps/landing run check         # builds dist/ and runs every check on it
+```
 
-### GitHub Pages (alternative)
+### Upload by hand
+1. Zip the **contents** of `apps/landing/dist` (not the folder itself), including the hidden `.htaccess`. For example: `cd apps/landing/dist && zip -r ../site.zip .`
+2. cPanel -> File Manager -> open the document root (`gotauth.ablacky.com/`). Under Settings, tick "Show Hidden Files".
+3. Delete the old site files there, but keep `.well-known/` and `cgi-bin/` if they exist. Then upload `site.zip`, right-click it -> Extract, and delete the zip.
+4. Open https://gotauth.ablacky.com and https://gotauth.ablacky.com/no-such-page (it must show the 404 page).
 
-This needs a workflow under `.github/`, outside G1's write scope, so it is filed as a request: [`docs/requests/G1-pages-workflow.md`](../../docs/requests/G1-pages-workflow.md) has the YAML and the settings. GitHub Pages ignores `_headers`, so the framing and permissions headers above are not sent there; the CSP `<meta>` tag still applies.
+### Upload automatically from GitHub (optional)
+`.github/workflows/landing-deploy.yml` builds the site with the same checks as CI and uploads it over FTPS on every push to `main` that touches `apps/landing/`. It stays off until you turn it on:
+
+1. **A dedicated FTP account.** cPanel -> FTP Accounts -> Add FTP Account. Set the directory to the document root (`gotauth.ablacky.com`) so the account can only write there. Under "Configure FTP Client", note the server hostname; use it instead of `gotauth.ablacky.com`, because the TLS certificate is issued for that name.
+2. **The `landing` environment.** GitHub -> Settings -> Environments -> New environment `landing`. Under deployment branches, allow only `main`. Add these environment secrets:
+   - `CPANEL_FTP_HOST`: the server hostname from step 1
+   - `CPANEL_FTP_USER`: the full FTP user, for example `deploy@ablacky.com`
+   - `CPANEL_FTP_PASSWORD`
+3. **Repository variables.** Settings -> Secrets and variables -> Actions -> Variables:
+   - `LANDING_DEPLOY` = `true`, which turns the workflow on
+   - the `PUBLIC_WAITLIST_*` values and `PUBLIC_CONTACT_EMAIL`, if you use the form
+   - `CPANEL_FTP_DIR`, only if the FTP account's home is not the document root
+4. Run it once by hand: Actions -> Deploy landing page -> Run workflow.
+
+The upload mirrors `dist/`: files that are no longer built are deleted on the server, except `.well-known/` and `cgi-bin/`. If your host has no FTPS, ask it to enable "explicit TLS" rather than sending passwords over plain FTP.
 
 ## Lighthouse
 
@@ -169,10 +189,10 @@ Measured locally on 2026-10-04 with Lighthouse 13.5.0 and headless Chromium 154,
 
 Mobile LCP 0.8 to 1.3 s, desktop LCP 0.2 to 0.3 s, TBT 0 to 20 ms, CLS 0. The home page is 34 KB of HTML (about 9.5 KB gzipped) with CSS and the form script inline, and no other requests except the favicon.
 
-Repeat it on the Cloudflare preview URL of the PR (the real host, with HTTPS, compression and headers):
+Repeat it on the deployed site (the real host, with HTTPS, compression and headers):
 
 - Chrome DevTools -> Lighthouse -> Mode: Navigation; Device: Mobile, then Desktop; all four categories -> Analyze. Save each report as HTML (menu -> Save as HTML) and attach it to the PR.
-- Or [PageSpeed Insights](https://pagespeed.web.dev/) with the preview URL; it reports mobile and desktop.
+- Or [PageSpeed Insights](https://pagespeed.web.dev/) with https://gotauth.ablacky.com; it reports mobile and desktop.
 - Or the CLI in Docker, the way the scores above were measured:
 
   ```bash

@@ -107,7 +107,7 @@ From the repository root, in the dev container:
 pnpm dlx shadcn@4.21.3 add @gotauth/sign-in-form @gotauth/sign-up-form @gotauth/social-buttons @gotauth/user-button @gotauth/api-key-manager @gotauth/use-session
 ```
 
-They are your code now, so edit them freely. Until the registry is published at `gotauth.dev`, build it from this repository instead:
+They are your code now, so edit them freely. Until the registry is published at `gotauth.ablacky.com`, build it from this repository instead:
 1. Run `pnpm --dir registry build`.
 2. Serve `registry/public`, for example with `python3 -m http.server 8765` in that folder.
 3. Point `@gotauth` in `components.json` at `http://127.0.0.1:8765/r/{name}.json`.

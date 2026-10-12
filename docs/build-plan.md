@@ -1,6 +1,6 @@
 # GotAuth: project overview
 
-> **Packages:** [`gotauth` on PyPI](https://pypi.org/project/gotauth/) (the library) and [`@gotauth/client` on npm](https://www.npmjs.com/package/@gotauth/client) (the typed client). **Code:** [github.com/gotauth/gotauth](https://github.com/gotauth/gotauth). **Site:** [gotauth.dev](https://gotauth.dev).
+> **Packages:** [`gotauth` on PyPI](https://pypi.org/project/gotauth/) (the library) and [`@gotauth/client` on npm](https://www.npmjs.com/package/@gotauth/client) (the typed client). **Code:** [github.com/gotauth/gotauth](https://github.com/gotauth/gotauth). **Site:** [gotauth.ablacky.com](https://gotauth.ablacky.com).
 >
 > **Engineering plan:** [plan/](plan/README.md). It is split into **work packages that several AI agents can build in parallel**:
 > - [CONTRACTS.md](plan/CONTRACTS.md): shared interfaces

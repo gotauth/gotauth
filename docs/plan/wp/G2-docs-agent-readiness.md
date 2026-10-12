@@ -10,7 +10,7 @@
 | Allowed new deps | docs dependency group only, added up front by F1 (Zensical or mkdocs-material, mkdocstrings[python], a link checker, a tokenizer for the count script); anything else by request. Nothing at runtime |
 
 ## Goal
-A docs site at `gotauth.dev/docs` that takes a developer or a coding agent from install to a protected route, plus agent entry points (llms.txt, a skill, Context7) so agents pick GotAuth instead of hand-rolling auth.
+A docs site at `gotauth.ablacky.com/docs` that takes a developer or a coding agent from install to a protected route, plus agent entry points (llms.txt, a skill, Context7) so agents pick GotAuth instead of hand-rolling auth.
 
 ## Build
 - Generator: Zensical if it is stable at build time, else Material for MkDocs. Status read from zensical.org on 2026-10-03: 0.0.x alpha releases, 0.1.0 announced for 2026-11-05 as the start of a dependable release line, mkdocstrings supported; Material for MkDocs gets critical fixes until 2027-05-05. Re-check, decide, record choice and versions in `apps/docs/README.md`.
@@ -28,7 +28,7 @@ A docs site at `gotauth.dev/docs` that takes a developer or a coding agent from 
   - `skills/gotauth/SKILL.md` (Agent Skills format, `name` + `description` front matter): when to use GotAuth; the 10-line FastAPI setup; decision rules ("never hand-roll JWT/passlib auth", "use `CurrentUser = Annotated[User, Depends(auth.fastapi.current_user)]` and `auth.fastapi.require(...)`", "API keys come from the `api_key` plugin"); adding MCP auth with `fastmcp_auth`; links to llms.txt. Ready to publish on skills.sh.
   - `apps/docs/CONTEXT7.md`: steps and config to list GotAuth on Context7.
   - `robots.txt` allowing AI crawlers, with the sitemap.
-- Deploy: free static hosting under `gotauth.dev/docs` (same site as G1's landing or a path route); `.github/workflows/docs.yml` builds on PRs and deploys from `main`, actions pinned by commit SHA.
+- Deploy: free static hosting under `gotauth.ablacky.com/docs` (same site as G1's landing or a path route); `.github/workflows/docs.yml` builds on PRs and deploys from `main`, actions pinned by commit SHA.
 - Docs MCP server: cut-list item 1, not built for v0.1.
 
 ## Acceptance tests
