@@ -56,6 +56,8 @@ __all__ = ["FastAPIIntegration", "OAuthErrorOut"]
 
 MAX_BODY_BYTES = 1024 * 1024
 _PARAM = re.compile(r"\{(\w+)\}")
+# request.state attribute holding the principal resolved for this request.
+_PRINCIPAL_STATE = "gotauth_principal"
 
 
 class OAuthErrorOut(BaseModel):
@@ -376,7 +378,12 @@ class FastAPIIntegration:
         """Whoever the request acts for: session, API key or OAuth token; 401 otherwise.
 
         Principal checks run, so a plugin can reject (for example banned users).
+        Resolved once per request, however many dependencies ask: each lookup of an
+        API key counts against its rate limit.
         """
+        cached = getattr(request.state, _PRINCIPAL_STATE, None)
+        if isinstance(cached, Principal):
+            return cached
         headers, cookies = self._credentials(request)
         try:
             principal = await self._auth.get_principal(headers, cookies)
@@ -386,6 +393,7 @@ class FastAPIIntegration:
             raise AuthError("INTERNAL_ERROR", 500) from exc
         if principal is None:
             raise AuthError("UNAUTHENTICATED", 401)
+        setattr(request.state, _PRINCIPAL_STATE, principal)
         return principal
 
     async def api_key_principal(self, request: Request) -> Principal:
