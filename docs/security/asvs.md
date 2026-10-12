@@ -17,7 +17,7 @@ Test paths use `sec/` for `tests/security/`. Open gaps link their request files.
 | Chapter | met | partial | not met | pending | app | n.a. |
 |---|---|---|---|---|---|---|
 | V6 Authentication | 18 | 1 | 4 | 9 | 0 | 3 |
-| V7 Session Management | 9 | 7 | 1 | 0 | 1 | 0 |
+| V7 Session Management | 10 | 6 | 1 | 0 | 1 | 0 |
 | V8 Authorization | 5 | 0 | 0 | 1 | 1 | 0 |
 | V9 Self-contained Tokens | 7 | 0 | 0 | 0 | 0 | 0 |
 | V10 OAuth and OIDC | 25 | 1 | 1 | 0 | 0 | 2 |
@@ -90,7 +90,7 @@ The enumeration test also covers 6.3.8 (Level 3) for bodies, and for timing on s
 | 7.4.3 | met | `change_password(revoke_other_sessions=True)`; reset ends all sessions by default | `tests/email_password/test_flows.py::test_reset_password_revokes_sessions_by_default` |
 | 7.4.4 | app | `registry/` UserButton has sign-out | |
 | 7.4.5 | partial | `SessionService.revoke_all` runs in-process | No admin endpoint until P6 |
-| 7.5.1 | partial | `change_password`, `delete_user` and `unlink_account` need a fresh session | `change_email` does not. [Q1-C2-asvs-gaps](../requests/Q1-C2-asvs-gaps.md) |
+| 7.5.1 | met | `change_password`, `change_email`, `delete_user` and `unlink_account` need a fresh session | `tests/email_password/test_http.py::test_change_email_needs_a_recent_sign_in` |
 | 7.5.2 | partial | `list_sessions`, `revoke_session`, `revoke_other_sessions` | No re-authentication before revoking |
 | 7.6.1 | met | GotAuth as an OpenID provider has no single logout; documented here | |
 | 7.6.2 | met | Sessions start only from a sign-in request; O1 asks for consent | `tests/plugins/oauth_provider/test_security.py::test_cimd_loopback_always_shows_consent` |

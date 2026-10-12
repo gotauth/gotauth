@@ -1,11 +1,11 @@
-# GotAuth contracts (version 4)
+# GotAuth contracts (version 5)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 4
+CONTRACT_VERSION = 5
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -33,6 +33,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 3 (2026-10-08, [CCR 003](../ccr/003-oauth-auth-time.md)):** `oauth_code` and `oauth_token` (12.2) gain an optional `auth_time`, so ID tokens carry the time the user signed in.
 
 **Version 4 (2026-10-12, [CCR 004](../ccr/004-scrypt-cost.md)):** the default scrypt parameters (section 8) go from `p=1` to `p=3`, the OWASP minimum at 32 MiB. Existing hashes keep working and are rehashed at the next sign-in.
+
+**Version 5 (2026-10-12, [CCR 005](../ccr/005-change-email-fresh.md)):** `change_email` (13.1) needs a fresh session, like `change_password`.
 
 ---
 
@@ -1009,7 +1011,7 @@ await auth.api.<endpoint_id>(body=None, *, headers=None, query=None, path_params
 | `request_password_reset` | POST `/request-password-reset` | none | `StatusOut` | C2 |
 | `reset_password` | POST `/reset-password` | none | `StatusOut` | C2 |
 | `change_password` | POST `/change-password` | session, fresh | `StatusOut` | C2 |
-| `change_email` | POST `/change-email` | session | `StatusOut` | C2 |
+| `change_email` | POST `/change-email` | session, fresh | `StatusOut` | C2 |
 | `update_user` | PATCH `/user` | session | `UserOut` | C2 |
 | `delete_user` | DELETE `/user` (JSON body `{password?}`) | session, fresh | `StatusOut` | C2 |
 | `get_session` | GET `/session` | optional | `SessionWithUserOut` or `null` | C3 |
