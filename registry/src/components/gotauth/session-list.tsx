@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table"
 import { useGotAuthClient } from "@/components/gotauth/gotauth-provider"
 import { FormMessage } from "@/components/gotauth/form-message"
-import type { GotAuthError, SessionListOut } from "@/lib/gotauth-client"
+import type { GotAuthError, Result, SessionListOut } from "@/lib/gotauth-client"
 
 function device(userAgent: string | null): string {
   if (!userAgent) return "Unknown device"
@@ -49,15 +49,22 @@ export function SessionList({ onCurrentRevoked }: { onCurrentRevoked?: () => voi
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    const result = await client.listSessions()
+  const show = useCallback((result: Result<SessionListOut>) => {
     if (result.error) setError(result.error)
     else setList(result.data)
-  }, [client])
+  }, [])
+  const load = useCallback(async () => show(await client.listSessions()), [client, show])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    // State is set in the callback, so it never changes during the effect itself.
+    let live = true
+    void client.listSessions().then((result) => {
+      if (live) show(result)
+    })
+    return () => {
+      live = false
+    }
+  }, [client, show])
 
   async function revoke(sessionId: string) {
     setBusy(sessionId)
