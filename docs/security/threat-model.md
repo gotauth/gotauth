@@ -30,7 +30,7 @@ Test paths are relative to the repository root. `sec/` is short for `tests/secur
 
 | STRIDE | Threat | Mitigation | Test |
 |---|---|---|---|
-| S | Credential stuffing, brute force | Per IP+path and per-email limits (10.2); scrypt `ln=15` (8) | `sec/test_limits_and_replay.py::test_per_email_limits_hold_across_rotating_ips` |
+| S | Credential stuffing, brute force | Per IP+path and per-email limits (10.2); scrypt `ln=15, r=8, p=3` (8) | `sec/test_limits_and_replay.py::test_per_email_limits_hold_across_rotating_ips` |
 | S | Pre-account hijack: attacker signs up with the victim's email first | Unverified accounts can be claimed by the real owner; reset requires email proof (9.1, C2) | `tests/email_password/test_flows.py::test_abandoned_unverified_sign_up_can_be_claimed`, `test_reset_password_verifies_the_email` |
 | T | Reuse of a reset or verification link | Single use, hashed, kind-bound, expiry 1h / 24h (9) | `sec/test_limits_and_replay.py::test_verification_and_reset_tokens_work_once`, `tests/email_password/test_flows.py::test_concurrent_resets_with_one_token_succeed_once` |
 | R | User denies a password change | `password.changed` event and a security notice email (9, 14) | `tests/email_password/test_flows.py::test_change_password` |

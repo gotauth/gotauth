@@ -58,7 +58,7 @@ Code without an endpoint context (an id generator, a CLI command) can use the fu
 | `random_token(prefix, nbytes=32)` | `secrets.token_bytes`, base64url without padding: 32 bytes give 43 characters. At least 16 bytes |
 | `hash_token(token)` | SHA-256 of the UTF-8 bytes, lower-case hex |
 | `equal(a, b)` | `hmac.compare_digest` on bytes (text as UTF-8) |
-| `hash_password` | `scrypt$ln=15,r=8,p=1$<salt>$<hash>`: `hashlib.scrypt`, N = 2**15, 16-byte salt, 64-byte key, standard base64 without padding, `maxmem` 64 MiB. With `password_algorithm="argon2id"`: `argon2id$<PHC string>` with argon2-cffi's defaults (t=3, m=64 MiB, p=4) |
+| `hash_password` | `scrypt$ln=15,r=8,p=3$<salt>$<hash>`: `hashlib.scrypt`, N = 2**15, p = 3 (the OWASP minimum at 32 MiB), 16-byte salt, 64-byte key, standard base64 without padding, `maxmem` 64 MiB. With `password_algorithm="argon2id"`: `argon2id$<PHC string>` with argon2-cffi's defaults (t=3, m=64 MiB, p=4) |
 | `verify_password` | Accepts `scrypt$`, `argon2id$` and `bcrypt$<$2a$, $2b$ or $2y$ hash>` (verify-only, for imports; the password is cut to 72 bytes first, as passlib did). Limits on stored hashes: scrypt ln at most 20, r at most 32, p at most 16 and 128 * r * N at most 1 GiB; bcrypt cost 4 to 16; argon2 memory at most 1 GiB, t and p at most 32 |
 | `derive_key(purpose, length=32)` | HKDF-SHA256 over the first secret, no salt, `info = b"gotauth:" + purpose` |
 | `sign(value, purpose=)` | `"<value>.<b64url HMAC-SHA256>"` keyed with `derive_key("sign:" + purpose)` |
