@@ -1,0 +1,52 @@
+# The example app: http://localhost:3000. Setup and the walkthrough are in README.md.
+#
+#   docker compose up --build                       SQLite in a volume
+#   docker compose --profile postgres up --build    Postgres (set DATABASE_URL in .env)
+name: gotauth-example
+
+services:
+  backend:
+    build:
+      context: backend
+      # The gotauth library from this repository (a path dependency).
+      additional_contexts:
+        gotauth: ../..
+    env_file: .env
+    environment:
+      BASE_URL: http://localhost:3000
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:////data/app.db}
+    volumes:
+      - data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+
+  frontend:
+    build:
+      context: frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+
+  postgres:
+    profiles: [postgres]
+    image: postgres:17
+    environment:
+      POSTGRES_USER: gotauth
+      POSTGRES_PASSWORD: gotauth
+      POSTGRES_DB: gotauth
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gotauth -d gotauth"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  data:
+  pgdata:
