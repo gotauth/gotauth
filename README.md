@@ -35,7 +35,7 @@ The first run builds the dev image and fills the dependency cache, which takes a
 
 | Document | What it covers |
 |---|---|
-| [docs/build-plan.md](docs/build-plan.md) | Strategy, positioning, phases, launch, money, risks |
+| [docs/build-plan.md](docs/build-plan.md) | Pitch, positioning, comparison, architecture, roadmap, security approach |
 | [docs/plan/README.md](docs/plan/README.md) | Engineering plan: work packages that several agents can build in parallel |
 | [docs/plan/CONTRACTS.md](docs/plan/CONTRACTS.md) | Shared interfaces, frozen at milestone M0 |
 | [AGENTS.md](AGENTS.md) | Rules every agent follows (copy of [docs/plan/AGENT-RULES.md](docs/plan/AGENT-RULES.md)) |
