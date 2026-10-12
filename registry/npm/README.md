@@ -1,13 +1,13 @@
-# gotauth (JavaScript client)
+# @gotauth/client
 
-A typed `fetch` client for [GotAuth](https://github.com/gotauth/gotauth), open-source auth for Python AI backends. The server side is the [`gotauth` Python package](https://pypi.org/project/gotauth/); this package talks to its HTTP API from browsers, Node 18+, Deno and Bun. No dependencies.
+The JavaScript client for [GotAuth](https://github.com/gotauth/gotauth), open-source auth for Python AI backends: a typed `fetch` client. The server side is the [`gotauth` Python package](https://pypi.org/project/gotauth/); this package talks to its HTTP API from browsers, Node 18+, Deno and Bun. No dependencies.
 
 ```bash
-npm install gotauth
+npm install @gotauth/client
 ```
 
 ```ts
-import { createGotAuthClient } from "gotauth"
+import { createGotAuthClient } from "@gotauth/client"
 
 const auth = createGotAuthClient({ baseURL: "/api/auth" })
 

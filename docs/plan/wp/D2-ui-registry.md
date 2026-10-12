@@ -51,7 +51,7 @@ Copy-in React components and a typed client that talk to GotAuth's HTTP API with
 - axe check in jsdom on each component: no violations.
 
 ## Out of scope
-- Server endpoints (C2-C4, P1-P5, O1); the npm `gotauth` package (later); the example app (G4).
+- Server endpoints (C2-C4, P1-P5, O1); the npm package `@gotauth/client` (later); the example app (G4).
 
 ## Notes
 - Check the current shadcn registry docs (`registry.json` schema, `shadcn build`) and record the CLI version; React 19 and current Next.js and Vite majors.
