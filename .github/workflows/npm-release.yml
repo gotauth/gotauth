@@ -1,4 +1,4 @@
-# Release of the npm package "gotauth" (registry/npm, the typed fetch client).
+# Release of the npm package "@gotauth/client" (registry/npm, the typed fetch client).
 # Push a tag js-vX.Y.Z whose version matches registry/npm/package.json.
 # Publishes with npm trusted publishing (OIDC) and provenance. Until a trusted
 # publisher is set up on npmjs.com, the "npm" environment's NPM_TOKEN secret is used
@@ -19,12 +19,12 @@ concurrency:
 
 jobs:
   publish:
-    name: Build and publish gotauth to npm
+    name: Build and publish @gotauth/client to npm
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment:
       name: npm
-      url: https://www.npmjs.com/package/gotauth
+      url: https://www.npmjs.com/package/@gotauth/client
     permissions:
       contents: read
       id-token: write # trusted publishing and provenance

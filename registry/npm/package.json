@@ -1,5 +1,5 @@
 {
-  "name": "gotauth",
+  "name": "@gotauth/client",
   "version": "0.0.1",
   "description": "Typed fetch client for GotAuth, open-source auth for Python AI backends",
   "keywords": ["auth", "authentication", "fastapi", "api-keys", "oauth", "mcp", "sessions"],

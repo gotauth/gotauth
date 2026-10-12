@@ -1,5 +1,5 @@
 {
-  // Compiles the registry's client (the single source) for the npm package "gotauth".
+  // Compiles the registry's client (the single source) for the npm package "@gotauth/client".
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

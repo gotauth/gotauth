@@ -1,4 +1,4 @@
-// Builds the npm package "gotauth" (registry/npm) from src/lib/gotauth-client.ts, then
+// Builds the npm package "@gotauth/client" (registry/npm) from src/lib/gotauth-client.ts, then
 // imports the result and makes one call with a fake fetch, so a broken build fails here.
 import { execFileSync } from "node:child_process"
 import { copyFileSync, readFileSync, rmSync } from "node:fs"
