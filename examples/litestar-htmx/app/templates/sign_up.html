@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Create an account{% endblock %}
+{% block content %}
+  <h1>Create an account</h1>
+  {# The same answer whether or not the email is taken; the link is printed by the
+     server on localhost and comes back to the sign-in page. #}
+  <form hx-post="/api/auth/sign-up/email" hx-swap="none" hx-vals='{"callback_url": "/sign-in"}'
+        data-done="message" data-text="Check your email for a link to finish signing up.">
+    <label>Email <input name="email" type="email" autocomplete="email" required></label>
+    <label>Password <input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+    <button>Create account</button>
+  </form>
+{% endblock %}

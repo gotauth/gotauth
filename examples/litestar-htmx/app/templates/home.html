@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>GotAuth with Litestar and htmx</h1>
+  {% if session %}
+    <p>Signed in as <strong>{{ session.user.email }}</strong>.</p>
+    <p><a href="/keys">Manage your API keys</a></p>
+  {% else %}
+    <p>Server-rendered pages; htmx sends every change to GotAuth's endpoints.</p>
+    <p><a href="/sign-in">Sign in</a> or <a href="/sign-up">create an account</a>.</p>
+  {% endif %}
+{% endblock %}

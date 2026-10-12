@@ -1,0 +1,18 @@
+{% if keys %}
+  <table>
+    <thead><tr><th>Name</th><th>Key</th><th>Scopes</th><th></th></tr></thead>
+    <tbody>
+      {% for key in keys %}
+        <tr>
+          <td>{{ key.name }}</td>
+          <td><code>{{ key.start }}...</code></td>
+          <td>{{ key.scopes | join(", ") }}</td>
+          <td><button hx-delete="/api/auth/api-keys/{{ key.id }}" hx-swap="none" data-done="reload"
+                      hx-confirm="Delete {{ key.name }}? Scripts using it stop working.">Delete</button></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No API keys yet.</p>
+{% endif %}

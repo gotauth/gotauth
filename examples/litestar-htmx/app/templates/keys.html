@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}API keys{% endblock %}
+{% block content %}
+  <h1>API keys</h1>
+  <form hx-post="/api/auth/api-keys" hx-swap="none" data-lists="scopes" data-done="new-key">
+    <label>Name <input name="name" required></label>
+    <fieldset>
+      <legend>Scopes</legend>
+      {% for scope in scopes %}
+        <label><input type="checkbox" name="scopes" value="{{ scope }}"> {{ scope }}</label>
+      {% endfor %}
+    </fieldset>
+    <button>Create key</button>
+  </form>
+  <div id="new-key" hidden>
+    <p>Copy your new key now. This is the only time it is shown.</p>
+    <code></code>
+  </div>
+  <div id="keys" hx-get="/keys/list" hx-trigger="load, reload"></div>
+{% endblock %}

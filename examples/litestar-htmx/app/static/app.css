@@ -1,0 +1,15 @@
+body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #1f2328; }
+header { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; border-bottom: 1px solid #d0d7de; }
+nav a { margin-right: 1rem; }
+main { max-width: 40rem; margin: 0 auto; padding: 1.5rem; }
+form { display: grid; gap: 0.75rem; margin-bottom: 1.5rem; }
+label { display: grid; gap: 0.25rem; }
+fieldset label { display: flex; gap: 0.5rem; }
+input[type="email"], input[type="password"], input:not([type]) { padding: 0.5rem; border: 1px solid #d0d7de; border-radius: 6px; }
+button { padding: 0.5rem 1rem; border: 1px solid #1f2328; border-radius: 6px; background: #1f2328; color: #fff; cursor: pointer; }
+header button, td button { background: #fff; color: #1f2328; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #d0d7de; }
+#message:not(:empty) { padding: 0.75rem; border-radius: 6px; background: #fff8c5; }
+#new-key { padding: 0.75rem; border: 1px solid #1a7f37; border-radius: 6px; margin-bottom: 1.5rem; }
+#new-key code { word-break: break-all; }
