@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import asyncio
 import os
-import secrets
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 import pytest
@@ -25,7 +25,12 @@ from app.auth import build_auth
 from app.main import create_app
 from gotauth.contracts import ProviderUser
 from gotauth.storage.sqlalchemy import sqlalchemy_adapter
-from gotauth.testing import CapturingMailer, StubOAuthProvider, fake_mailer
+from gotauth.testing import (
+    CapturingMailer,
+    StubOAuthProvider,
+    fake_mailer,
+    fresh_database_url,
+)
 
 BACKEND = Path(__file__).resolve().parent.parent
 GITHUB_USER = ProviderUser(
@@ -38,42 +43,38 @@ GITHUB_USER = ProviderUser(
 )
 
 
-def _postgres_url() -> str:
-    """A fresh database on the Postgres server for this test run."""
-    base = os.environ.get("GOTAUTH_TEST_POSTGRES_URL")
-    if not base:
-        pytest.skip("GOTAUTH_TEST_POSTGRES_URL is not set")
-    import asyncpg  # pyright: ignore[reportMissingTypeStubs]
-
-    name = "example_" + secrets.token_hex(6)
-
-    async def create() -> None:
-        conn = await asyncpg.connect(base)
-        await conn.execute(f'CREATE DATABASE "{name}"')
-        await conn.close()
-
-    asyncio.run(create())
-    server = base.rsplit("/", 1)[0].replace("postgresql://", "postgresql+asyncpg://")
-    return f"{server}/{name}"
-
-
-@pytest.fixture(params=["sqlite", "postgres"])
-def database_url(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[str]:
-    """A migrated database: `alembic upgrade head`, as the README does it."""
-    if request.param == "sqlite":
-        url = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
-    else:
-        url = _postgres_url()
+async def migrate(url: str) -> None:
+    """`alembic upgrade head`, as the app's container runs it."""
     previous = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = url
     try:
-        command.upgrade(Config(str(BACKEND / "alembic.ini")), "head")
-        yield url
+        # migrations/env.py starts its own event loop, so Alembic gets a thread.
+        config = Config(str(BACKEND / "alembic.ini"))
+        await asyncio.to_thread(command.upgrade, config, "head")
     finally:
         if previous is None:
             del os.environ["DATABASE_URL"]
         else:
             os.environ["DATABASE_URL"] = previous
+
+
+@pytest.fixture(params=["sqlite", "postgres"])
+async def database_url(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> AsyncIterator[str]:
+    """A migrated database: a SQLite file, or a fresh Postgres database."""
+    if request.param == "sqlite":
+        url = f"sqlite+aiosqlite:///{tmp_path / 'app.db'}"
+        await migrate(url)
+        yield url
+        return
+    base = os.environ.get("GOTAUTH_TEST_POSTGRES_URL")
+    if not base:
+        pytest.skip("GOTAUTH_TEST_POSTGRES_URL is not set")
+    server = urlsplit(base)._replace(scheme="postgresql+asyncpg")
+    async for url in fresh_database_url(urlunsplit(server)):  # dropped afterwards
+        await migrate(url)
+        yield url
 
 
 @dataclass

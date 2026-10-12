@@ -4,13 +4,12 @@ import Link from "next/link"
 
 import { ApiKeyManager } from "@/components/gotauth/api-key-manager"
 import { useSession } from "@/hooks/use-session"
-
-// The backend's api_key(allowed_scopes=...).
-const SCOPES = ["projects:read", "projects:write"]
+import { useAppConfig } from "@/lib/app-config"
 
 export default function KeysPage() {
   const { data, isPending } = useSession()
-  if (isPending) return null
+  const config = useAppConfig()
+  if (isPending || !config) return null
   if (!data) {
     return (
       <p>
@@ -27,7 +26,8 @@ export default function KeysPage() {
           curl -H &quot;x-api-key: gak_...&quot; http://localhost:3000/api/v1/projects
         </code>
       </p>
-      <ApiKeyManager scopes={SCOPES} />
+      {/* The backend's api_key(allowed_scopes=...), from GET /api/config. */}
+      <ApiKeyManager scopes={config.api_key_scopes} />
     </section>
   )
 }

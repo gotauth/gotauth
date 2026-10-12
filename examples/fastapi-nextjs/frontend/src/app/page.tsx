@@ -10,18 +10,32 @@ type Project = { id: number; name: string }
 
 function Projects() {
   const [projects, setProjects] = useState<Project[] | null>(null)
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let live = true
     // The session cookie goes along: same origin.
     fetch("/api/projects")
-      .then((response) => (response.ok ? (response.json() as Promise<Project[]>) : []))
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json() as Promise<Project[]>
+      })
       .then((value) => {
         if (live) setProjects(value)
+      })
+      .catch(() => {
+        if (live) setFailed(true)
       })
     return () => {
       live = false
     }
   }, [])
+  if (failed) {
+    return (
+      <p role="alert" className="text-destructive">
+        Could not load your projects. Sign in again or reload the page.
+      </p>
+    )
+  }
   if (!projects) return <p className="text-muted-foreground">Loading projects...</p>
   return (
     <ul className="grid gap-2" data-testid="projects">

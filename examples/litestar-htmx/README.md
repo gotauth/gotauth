@@ -21,13 +21,13 @@ From the repository root, in the dev container. `UV_PROJECT_ENVIRONMENT=.venv` k
 
 ```bash
 ./dev.sh --ports bash
-cd examples/litestar-htmx && export UV_PROJECT_ENVIRONMENT=.venv
-uv sync --locked && export GOTAUTH_SECRET="$(uv run gotauth secret)"
-uv run gotauth migrate --auth app.auth:auth     # creates GotAuth's tables in app.db
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+cd examples/litestar-htmx && export UV_PROJECT_ENVIRONMENT=.venv && uv sync --locked
+[ -f .env ] || echo "GOTAUTH_SECRET=$(uv run gotauth secret)" > .env   # once
+set -a && . ./.env && set +a                    # nothing else loads .env
+uv run gotauth migrate --auth app.auth:auth && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Then open http://localhost:8000. The secret above lasts for this shell only. Put it in `.env` (see `.env.example`) to keep sessions across restarts.
+Then open http://localhost:8000. `gotauth migrate` creates GotAuth's tables in `app.db`. `.env.example` lists the other settings.
 
 **The walkthrough:**
 1. Create an account.

@@ -46,9 +46,8 @@ GotAuth already provides sign-up, sign-in, sessions, email verification, passwor
 4. The callback URL is `http://localhost:3000/api/auth/callback/<id>`.
 
 **Add an API key scope:**
-1. Add it to `SCOPES` in `auth.py`.
-2. Add it to `SCOPES` in `frontend/src/app/keys/page.tsx`.
-3. Protect routes with `require("<scope>")`.
+1. Add it to `SCOPES` in `auth.py`. The keys page reads the list from `GET /api/config`.
+2. Protect routes with `require("<scope>")`.
 
 **Add a GotAuth plugin:**
 1. Add it to `plugins` in `auth.py`.

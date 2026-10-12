@@ -92,7 +92,11 @@ From the repository root, in the dev container:
 `UV_PROJECT_ENVIRONMENT=.venv` keeps the example's environment apart from the library's.
 
 **Running without Docker Compose** (two terminals):
-- **Backend:** `uv run alembic upgrade head && uv run uvicorn app.main:app --reload`, on port 8000.
+- **Backend**, on port 8000:
+  ```bash
+  set -a && . ../.env && set +a   # nothing else loads .env
+  uv run alembic upgrade head && uv run uvicorn app.main:app --reload
+  ```
 - **Frontend:** `pnpm dev`, on port 3000. `BACKEND_URL` defaults to `http://localhost:8000`.
 
 ## Where the UI comes from

@@ -43,7 +43,10 @@ async def test_m2_scenario(example: Example) -> None:
     # account. 4. The session cookie is set.
     async with example.browser() as browser:
         config = (await browser.get("/api/config")).json()
-        assert config["social_providers"] == [{"id": "github", "name": "GitHub"}]
+        assert config == {
+            "social_providers": [{"id": "github", "name": "GitHub"}],
+            "api_key_scopes": ["projects:read", "projects:write"],
+        }
         started = await browser.post(
             "/api/auth/sign-in/social", json={"provider": "github", "callback_url": "/"}
         )

@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 
-from gotauth import GotAuth, Principal, User
+from app.auth import SCOPES
+from gotauth import AuthError, GotAuth, Principal, User
 
 
 class Project(BaseModel):
@@ -22,6 +23,7 @@ class Provider(BaseModel):
 
 class Config(BaseModel):
     social_providers: list[Provider]
+    api_key_scopes: list[str]
 
 
 # Demo data, kept in memory per user.
@@ -29,10 +31,10 @@ _projects: dict[str, list[Project]] = {}
 
 
 def projects_of(user_id: str) -> list[Project]:
-    names = ("Website redesign", "Mobile app", "Data pipeline")
-    return _projects.setdefault(
-        user_id, [Project(id=i + 1, name=name) for i, name in enumerate(names)]
-    )
+    if user_id not in _projects:
+        names = ("Website redesign", "Mobile app", "Data pipeline")
+        _projects[user_id] = [Project(id=i + 1, name=n) for i, n in enumerate(names)]
+    return _projects[user_id]
 
 
 def create_app(auth: GotAuth) -> FastAPI:
@@ -46,9 +48,9 @@ def create_app(auth: GotAuth) -> FastAPI:
 
     @app.get("/api/config")
     async def config() -> Config:
-        """What the frontend needs to know, such as which sign-in buttons to show."""
+        """What the frontend needs: which sign-in buttons and key scopes to offer."""
         providers = [Provider(id=p.id, name=p.name) for p in auth.providers.values()]
-        return Config(social_providers=providers)
+        return Config(social_providers=providers, api_key_scopes=list(SCOPES))
 
     @app.get("/api/projects")
     async def projects(user: Annotated[User, current_user]) -> list[Project]:
@@ -60,7 +62,9 @@ def create_app(auth: GotAuth) -> FastAPI:
         key: Annotated[Principal, api_key], _: Annotated[Principal, can_read]
     ) -> list[Project]:
         """For scripts: an API key with the projects:read scope."""
-        return projects_of(key.user_id or "")
+        if key.user_id is None:  # the demo data belongs to users, not organizations
+            raise AuthError("FORBIDDEN", 403)
+        return projects_of(key.user_id)
 
     return app
 

@@ -19,9 +19,11 @@ def build_auth(
     database: Adapter | None = None,  # tests pass their own database and mailer
     email_sender: EmailSender | None = None,
 ) -> GotAuth:
-    engine = create_async_engine(env.get("DATABASE_URL", "sqlite+aiosqlite:///app.db"))
+    if database is None:
+        url = env.get("DATABASE_URL", "sqlite+aiosqlite:///app.db")
+        database = sqlalchemy_adapter(create_async_engine(url))
     return GotAuth(
-        database=database or sqlalchemy_adapter(engine),
+        database=database,
         secret=env["GOTAUTH_SECRET"],
         base_url=env.get("BASE_URL", "http://localhost:8000"),
         email_password={"require_email_verification": True},
