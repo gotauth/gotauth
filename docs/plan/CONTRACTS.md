@@ -1,11 +1,11 @@
-# GotAuth contracts (version 5)
+# GotAuth contracts (version 6)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 5
+CONTRACT_VERSION = 6
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -35,6 +35,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 4 (2026-10-12, [CCR 004](../ccr/004-scrypt-cost.md)):** the default scrypt parameters (section 8) go from `p=1` to `p=3`, the OWASP minimum at 32 MiB. Existing hashes keep working and are rehashed at the next sign-in.
 
 **Version 5 (2026-10-12, [CCR 005](../ccr/005-change-email-fresh.md)):** `change_email` (13.1) needs a fresh session, like `change_password`.
+
+**Version 6 (2026-10-12, [CCR 006](../ccr/006-session-lifetime.md)):** `SessionConfig.absolute_lifetime` (section 7, default `"30d"`) caps every session at `created_at` plus that, however often it slides; and a sign-in ends the session the request's cookie belonged to.
 
 ---
 
@@ -464,10 +466,12 @@ Plugins add codes through `Plugin.error_codes`, prefixed with their area, e.g. `
   | `update_age` | `"1d"` | Sliding refresh: once a session is older than this since its last update, `expires_at` moves forward |
   | `fresh_age` | `"1d"` | |
   | `short_expires_in` | `"1d"` | Server expiry for `remember_me=False` |
+  | `absolute_lifetime` | `"30d"` | No session outlives `created_at` plus this, however often it slides; `None` turns the cap off |
   | `allow_bearer` | `True` | |
   | `expose_token` | `False` | When True, sign-in responses include `token` for native and CLI clients |
   | `cookie_cache` | `{enabled: False, max_age: "5m"}` | |
 - **Sliding refresh on `GET /session`** is allowed bookkeeping and doesn't count as a state change (see AGENT-RULES).
+- **Re-authentication:** `complete_sign_in` and `finish_challenge` revoke the session behind the request's session cookie, if any, once the new session exists. Bearer tokens are not touched.
 
 ```python
 @dataclass(frozen=True)

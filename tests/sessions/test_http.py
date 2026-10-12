@@ -184,3 +184,23 @@ async def test_secondary_storage_is_used_end_to_end() -> None:
         assert (await client.get("/session")).json() is not None
     key = f"session:{auth.crypto.hash_token(token)}"
     assert await storage.get(key) is not None
+
+
+async def test_signing_in_again_ends_the_presented_session() -> None:
+    # ASVS 7.2.4: re-authentication replaces the browser's session.
+    auth = make_auth(email_password={"require_email_verification": False})
+    credentials = {"email": "ada@example.com", "password": "correct horse battery"}
+    async with make_client(auth) as browser:
+        assert (
+            await browser.post("/sign-up/email", json=credentials)
+        ).status_code == 200
+        first = browser.cookies.get("gotauth.session_token")
+        again = await browser.post("/sign-in/email", json=credentials)
+        assert again.status_code == 200, again.text
+        second = browser.cookies.get("gotauth.session_token")
+        assert first and second and first != second
+        listed = (await browser.get("/sessions")).json()
+        assert [s["id"] for s in listed["sessions"]] == [listed["current_session_id"]]
+    async with make_client(auth) as old:
+        old.cookies.set("gotauth.session_token", first)
+        assert (await old.get("/session")).json() is None

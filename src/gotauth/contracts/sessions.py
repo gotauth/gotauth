@@ -125,6 +125,9 @@ class SessionConfig(BaseModel):
     fresh_age: Duration = "1d"
     short_expires_in: Duration = "1d"
     """Server expiry for ``remember_me=False``."""
+    absolute_lifetime: Duration | None = "30d"
+    """No session outlives ``created_at`` plus this, however often it slides;
+    ``None`` turns the cap off."""
     allow_bearer: bool = True
     expose_token: bool = False
     """When True, sign-in responses include ``token`` for native and CLI clients."""
@@ -134,6 +137,11 @@ class SessionConfig(BaseModel):
     @classmethod
     def _valid_duration(cls, value: Duration) -> Duration:
         return _check_duration(value)
+
+    @field_validator("absolute_lifetime")
+    @classmethod
+    def _valid_optional_duration(cls, value: Duration | None) -> Duration | None:
+        return None if value is None else _check_duration(value)
 
 
 @dataclass(frozen=True)

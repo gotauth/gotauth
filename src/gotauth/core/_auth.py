@@ -968,7 +968,9 @@ class GotAuth:
         if challenge is not None:
             self._set_challenge(ctx, user.id, challenge, method, remember_me)
             return ChallengeOut(challenge=challenge)
+        presented = await self._presented_session_id(ctx)
         created = await ctx.sessions.create(ctx, user.id, remember_me=remember_me)
+        await self._end_presented_session(ctx, presented, created.session.id)
         await ctx.emit("sign_in.succeeded", user_id=user.id, method=method)
         token = created.token if self._config.sessions.expose_token else None
         return SignInOut.model_validate(
@@ -978,6 +980,31 @@ class GotAuth:
                 "token": token,
             }
         )
+
+    async def _presented_session_id(self, ctx: EndpointContext) -> str | None:
+        """The session behind the request's session cookie, looked up by hash only
+        (no sliding refresh, no cookie written). Bearer tokens belong to other
+        clients and are left alone."""
+        name = cookie_name(
+            "session_token",
+            base_url=self._config.base_url,
+            prefix=self._config.advanced.cookie_prefix,
+        )
+        token = ctx.request.cookies.get(name)
+        if not token:
+            return None
+        row = await ctx.adapter.find_one(
+            "session", [Where("token_hash", ctx.crypto.hash_token(token))]
+        )
+        return str(row["id"]) if row is not None else None
+
+    @staticmethod
+    async def _end_presented_session(
+        ctx: EndpointContext, presented: str | None, new_session_id: str
+    ) -> None:
+        """Re-authentication replaces the browser's session (ASVS 7.2.4)."""
+        if presented is not None and presented != new_session_id:
+            await ctx.sessions.revoke(ctx, presented)
 
     def _set_challenge(
         self,
@@ -1048,7 +1075,9 @@ class GotAuth:
         if row is None:
             raise AuthError("TOKEN_INVALID", 400)
         user = User.model_validate(returned_only(self._schema["user"], row))
+        presented = await self._presented_session_id(ctx)
         created = await ctx.sessions.create(ctx, user.id, remember_me=state.remember_me)
+        await self._end_presented_session(ctx, presented, created.session.id)
         ctx.set_cookie(
             SetCookie(
                 name=self.cookie_name("challenge"),

@@ -5,6 +5,7 @@
 | From | Q1 (`docs/security/asvs.md`) |
 | For | C3 (`src/gotauth/sessions/`) and C1 (`complete_sign_in` in `src/gotauth/core/`); item 1 adds config, so it needs a CCR |
 | Date | 2026-10-10 |
+| Status | Applied 2026-10-12 as [CCR 006](../ccr/006-session-lifetime.md) (issue #5) |
 
 ## What and why
 
