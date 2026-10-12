@@ -354,7 +354,13 @@ CORE_ENDPOINTS: tuple[EndpointSpec, ...] = (
         output=(StatusOut,),
     ),
     EndpointSpec(
-        "change_email", "POST", "/change-email", "session", "C2", output=(StatusOut,)
+        "change_email",
+        "POST",
+        "/change-email",
+        "session",
+        "C2",
+        fresh_session=True,
+        output=(StatusOut,),
     ),
     EndpointSpec("update_user", "PATCH", "/user", "session", "C2", output=(UserOut,)),
     EndpointSpec(

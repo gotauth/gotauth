@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from gotauth.testing import fake_mailer, make_auth, make_client
+from gotauth.testing import fake_clock, fake_mailer, make_auth, make_client
 
 from .conftest import PASSWORD, token_from
 
@@ -102,3 +102,31 @@ async def test_untrusted_redirect_is_invalid_request() -> None:
         )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+async def test_change_email_needs_a_recent_sign_in() -> None:
+    # ASVS 7.5.1: a stolen day-old session must not be able to move the account.
+    clock = fake_clock()
+    auth, mailer = build(
+        clock=clock, email_password={"require_email_verification": False}
+    )
+    async with make_client(auth) as client:
+        signed_up = await client.post(
+            "/sign-up/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        assert signed_up.status_code == 200, signed_up.text
+        clock.advance("2d")  # older than sessions.fresh_age (1 day), still valid
+        stale = await client.post(
+            "/change-email", json={"new_email": "new@example.com"}
+        )
+        assert stale.status_code == 403
+        assert stale.json()["error"]["code"] == "FRESH_SESSION_REQUIRED"
+        signed_in = await client.post(
+            "/sign-in/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        assert signed_in.status_code == 200, signed_in.text
+        fresh = await client.post(
+            "/change-email", json={"new_email": "new@example.com"}
+        )
+        assert fresh.status_code == 200, fresh.text
+        assert mailer.last("change_email", "new@example.com")

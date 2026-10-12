@@ -11,6 +11,8 @@
 ### 1. `change_email` without a fresh session (ASVS 7.5.1, Level 2)
 `change_password`, `delete_user` and `unlink_account` are declared with `fresh_session=True`; `change_email` is not. A stolen session older than `fresh_age` can therefore start an email change. The link goes to the new address, which the thief controls, and the old address only gets a notice after the change.
 
+**Applied 2026-10-12** as [CCR 005](../ccr/005-change-email-fresh.md).
+
 **Proposed:** add `fresh_session=True` to the `change_email` endpoint and mark it "session, fresh" in the CONTRACTS 13.1 table. It is a one-line code change plus the table edit.
 
 ### 2. No check against common passwords (ASVS 6.2.4, Level 1)

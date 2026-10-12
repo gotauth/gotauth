@@ -584,6 +584,7 @@ def email_password_plugin(
                 input=ChangeEmailIn,
                 output=StatusOut,
                 auth="session",
+                fresh_session=True,
                 summary="Change your email address",
                 tags=tags,
             ),
