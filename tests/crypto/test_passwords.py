@@ -24,7 +24,7 @@ from gotauth.crypto._passwords import (
 SECRET = "password-tests-secret-0123456789abcdef"
 KIT = crypto_kit(SECRET)
 SCRYPT_FORMAT = re.compile(
-    r"scrypt\$ln=15,r=8,p=1\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{86}"
+    r"scrypt\$ln=15,r=8,p=3\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{86}"
 )
 HAS_ARGON2 = importlib.util.find_spec("argon2") is not None
 HAS_BCRYPT = importlib.util.find_spec("bcrypt") is not None

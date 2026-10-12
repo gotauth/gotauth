@@ -153,7 +153,8 @@ function verifyPassword(password, stored) {
     if (salt.length < 8 || salt.length > 128 || key.length < 16 || key.length > 128) return FAIL;
     const maxmem = 128 * r * (2 ** ln + 2 + p) + 2 ** 26;
     const ok = scryptSync(utf8(password), salt, key.length, { N: 2 ** ln, r, p, maxmem }).equals(key);
-    const standard = ln === 15 && r === 8 && p === 1 && salt.length === 16 && key.length === 64;
+    // The default since CONTRACT_VERSION 4 (CCR 004): ln=15, r=8, p=3.
+    const standard = ln === 15 && r === 8 && p === 3 && salt.length === 16 && key.length === 64;
     return { ok, needs_rehash: ok && !standard };
   }
   if (tag === "bcrypt") {

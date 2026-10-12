@@ -2,7 +2,7 @@
 
 Stored formats, each with a tag in front:
 
-- ``scrypt$ln=15,r=8,p=1$<salt>$<hash>``: the default. Standard base64 without padding,
+- ``scrypt$ln=15,r=8,p=3$<salt>$<hash>``: the default. Standard base64 without padding,
   16-byte salt, 64-byte key, N = 2**ln.
 - ``argon2id$<PHC string>``: with the ``argon2`` extra and
   ``password_algorithm="argon2id"``.
@@ -76,7 +76,7 @@ class ScryptParams:
         return 1 << self.ln
 
 
-DEFAULT_SCRYPT = ScryptParams(ln=15, r=8, p=1)
+DEFAULT_SCRYPT = ScryptParams(ln=15, r=8, p=3)
 SCRYPT_SALT_BYTES = 16
 SCRYPT_KEY_BYTES = 64
 # N = 2**15 with r = 8 needs 32 MiB plus a little, just over OpenSSL's default limit.
@@ -275,7 +275,7 @@ class PasswordHasher:
             password: The password.
 
         Returns:
-            The tagged stored form, for example ``scrypt$ln=15,r=8,p=1$...``.
+            The tagged stored form, for example ``scrypt$ln=15,r=8,p=3$...``.
 
         Raises:
             ValueError: If the password cannot be encoded as UTF-8 (lone surrogates).

@@ -5,6 +5,7 @@
 | From | Q1 (ASVS mapping, 11.4.2) |
 | For | F3 (`src/gotauth/crypto/_passwords.py`) |
 | Date | 2026-10-10 |
+| Status | Applied 2026-10-12 as [CCR 004](../ccr/004-scrypt-cost.md) (issue #6) |
 
 ## What
 `DEFAULT_SCRYPT = ScryptParams(ln=15, r=8, p=1)` is below the OWASP Password Storage Cheat Sheet minimum (checked 2026-10-10). The minimum is N=2^17, r=8, p=1. These equivalent settings give the same protection:

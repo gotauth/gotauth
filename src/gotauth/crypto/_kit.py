@@ -161,7 +161,7 @@ class DefaultCryptoKit:
             password: The password.
 
         Returns:
-            The tagged stored form, for example ``scrypt$ln=15,r=8,p=1$<salt>$<hash>``.
+            The tagged stored form, for example ``scrypt$ln=15,r=8,p=3$<salt>$<hash>``.
 
         Raises:
             ValueError: If the password cannot be encoded as UTF-8.

@@ -21,7 +21,7 @@ Test paths use `sec/` for `tests/security/`. Open gaps link their request files.
 | V8 Authorization | 5 | 0 | 0 | 1 | 1 | 0 |
 | V9 Self-contained Tokens | 7 | 0 | 0 | 0 | 0 | 0 |
 | V10 OAuth and OIDC | 25 | 1 | 1 | 0 | 0 | 2 |
-| V11 Cryptography | 12 | 1 | 0 | 0 | 0 | 1 |
+| V11 Cryptography | 13 | 0 | 0 | 0 | 0 | 1 |
 
 ## V6 Authentication
 
@@ -166,7 +166,7 @@ GotAuth is an OAuth client (C4, social login), an authorization server and OpenI
 
 | Use | Algorithm | Key or parameters | Rotation |
 |---|---|---|---|
-| Password hashing | scrypt (default), argon2id (extra), bcrypt (verify only, imports) | scrypt `ln=15, r=8, p=1` | Tagged format; rehash on sign-in when parameters change |
+| Password hashing | scrypt (default), argon2id (extra), bcrypt (verify only, imports) | scrypt `ln=15, r=8, p=3` | Tagged format; rehash on sign-in when parameters change |
 | Token hashing (`gas_`, `gak_`, `gar_`, `gac_`, `gav_`, `gcs_`) | SHA-256 | Tokens are 256-bit random | n/a |
 | Cookie and state signing | HMAC-SHA256 | `derive_key("sign:" + purpose)`, HKDF-SHA256 from `secret` | Change `secret`; old cookies stop working |
 | Encryption at rest (provider tokens, JWK private keys) | AES-256-GCM, `v1.` format | `derive_key("encrypt")`, HKDF-SHA256 from `secret`; the purpose is the associated data | Versioned ciphertext |
@@ -187,7 +187,7 @@ GotAuth is an OAuth client (C4, social login), an authorization server and OpenI
 | 11.3.2 | met | AES-GCM | `tests/crypto/test_kit.py` |
 | 11.3.3 | met | GCM with the purpose as associated data | `tests/crypto/test_kit.py` |
 | 11.4.1 | met | SHA-256 everywhere; SHA-1 only inside HMAC for TOTP (P2), as RFC 6238 requires | |
-| 11.4.2 | partial | scrypt, but `ln=15, r=8, p=1` is below OWASP's minimum (`ln=17, r=8, p=1` or equivalent) | [Q1-F3-scrypt-cost](../requests/Q1-F3-scrypt-cost.md) |
+| 11.4.2 | met | scrypt `ln=15, r=8, p=3`, the OWASP minimum at 32 MiB; older hashes are rehashed at sign-in | `tests/crypto/test_vectors.py` (previous default needs a rehash) |
 | 11.4.3 | met | SHA-256 for signatures and token hashes | |
 | 11.4.4 | n.a. | No keys derived from passwords | |
 | 11.5.1 | met | `secrets`; 256 bits | `tests/crypto/test_kit.py` |
