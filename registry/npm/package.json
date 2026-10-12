@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Typed fetch client for GotAuth, open-source auth for Python AI backends",
   "keywords": ["auth", "authentication", "fastapi", "api-keys", "oauth", "mcp", "sessions"],
-  "homepage": "https://gotauth.dev",
+  "homepage": "https://gotauth.ablacky.com",
   "bugs": "https://github.com/gotauth/gotauth/issues",
   "repository": {
     "type": "git",

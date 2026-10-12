@@ -1,7 +1,7 @@
 {
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "name": "gotauth",
-  "homepage": "https://gotauth.dev",
+  "homepage": "https://gotauth.ablacky.com",
   "items": [
     {
       "name": "gotauth-client",

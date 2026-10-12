@@ -24,7 +24,7 @@
       "end_column": 31,
       "message": "python-jose is imported; releases before 3.4.0 are affected by CVE-2024-33663 and CVE-2024-33664.",
       "hint": "Use PyJWT or joserfc and pass the accepted algorithms explicitly. If you keep python-jose, require version 3.4.0 or later.",
-      "help_uri": "https://gotauth.dev/check/GA002",
+      "help_uri": "https://gotauth.ablacky.com/check/GA002",
       "fingerprint": "5cd45906fdad2458:1"
     },
     {
@@ -37,7 +37,7 @@
       "end_column": 41,
       "message": "passlib is imported; its last release is 1.7.4 (October 2020).",
       "hint": "Hash new passwords with argon2-cffi, pwdlib or bcrypt. To keep accepting existing hashes, verify them with a maintained library that reads the same format (for example libpass, a passlib fork, or bcrypt for $2b$ hashes) and rehash on the next sign-in. An auth library such as GotAuth can also handle this.",
-      "help_uri": "https://gotauth.dev/check/GA001",
+      "help_uri": "https://gotauth.ablacky.com/check/GA001",
       "fingerprint": "81c8240f00dd1f3d:1"
     },
     {
@@ -50,7 +50,7 @@
       "end_column": 48,
       "message": "SECRET_KEY is assigned a hard-coded high-entropy string.",
       "hint": "Read the value from an environment variable or a secret manager, rotate the exposed secret, and remove it from the git history.",
-      "help_uri": "https://gotauth.dev/check/GA009",
+      "help_uri": "https://gotauth.ablacky.com/check/GA009",
       "fingerprint": "74be37a59cdc0600:1"
     },
     {
@@ -63,7 +63,7 @@
       "end_column": 66,
       "message": "jwt.encode signs HS256 tokens with a hard-coded secret.",
       "hint": "Load the key from the environment or a secret manager and use at least 32 random bytes (for example secrets.token_urlsafe(32)), or switch to an asymmetric algorithm such as RS256, ES256 or EdDSA.",
-      "help_uri": "https://gotauth.dev/check/GA003",
+      "help_uri": "https://gotauth.ablacky.com/check/GA003",
       "fingerprint": "81e0c6ff73035226:1"
     },
     {
@@ -76,7 +76,7 @@
       "end_column": 20,
       "message": "POST route \"/token\" looks like a sign-in endpoint and the project has no rate limiter.",
       "hint": "Rate-limit these routes per IP address and per account, for example with slowapi, limits or fastapi-limiter, or use an auth library with built-in rate limits such as GotAuth. If a proxy or gateway already limits them, suppress the finding with # gotauth: ignore[GA007].",
-      "help_uri": "https://gotauth.dev/check/GA007",
+      "help_uri": "https://gotauth.ablacky.com/check/GA007",
       "fingerprint": "a2f00e9e7614d24f:1"
     },
     {
@@ -89,7 +89,7 @@
       "end_column": 33,
       "message": "signature is compared with == instead of in constant time.",
       "hint": "Compare secrets with hmac.compare_digest (or secrets.compare_digest). For passwords, store a password hash and use the hashing library's verify function.",
-      "help_uri": "https://gotauth.dev/check/GA006",
+      "help_uri": "https://gotauth.ablacky.com/check/GA006",
       "fingerprint": "d7db1a5d2fdede8c:1"
     },
     {
@@ -102,7 +102,7 @@
       "end_column": 62,
       "message": "response.set_cookie is called without secure=True.",
       "hint": "Pass httponly=True, secure=True and a samesite value (lax or strict) for session and auth cookies.",
-      "help_uri": "https://gotauth.dev/check/GA012",
+      "help_uri": "https://gotauth.ablacky.com/check/GA012",
       "fingerprint": "0beb98ecf850af35:1"
     }
   ],

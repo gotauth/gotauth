@@ -74,7 +74,10 @@ def test_json_schema(sample_app: Path, capsys: pytest.CaptureFixture[str]) -> No
             "help_uri",
             "fingerprint",
         }
-        assert finding["help_uri"] == f"https://gotauth.dev/check/{finding['rule_id']}"
+        assert (
+            finding["help_uri"]
+            == f"https://gotauth.ablacky.com/check/{finding['rule_id']}"
+        )
     assert {
         item["path"]: item["reason"].split(":")[0] for item in report["skipped"]
     } == {
@@ -114,7 +117,7 @@ def test_sarif_tool_driver(sarif: dict[str, Any]) -> None:
     assert driver["name"] == "gotauth check"
     assert driver["version"] == gotauth.__version__
     assert driver["semanticVersion"] == gotauth.__version__
-    assert driver["informationUri"] == "https://gotauth.dev/check"
+    assert driver["informationUri"] == "https://gotauth.ablacky.com/check"
     rules = driver["rules"]
     assert [rule["id"] for rule in rules] == sorted(RULES)
     for rule in rules:
@@ -124,7 +127,7 @@ def test_sarif_tool_driver(sarif: dict[str, Any]) -> None:
         assert nonempty_text(rule["fullDescription"]["text"], 1024)
         assert nonempty_text(rule["help"]["text"])
         assert source.hint in rule["help"]["text"]
-        assert rule["helpUri"] == f"https://gotauth.dev/check/{rule['id']}"
+        assert rule["helpUri"] == f"https://gotauth.ablacky.com/check/{rule['id']}"
         assert rule["defaultConfiguration"]["level"] == LEVELS[source.severity]
         properties = rule["properties"]
         assert 0 < len(properties["tags"]) <= 20

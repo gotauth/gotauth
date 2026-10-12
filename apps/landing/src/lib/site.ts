@@ -42,7 +42,7 @@ function readWaitlist(): WaitlistConfig | undefined {
   }
   const local = endpoint.hostname === "localhost" || endpoint.hostname === "127.0.0.1";
   if (endpoint.protocol !== "https:" && !(local && endpoint.protocol === "http:")) {
-    // gotauth.dev is HTTPS only, and browsers block a form post from HTTPS to HTTP.
+    // The site is served over HTTPS only, and browsers block a form post from HTTPS to HTTP.
     throw new Error(`PUBLIC_WAITLIST_ENDPOINT must use https: ${raw}`);
   }
 

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://gotauth.dev/sitemap-index.xml
+Sitemap: https://gotauth.ablacky.com/sitemap-index.xml

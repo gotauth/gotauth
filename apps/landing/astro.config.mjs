@@ -2,7 +2,7 @@
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 
-const site = "https://gotauth.dev";
+const site = "https://gotauth.ablacky.com";
 
 export default defineConfig({
   site,

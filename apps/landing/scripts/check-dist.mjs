@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = join(root, "dist");
-const SITE = "https://gotauth.dev";
+const SITE = "https://gotauth.ablacky.com";
 const STATIC_EXT = new Set([".html", ".xml", ".txt", ".js", ".css", ".png", ".svg", ".ico", ".webmanifest", ""]);
 // U+2013 en dash and U+2014 em dash, built from char codes so this file stays ASCII.
 const DASHES = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
@@ -93,6 +93,10 @@ if (!failures.length) pass(`no third-party resources in ${htmlFiles.length} page
 for (const name of ["robots.txt", "sitemap-index.xml", "favicon.svg", "favicon-32.png", "apple-touch-icon.png", "og.png", "404.html"]) {
   if (!existsSync(join(dist, name))) fail(`missing dist/${name}`);
 }
+// Apache (cPanel) settings: the 404 page, HTTPS and the security headers.
+const htaccess = existsSync(join(dist, ".htaccess")) ? readFileSync(join(dist, ".htaccess"), "utf8") : "";
+if (!htaccess.includes("ErrorDocument 404 /404.html")) fail("dist/.htaccess is missing or has no 404 page");
+if (!htaccess.includes('X-Frame-Options "DENY"')) fail("dist/.htaccess does not block framing");
 const og = readFileSync(join(dist, "og.png"));
 if (og.readUInt32BE(16) !== 1200 || og.readUInt32BE(20) !== 630) fail("og.png is not 1200x630");
 if (!read("robots.txt").includes(`Sitemap: ${SITE}/sitemap-index.xml`)) fail("robots.txt does not point to the sitemap");
@@ -192,7 +196,7 @@ const sources = [
   "package.json",
   ".env.example",
   "public/robots.txt",
-  "public/_headers",
+  "public/.htaccess",
   "public/favicon.svg",
 ].map((f) => join(root, f));
 const texts = [...htmlFiles.map((f) => join(dist, f)), ...sources].filter((f) => existsSync(f));

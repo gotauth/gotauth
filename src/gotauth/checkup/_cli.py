@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Silence one finding with a comment on its line: # gotauth: ignore[GA006]. "
             "Exit codes: 0 done, 1 score below --fail-under, 2 usage error. "
-            "Rules: https://gotauth.dev/check"
+            "Rules: https://gotauth.ablacky.com/check"
         ),
     )
     parser.add_argument(

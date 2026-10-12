@@ -67,8 +67,8 @@ starlette = ["starlette>=0.46"]
 gotauth = "gotauth.cli:main"
 
 [project.urls]
-Homepage = "https://gotauth.dev"
-Documentation = "https://gotauth.dev/docs"
+Homepage = "https://gotauth.ablacky.com"
+Documentation = "https://github.com/gotauth/gotauth#readme"
 Repository = "https://github.com/gotauth/gotauth"
 Changelog = "https://github.com/gotauth/gotauth/blob/main/CHANGELOG.md"
 
