@@ -528,3 +528,38 @@ def test_the_fastapi_extra_brings_form_support() -> None:
         r.name for r in requires if r.marker and r.marker.evaluate({"extra": "fastapi"})
     }
     assert "python-multipart" in fastapi_extra, fastapi_extra
+
+
+async def test_the_principal_is_resolved_once_per_request() -> None:
+    # api_key_principal with require(...) is the documented pairing for key-only
+    # routes. Each lookup counts against the key's rate limit, so it must be one.
+    auth, app = build(mount=False)
+    fa = auth.fastapi
+
+    @app.get("/both")
+    async def both(
+        key: Annotated[Principal, Depends(fa.api_key_principal)],
+        _: Annotated[Principal, Depends(fa.require("projects:read"))],
+    ) -> dict[str, str]:
+        return {"id": key.credential_id}
+
+    calls = 0
+    original = auth.get_principal
+
+    async def counting(headers: Any, cookies: Any) -> Principal | None:  # Any: maps
+        nonlocal calls
+        calls += 1
+        return await original(headers, cookies)
+
+    auth.get_principal = counting
+    async with client(app) as http:
+        await sign_up(http)
+        created = await http.post(
+            "/api/auth/api-keys", json={"name": "k", "scopes": ["projects:read"]}
+        )
+        key = created.json()["key"]
+    async with client(app, origin=False) as curl:
+        calls = 0
+        response = await curl.get("/both", headers={"x-api-key": key})
+    assert response.status_code == 200, response.text
+    assert calls == 1
