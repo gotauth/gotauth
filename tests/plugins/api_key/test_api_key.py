@@ -240,6 +240,7 @@ async def test_an_unparseable_expiry_is_invalid_request(expires_in: str) -> None
     error = response.json()["error"]
     assert error["code"] == "INVALID_REQUEST"
     assert ["expires_in"] in [e["loc"] for e in error["details"]["errors"]]
+    assert expires_in not in response.text or not expires_in  # no input echoed
 
 
 # ---------------------------------------------------------------- organizations

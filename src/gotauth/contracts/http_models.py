@@ -177,9 +177,14 @@ class IssueApiKeyIn(_CallIn):
     @field_validator("expires_in")
     @classmethod
     def _valid_duration(cls, value: Duration | None) -> Duration | None:
-        # A bad duration is a 400 with the field location, not a crash later.
+        # A bad duration is a 400 with the field location, not a crash later. The
+        # message must not repeat the value (no input in errors, CONTRACTS 6).
         if value is not None:
-            to_timedelta(value)
+            try:
+                to_timedelta(value)
+            except ValueError:
+                msg = "expected a duration such as '90s', '15m', '12h' or '7d'"
+                raise ValueError(msg) from None
         return value
 
 
