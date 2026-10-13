@@ -20,7 +20,13 @@ from gotauth.crypto._keys import (
     purpose_info,
     signature,
 )
-from gotauth.crypto._passwords import PasswordAlgorithm, PasswordCheck, PasswordHasher
+from gotauth.crypto._passwords import (
+    DEFAULT_SCRYPT,
+    PasswordAlgorithm,
+    PasswordCheck,
+    PasswordHasher,
+    ScryptParams,
+)
 
 __all__ = ["MIN_SECRET_LENGTH", "DefaultCryptoKit", "crypto_kit"]
 
@@ -74,6 +80,7 @@ class DefaultCryptoKit:
         secret: str | Sequence[str],
         *,
         password_algorithm: PasswordAlgorithm = "scrypt",  # noqa: S107 - a name, not a password
+        scrypt_params: ScryptParams | None = None,
     ) -> None:
         """Create a kit. Prefer `crypto_kit`, which has the same arguments.
 
@@ -87,7 +94,10 @@ class DefaultCryptoKit:
                 or the password algorithm is unknown or its extra is missing.
         """
         self._secrets = _load_secrets(secret)
-        self._passwords = PasswordHasher(password_algorithm)
+        self._passwords = PasswordHasher(
+            password_algorithm,
+            scrypt=scrypt_params if scrypt_params is not None else DEFAULT_SCRYPT,
+        )
         self._key_cache: dict[tuple[int, str, int], Secret] = {}
 
     def __repr__(self) -> str:
@@ -392,6 +402,7 @@ def crypto_kit(
     secret: str | Sequence[str],
     *,
     password_algorithm: PasswordAlgorithm = "scrypt",  # noqa: S107 - a name, not a password
+    scrypt_params: ScryptParams | None = None,
 ) -> DefaultCryptoKit:
     """Build the crypto kit (CONTRACTS 13.2).
 
@@ -400,6 +411,9 @@ def crypto_kit(
             for rotation. The first one signs and encrypts; all of them verify.
         password_algorithm: ``"scrypt"`` (default, standard library) or ``"argon2id"``
             (needs the ``argon2`` extra).
+        scrypt_params: Parameters for new scrypt hashes; the default is the OWASP
+            minimum (``DEFAULT_SCRYPT``). Lower them only in tests: the testing kit
+            uses ``TEST_SCRYPT``.
 
     Returns:
         A kit that implements the ``CryptoKit`` protocol.
@@ -408,7 +422,9 @@ def crypto_kit(
         ConfigError: If a secret is shorter than 32 characters, the list is empty, or
             the password algorithm is unknown or its extra is not installed.
     """
-    return DefaultCryptoKit(secret, password_algorithm=password_algorithm)
+    return DefaultCryptoKit(
+        secret, password_algorithm=password_algorithm, scrypt_params=scrypt_params
+    )
 
 
 def _utf8(text: str) -> bool:

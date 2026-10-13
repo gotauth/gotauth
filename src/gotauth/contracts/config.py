@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypeVar, ov
 from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
 from pydantic import Field as PydanticField
 
+from gotauth.contracts.crypto import CryptoKit
 from gotauth.contracts.email import EmailConfig, EmailService
 from gotauth.contracts.primitives import Clock, Duration, IdGenerator, to_timedelta
 from gotauth.contracts.protection import RateLimitConfig
@@ -111,6 +112,8 @@ class AdvancedConfig(BaseModel):
         clock: Clock override.
         ids: Id generator override.
         session_service: Session service override (tests, advanced use).
+        crypto: Crypto kit override (tests, advanced use); the testing kit passes one
+            with a low password-hash cost.
         email_service: Email service override (tests, advanced use).
         install_core_plugins: False skips the automatic sessions, email + password and
             social plugins (C1's own tests and tests that run before C2-C4 merge).
@@ -126,6 +129,7 @@ class AdvancedConfig(BaseModel):
     clock: Clock | None = None
     ids: IdGenerator | None = None
     session_service: SessionService | None = None
+    crypto: CryptoKit | None = None
     email_service: EmailService | None = None
     install_core_plugins: bool = True
 

@@ -65,7 +65,7 @@ from gotauth.contracts.sessions import (
     secure_cookies,
 )
 from gotauth.contracts.social import OAuthProvider
-from gotauth.crypto import crypto_kit
+from gotauth.crypto import ScryptParams, crypto_kit
 from gotauth.storage.memory import memory_adapter
 from gotauth.testing._clock import fake_clock, seq_ids
 from gotauth.testing._mail import PassThroughEmailService, fake_mailer
@@ -92,6 +92,10 @@ logger = logging.getLogger("gotauth.testing")
 
 TEST_SECRET = "test-secret-" * 4
 """The secret ``make_context`` and ``make_auth`` use (48 characters)."""
+
+TEST_SCRYPT = ScryptParams(ln=10, r=8, p=1)
+"""Password-hash cost for tests (about 1/100 of ``DEFAULT_SCRYPT``); the crypto
+tests and the spec vectors keep using the real default."""
 
 TEST_BASE_URL = "http://localhost:8000"
 """The ``base_url`` ``make_context`` and ``make_auth`` use."""
@@ -1133,6 +1137,7 @@ def make_context(
         else crypto_kit(
             tuple(value.get_secret_value() for value in config.secret),
             password_algorithm=config.advanced.password_algorithm,
+            scrypt_params=TEST_SCRYPT,
         )
     )
     the_email: EmailService = (

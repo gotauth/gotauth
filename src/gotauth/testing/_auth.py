@@ -6,12 +6,14 @@ import importlib
 from typing import Any, cast
 
 import httpx
+from pydantic import SecretStr
 
 from gotauth.contracts.config import AdvancedConfig, GotAuthInstance
 from gotauth.contracts.protection import normalize_origin
+from gotauth.crypto import ConfigError, crypto_kit
 from gotauth.storage.memory import memory_adapter
 from gotauth.testing._clock import fake_clock, seq_ids
-from gotauth.testing._context import TEST_BASE_URL, TEST_SECRET
+from gotauth.testing._context import TEST_BASE_URL, TEST_SCRYPT, TEST_SECRET
 from gotauth.testing._mail import fake_mailer
 
 __all__ = ["make_auth", "make_client"]
@@ -57,6 +59,22 @@ def make_auth(**overrides: Any) -> GotAuthInstance:  # Any: GotAuth(...) keyword
         "advanced": options,
     }
     kwargs.update(overrides)
+    if "crypto" not in options:
+        # Low-cost password hashing, with the secret the GotAuth will use. A bad secret
+        # or algorithm is left for GotAuth(...) to report.
+        secret = kwargs["secret"]
+        secrets = [secret] if isinstance(secret, str | SecretStr) else list(secret)
+        try:
+            options["crypto"] = crypto_kit(
+                [
+                    s.get_secret_value() if isinstance(s, SecretStr) else s
+                    for s in secrets
+                ],
+                password_algorithm=options.get("password_algorithm", "scrypt"),
+                scrypt_params=TEST_SCRYPT,
+            )
+        except ConfigError:
+            pass
     return cast("GotAuthInstance", cls(**kwargs))
 
 

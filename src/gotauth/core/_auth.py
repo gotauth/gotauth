@@ -223,7 +223,7 @@ class GotAuth:
         advanced_config = config.advanced
 
         # Services
-        self.crypto = crypto_kit(
+        self.crypto = advanced_config.crypto or crypto_kit(
             [value.get_secret_value() for value in config.secret],
             password_algorithm=advanced_config.password_algorithm,
         )

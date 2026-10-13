@@ -1,11 +1,11 @@
-# GotAuth contracts (version 8)
+# GotAuth contracts (version 9)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 8
+CONTRACT_VERSION = 9
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -41,6 +41,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 7 (2026-10-12, [CCR 007](../ccr/007-deferred-work.md)):** `EndpointContext.defer(work)` (section 5) runs work after the request's transaction commits, off the response path outside localhost; C2 uses it so password reset and verification requests take the same time for every email (9.1).
 
 **Version 8 (2026-10-13, [CCR 008](../ccr/008-password-check.md)):** `EmailPasswordConfig.password_check` (13) lets the app reject passwords (breached, common or app-specific) with the new error code `PASSWORD_REJECTED` (6).
+
+**Version 9 (2026-10-13, [CCR 009](../ccr/009-crypto-override.md)):** `crypto_kit` (13.2) takes `scrypt_params`, and `AdvancedConfig.crypto` (13) replaces the kit `GotAuth` builds; the testing kit uses both to hash passwords at a low cost.
 
 ---
 
@@ -954,7 +956,7 @@ class GotAuth:
 | `SessionConfig` | section 7 |
 | `RateLimitConfig` | section 10.2 |
 | `EmailConfig` | section 9 |
-| `AdvancedConfig` | `cookie_prefix` ("gotauth"), `table_prefix` ("auth_"), `ip_headers` (()), `trusted_proxies` (()), `password_algorithm` ("scrypt" or "argon2id"), `clock`, `ids`, `session_service` and `email_service` overrides (testing and advanced use), `install_core_plugins` (True). False skips the automatic sessions, email + password and social plugins; it is meant for C1's own tests and for tests that run before C2-C4 merge |
+| `AdvancedConfig` | `cookie_prefix` ("gotauth"), `table_prefix` ("auth_"), `ip_headers` (()), `trusted_proxies` (()), `password_algorithm` ("scrypt" or "argon2id"), `clock`, `ids`, `session_service`, `crypto` and `email_service` overrides (testing and advanced use), `install_core_plugins` (True). False skips the automatic sessions, email + password and social plugins; it is meant for C1's own tests and for tests that run before C2-C4 merge |
 
 ```python
 @dataclass(frozen=True)
@@ -1045,7 +1047,7 @@ await auth.api.<endpoint_id>(body=None, *, headers=None, query=None, path_params
 | Import | What | Owner |
 |---|---|---|
 | `from gotauth import GotAuth, AuthError, Principal, User, Session` | Main class and core types | C1, F2 |
-| `gotauth.crypto.crypto_kit(secret, *, password_algorithm) -> CryptoKit` | Crypto kit | F3 |
+| `gotauth.crypto.crypto_kit(secret, *, password_algorithm, scrypt_params) -> CryptoKit` | Crypto kit | F3 |
 | `gotauth.sessions.session_service(config, *, secondary_storage=None) -> SessionService`, `gotauth.sessions.sessions_plugin() -> Plugin`, `memory_secondary_storage()`, `redis_secondary_storage(...)` | Sessions | C3 |
 | `gotauth.email_password.email_password_plugin(config) -> Plugin` | Email + password | C2 |
 | `gotauth.social.social_plugin() -> Plugin`, `from gotauth.social import github, google, microsoft, discord, gitlab, apple, generic_oidc` | Social login. Provider modules are private (`social/providers/_github.py`), so factory names never collide with submodules | C4 |
