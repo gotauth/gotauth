@@ -5,6 +5,7 @@
 | From | Q1 (`docs/security/asvs.md`, `docs/security/conformance/`) |
 | For | O1 (`src/gotauth/plugins/oauth_provider/`); item 1 adds endpoints, so it needs a CCR (CONTRACTS 12.3 table) |
 | Date | 2026-10-10 |
+| Status | Applied 2026-10-13 (issue #7): item 1 as [CCR 010](../ccr/010-oauth-grants.md), item 2 in the conformance app and `plan.json` |
 
 ## What and why
 

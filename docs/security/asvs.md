@@ -145,7 +145,7 @@ GotAuth is an OAuth client (C4, social login), an authorization server and OpenI
 | 10.4.6 | met | S256 required; `plain` refused | `tests/plugins/oauth_provider/test_flow.py::test_pkce_is_required_and_checked` |
 | 10.4.7 | met | DCR off by default; metadata validated; consent always shown | `tests/plugins/oauth_provider/test_security.py::test_dynamic_registration` |
 | 10.4.8 | met | A rotated refresh token keeps its family's expiry (30 days) | |
-| 10.4.9 | partial | `revoke_oauth_tokens` server call | No user-facing endpoint or UI. [Q1-O1-asvs-gaps](../requests/Q1-O1-asvs-gaps.md) |
+| 10.4.9 | met | `revoke_oauth_grant` (session) revokes an app's tokens for the user; `revoke_oauth_tokens` server call | `tests/plugins/oauth_provider/test_grants.py::test_revoke_ends_tokens_codes_and_consent` ([CCR 010](../ccr/010-oauth-grants.md)) |
 | 10.4.10 | met | Confidential clients authenticate at token, revoke and introspect | `tests/plugins/oauth_provider/test_flow.py::test_introspection_and_revocation` |
 | 10.4.11 | met | Issued scopes stay within the client's and the user's grant | `tests/plugins/oauth_provider/test_flow.py::test_issued_scopes_stay_within_granted` |
 | 10.5.1 | met | `nonce` on OIDC providers | `tests/social/test_flow.py::test_oidc_providers_get_a_nonce_without_openid_scope` |
@@ -157,7 +157,7 @@ GotAuth is an OAuth client (C4, social login), an authorization server and OpenI
 | 10.6.2 | n.a. | No RP-initiated logout | |
 | 10.7.1 | met | Consent per client, scopes and resource; CIMD on loopback always asks | `tests/plugins/oauth_provider/test_security.py::test_cimd_loopback_always_shows_consent` |
 | 10.7.2 | met | Consent page lists the client, scopes and resource | `tests/plugins/oauth_provider/test_flow.py::test_consent_page_and_ids` |
-| 10.7.3 | not met | No way for users to list or revoke consents | [Q1-O1-asvs-gaps](../requests/Q1-O1-asvs-gaps.md) |
+| 10.7.3 | met | `list_oauth_grants` and `revoke_oauth_grant`: the user sees each authorized app with its scopes, resources and last use, and revokes it | `tests/plugins/oauth_provider/test_grants.py` ([CCR 010](../ccr/010-oauth-grants.md)) |
 
 
 ## V11 Cryptography

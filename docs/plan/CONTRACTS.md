@@ -1,11 +1,11 @@
-# GotAuth contracts (version 9)
+# GotAuth contracts (version 10)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 9
+CONTRACT_VERSION = 10
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -43,6 +43,7 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 8 (2026-10-13, [CCR 008](../ccr/008-password-check.md)):** `EmailPasswordConfig.password_check` (13) lets the app reject passwords (breached, common or app-specific) with the new error code `PASSWORD_REJECTED` (6).
 
 **Version 9 (2026-10-13, [CCR 009](../ccr/009-crypto-override.md)):** `crypto_kit` (13.2) takes `scrypt_params`, and `AdvancedConfig.crypto` (13) replaces the kit `GotAuth` builds; the testing kit uses both to hash passwords at a low cost.
+**Version 10 (2026-10-13, [CCR 010](../ccr/010-oauth-grants.md)):** O1 adds `list_oauth_grants` and `revoke_oauth_grant` (12.3), so a signed-in user can see and revoke the apps they authorized.
 
 ---
 
@@ -816,6 +817,8 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 | `oauth_jwks` | GET `/oauth2/jwks` | none | O1 |
 | `oauth_userinfo` | GET `/oauth2/userinfo` | none (own token check) | O1 |
 | `oauth_register` | POST `/oauth2/register` (off by default) | none | O1 |
+| `list_oauth_grants` | GET `/oauth2/grants`: the user's authorized apps (`{grants: [{client_id, client_name, scopes, resources, created_at, last_used_at}]}`), one per client with a consent or live tokens | session | O1 |
+| `revoke_oauth_grant` | POST `/oauth2/grants/revoke` `{client_id}`: deletes the user's consent and unused codes for the client and revokes its tokens (`{revoked: int}`); a client without a grant is a no-op | session | O1 |
 | `oauth_openid_configuration` | GET `/.well-known/openid-configuration` (inside the mount: issuer + path) | none | O1 |
 | `oauth_server_metadata` | well-known: GET `/.well-known/oauth-authorization-server{base_path}` at the host root (RFC 8414 path insertion); the same document as `oauth_openid_configuration` | none | O1 |
 | `create_oauth_client`, `list_oauth_clients`, `get_oauth_client`, `update_oauth_client`, `delete_oauth_client`, `rotate_oauth_client_secret`, `rotate_signing_key`, `revoke_oauth_tokens`, `verify_access_token` | server_only | | O1 |

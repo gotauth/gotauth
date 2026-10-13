@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -84,6 +85,25 @@ class OAuthClientListOut(BaseModel):
     """``list_oauth_clients`` output."""
 
     clients: list[OAuthClientOut]
+
+
+class OAuthGrantOut(BaseModel):
+    """An app the signed-in user authorized: a client with a stored consent or live
+    tokens for the user."""
+
+    client_id: str
+    client_name: str
+    scopes: list[str]
+    resources: list[str]
+    created_at: datetime
+    last_used_at: datetime | None
+    """When the client last got tokens (sign-in or refresh), if it holds any."""
+
+
+class OAuthGrantListOut(BaseModel):
+    """``list_oauth_grants`` output."""
+
+    grants: list[OAuthGrantOut]
 
 
 class SigningKeyOut(BaseModel):
@@ -356,6 +376,92 @@ def oauth_provider(
             )
         return RevokedOut(revoked=count)
 
+    # -------------------------------------------------------- the user's grants
+
+    def grant_owner(ctx: EndpointContext) -> str:
+        principal = ctx.principal
+        if principal is None or principal.user_id is None:  # the pipeline checked
+            raise AuthError("UNAUTHENTICATED", 401)
+        return principal.user_id
+
+    async def list_grants(ctx: EndpointContext, _: None) -> OAuthGrantListOut:
+        user_id = grant_owner(ctx)
+        consents = await ctx.adapter.find_many(
+            "oauth_consent", [Where("user_id", user_id)]
+        )
+        tokens = await ctx.adapter.find_many(
+            "oauth_token",
+            [
+                Where("user_id", user_id),
+                Where("revoked_at", True, "is_null"),
+                Where("expires_at", ctx.clock.now(), "gt"),
+            ],
+        )
+        found: dict[str, dict[str, Any]] = {}  # Any: the grant being built
+        for row in (*consents, *tokens):
+            grant = found.setdefault(
+                row["client_id"],
+                {
+                    "scopes": set[str](),
+                    "resources": set[str](),
+                    "created_at": row["created_at"],
+                    "last_used_at": None,
+                },
+            )
+            grant["scopes"].update(row["scopes"])
+            if row.get("resource"):
+                grant["resources"].add(row["resource"])
+            grant["created_at"] = min(grant["created_at"], row["created_at"])
+        for row in tokens:
+            grant = found[row["client_id"]]
+            last = grant["last_used_at"]
+            grant["last_used_at"] = (
+                row["created_at"] if last is None else max(last, row["created_at"])
+            )
+        clients = (
+            await ctx.adapter.find_many(
+                "oauth_client", [Where("client_id", list(found), "in")]
+            )
+            if found
+            else []
+        )
+        names = {row["client_id"]: row["name"] for row in clients}
+        grants = [
+            OAuthGrantOut(
+                client_id=client_id,
+                client_name=names.get(client_id, client_id),
+                scopes=sorted(grant["scopes"]),
+                resources=sorted(grant["resources"]),
+                created_at=grant["created_at"],
+                last_used_at=grant["last_used_at"],
+            )
+            for client_id, grant in found.items()
+        ]
+        grants.sort(key=lambda grant: (grant.created_at, grant.client_id))
+        return OAuthGrantListOut(grants=grants)
+
+    async def revoke_grant(ctx: EndpointContext, body: ClientIdIn) -> RevokedOut:
+        # The consent, unused codes and every token of this client for this user.
+        # Access tokens check their row, so they stop working at once. Revoking a
+        # grant the user does not have is a no-op, not an error.
+        user_id = grant_owner(ctx)
+        owned = [Where("user_id", user_id), Where("client_id", body.client_id)]
+        await ctx.adapter.delete("oauth_consent", owned)
+        await ctx.adapter.delete("oauth_code", owned)
+        count = await ctx.adapter.update_many(
+            "oauth_token",
+            [*owned, Where("revoked_at", True, "is_null")],
+            {"revoked_at": ctx.clock.now()},
+        )
+        if count:
+            await ctx.emit(
+                "oauth.token_revoked",
+                count=count,
+                client_id=body.client_id,
+                user_id=user_id,
+            )
+        return RevokedOut(revoked=count)
+
     async def verify_token(
         ctx: EndpointContext, body: VerifyAccessTokenIn
     ) -> VerifyOut:
@@ -517,6 +623,27 @@ def oauth_provider(
             "/.well-known/openid-configuration",
             server.discovery,
             summary="OpenID provider metadata",
+            tags=tags,
+        ),
+        Endpoint(
+            "list_oauth_grants",
+            "GET",
+            "/oauth2/grants",
+            list_grants,
+            output=OAuthGrantListOut,
+            auth="session",
+            summary="Apps the signed-in user has authorized",
+            tags=tags,
+        ),
+        Endpoint(
+            "revoke_oauth_grant",
+            "POST",
+            "/oauth2/grants/revoke",
+            revoke_grant,
+            input=ClientIdIn,
+            output=RevokedOut,
+            auth="session",
+            summary="Revoke an app's access: its consent and tokens",
             tags=tags,
         ),
         Endpoint(
