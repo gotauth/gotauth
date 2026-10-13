@@ -99,7 +99,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [examples/fastapi-nextjs/backend, examples/litestar-htmx]
+        project:
+          - examples/fastapi-nextjs/backend
+          - examples/litestar-htmx
+          - examples/fastmcp-server
     services:
       postgres:
         image: postgres:17

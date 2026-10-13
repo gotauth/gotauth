@@ -1,0 +1,47 @@
+[project]
+name = "gotauth-example-fastmcp-server"
+version = "0.0.0"
+description = "GotAuth example: an MCP server (FastMCP) with GotAuth sign-in"
+requires-python = ">=3.11"
+dependencies = [
+  "gotauth[fastapi,mcp,sqlalchemy,sqlite]",
+  "uvicorn>=0.54",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28",
+  "pyright>=1.1.414",
+  "pytest>=9.1",
+  "pytest-asyncio>=1.4",
+  "ruff>=0.16",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+# The library from this repository, so the example always runs the current code.
+gotauth = { path = "../..", editable = true }
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.pyright]
+include = ["app", "tests"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra"]
+strict = true
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
