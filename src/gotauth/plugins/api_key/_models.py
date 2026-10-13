@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 from gotauth.contracts.http_models import ApiKeyOut
-from gotauth.contracts.primitives import Duration
+from gotauth.contracts.primitives import Duration, to_timedelta
 
 __all__ = ["ApiKeyListOut", "CreateApiKeyIn", "ListApiKeysIn", "UpdateApiKeyIn"]
 
@@ -24,6 +24,14 @@ class CreateApiKeyIn(BaseModel):
     metadata: dict[str, Any] | None = None  # Any: app-defined JSON
     rate_limit_max: int | None = Field(default=None, ge=1)
     rate_limit_window: int | None = Field(default=None, ge=1)  # seconds
+
+    @field_validator("expires_in")
+    @classmethod
+    def _valid_duration(cls, value: Duration | None) -> Duration | None:
+        # A bad duration is a 400 with the field location, not a crash later.
+        if value is not None:
+            to_timedelta(value)
+        return value
 
 
 class ListApiKeysIn(BaseModel):
