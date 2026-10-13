@@ -227,6 +227,22 @@ async def test_expiry_limits() -> None:
         assert too_long.status_code == 400
 
 
+@pytest.mark.parametrize("expires_in", ["soon", "12x", "", "1.5d"])
+async def test_an_unparseable_expiry_is_invalid_request(expires_in: str) -> None:
+    # Found by the security fuzz test: this used to be a 500 (issue #21).
+    auth = build()
+    async with make_client(auth) as client:
+        await sign_up(client)
+        response = await client.post(
+            "/api-keys", json={"name": "x", "expires_in": expires_in}
+        )
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_REQUEST"
+    assert ["expires_in"] in [e["loc"] for e in error["details"]["errors"]]
+    assert expires_in not in response.text or not expires_in  # no input echoed
+
+
 # ---------------------------------------------------------------- organizations
 
 

@@ -10,12 +10,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from gotauth.contracts.core_schema import Session, User
 from gotauth.contracts.endpoints import EndpointSpec, SignInChallenge
 from gotauth.contracts.errors import ErrorBody, ErrorOut
-from gotauth.contracts.primitives import Duration
+from gotauth.contracts.primitives import Duration, to_timedelta
 from gotauth.contracts.principal import Principal
 
 __all__ = [
@@ -173,6 +173,19 @@ class IssueApiKeyIn(_CallIn):
     scopes: list[str]
     expires_in: Duration | None = None
     metadata: dict[str, Any] | None = None  # Any: app-defined JSON
+
+    @field_validator("expires_in")
+    @classmethod
+    def _valid_duration(cls, value: Duration | None) -> Duration | None:
+        # A bad duration is a 400 with the field location, not a crash later. The
+        # message must not repeat the value (no input in errors, CONTRACTS 6).
+        if value is not None:
+            try:
+                to_timedelta(value)
+            except ValueError:
+                msg = "expected a duration such as '90s', '15m', '12h' or '7d'"
+                raise ValueError(msg) from None
+        return value
 
 
 class IssueApiKeyOut(BaseModel):
