@@ -12,6 +12,7 @@ from gotauth.contracts import AuthError, Endpoint, EndpointContext, Plugin, Wher
 from gotauth.testing import make_auth, make_client
 
 GATE: dict[str, asyncio.Event] = {}
+DONE: set[str] = set()
 
 
 class NameIn(BaseModel):
@@ -27,6 +28,7 @@ async def create_later(ctx: EndpointContext, data: NameIn) -> dict[str, str]:
             later, {"email": f"{data.name}@example.com"}
         )
         await later.emit("user.updated")
+        DONE.add(data.name)
 
     ctx.defer(create)
     return {"status": "ok"}
@@ -104,7 +106,8 @@ async def test_off_localhost_the_reply_does_not_wait() -> None:
                 client.post("/later", json={"name": "remote"}), timeout=5
             )
         assert response.status_code == 200
-        assert await user(auth, "remote") is None
+        # The job is still waiting (and holds its transaction, so no reads here).
+        assert "remote" not in DONE
         GATE["remote"].set()
         await auth.drain()
     finally:

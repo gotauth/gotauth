@@ -162,6 +162,10 @@ class _BasicEmailService:
         """Nothing is sent in the background."""
 
 
+# Seconds a background deferred job waits before it starts (see _run_deferred).
+_DEFER_DELAY = 0.05
+
+
 class GotAuth:
     """Auth for Python AI backends (CONTRACTS 13).
 
@@ -802,13 +806,22 @@ class GotAuth:
                 await self._run_deferred(ctx, works)
             else:
                 # After the reply, so its duration does not show (CONTRACTS 9.1).
-                self.background(self._run_deferred(ctx, works))
+                self.background(self._run_deferred(ctx, works, delay=_DEFER_DELAY))
         return result
 
     async def _run_deferred(
-        self, ctx: RequestContext, works: list[Callable[[Any], Awaitable[None]]]
+        self,
+        ctx: RequestContext,
+        works: list[Callable[[Any], Awaitable[None]]],
+        *,
+        delay: float = 0,
     ) -> None:
         """Run deferred work in order, each in a transaction of its own."""
+        if delay:
+            # Start once the reply has gone out: a job that ran while the response
+            # was still being written would slow only the requests that had real
+            # work to do, which is what deferring is meant to hide.
+            await asyncio.sleep(delay)
         for work in works:
             first_event = len(ctx.events)
             try:

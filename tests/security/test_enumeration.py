@@ -90,9 +90,10 @@ Body = Callable[[str, int], dict[str, Any]]  # Any: JSON
     ],
 )
 async def test_timing_does_not_reveal_accounts(path: str, body: Body) -> None:
-    # Off localhost, email goes out in the background (CONTRACTS 9), so the reply
-    # does not wait for delivery. Welch two-sample t-test over 200 runs per side,
-    # interleaved so drift hits both sides alike.
+    # Off localhost, account-only work runs after the reply (CONTRACTS 9). Welch
+    # two-sample t-test over 200 runs per side, interleaved so drift hits both
+    # sides alike, and alternating which goes first: the first request after
+    # drain() is slower, which would otherwise always count against one side.
     app = full_app(base_url="https://auth.example.com", rate_limit={"enabled": False})
     runs = 200
     known: list[float] = []
@@ -103,7 +104,8 @@ async def test_timing_does_not_reveal_accounts(path: str, body: Body) -> None:
         )
         await app.auth.drain()
         for i in range(runs + 20):
-            for email, sink in (("ada@example.com", known), (UNKNOWN, unknown)):
+            pair = [("ada@example.com", known), (UNKNOWN, unknown)]
+            for email, sink in pair if i % 2 == 0 else pair[::-1]:
                 start = time.perf_counter()
                 await http.post(path, json=body(email, i))
                 if i >= 20:  # warm-up
