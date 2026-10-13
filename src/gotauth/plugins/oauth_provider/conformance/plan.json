@@ -19,5 +19,37 @@
     "client_registration": "static_client",
     "client_auth_type": "client_secret_basic",
     "response_type": "code"
-  }
+  },
+  "browser": [
+    {
+      "match": "https://op.example.test/api/auth/oauth2/authorize*",
+      "tasks": [
+        {
+          "task": "Sign in",
+          "optional": true,
+          "match": "https://op.example.test/sign-in*",
+          "commands": [
+            ["text", "id", "email", "conformance@example.com"],
+            ["text", "id", "password", "conformance-password"],
+            ["click", "id", "sign-in"]
+          ]
+        },
+        {
+          "task": "Consent",
+          "optional": true,
+          "match": "https://op.example.test/api/auth/oauth2/authorize*",
+          "commands": [
+            ["click", "id", "allow"]
+          ]
+        },
+        {
+          "task": "Verify complete",
+          "match": "*/test/a/gotauth/callback*",
+          "commands": [
+            ["wait", "id", "submission_complete", 10]
+          ]
+        }
+      ]
+    }
+  ]
 }

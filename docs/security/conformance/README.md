@@ -8,7 +8,7 @@ The OpenID Foundation conformance suite tests O1 as an OpenID provider. Results 
 - **An https URL the suite can reach.**
   - For the hosted suite, this has to be a public URL, for example through a tunnel to the dev container.
   - For a local copy of the suite, the app must be reachable over https from the suite's containers.
-- **A sign-in page the suite's browser steps can fill in.** The app does not have one yet. See [Q1-O1-asvs-gaps](../../requests/Q1-O1-asvs-gaps.md), item 2.
+- **The app's sign-in page.** The app creates one test user at startup (`CONFORMANCE_EMAIL` and `CONFORMANCE_PASSWORD`, defaults `conformance@example.com` and `conformance-password`) and serves a form at `/sign-in`. The `browser` block in `plan.json` fills it in, then clicks Allow on the consent page.
 
 ## Steps
 1. **Start the app** in the dev container, with the public URL as `GOTAUTH_BASE_URL` and the suite's callback as `CONFORMANCE_REDIRECT`:
@@ -21,6 +21,7 @@ The OpenID Foundation conformance suite tests O1 as an OpenID provider. Results 
 2. **Fill in `plan.json`.**
    - Copy the printed `client` and `client2` credentials into it.
    - Set `server.discoveryUrl` to `https://<public host>/api/auth/.well-known/openid-configuration`.
+   - Replace `https://op.example.test` in the `browser` block's `match` values with `https://<public host>`. If you changed the test user, change its email and password there too.
 3. **Create the test plan.**
    - **Hosted suite:** sign in at `https://www.certification.openid.net`, create a test plan, and paste the JSON.
    - **Local suite:** clone `https://gitlab.com/openid/conformance-suite`, then follow its README to build and start it with Docker Compose.

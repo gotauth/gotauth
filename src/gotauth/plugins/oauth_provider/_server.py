@@ -442,9 +442,9 @@ class OAuthServer:
             f'<form method="post" action="{action}">'
             '<input type="hidden" name="consent_id" '
             f'value="{html.escape(consent_id)}">'
-            '<button class="primary" type="submit" name="accept" value="true">'
-            "Allow</button>"
-            '<button type="submit" name="accept" value="false">Deny</button>'
+            '<button class="primary" id="allow" type="submit" name="accept" '
+            'value="true">Allow</button>'
+            '<button id="deny" type="submit" name="accept" value="false">Deny</button>'
             "</form>"
         )
         return _page(f"Allow {client['name']}?", body)

@@ -266,6 +266,10 @@ PLUGIN_ENDPOINTS: tuple[EndpointSpec, ...] = (
         "O1",
         well_known=True,
     ),
+    EndpointSpec("list_oauth_grants", "GET", "/oauth2/grants", "session", "O1"),
+    EndpointSpec(
+        "revoke_oauth_grant", "POST", "/oauth2/grants/revoke", "session", "O1"
+    ),
     _server_only("create_oauth_client", "O1"),
     _server_only("list_oauth_clients", "O1"),
     _server_only("get_oauth_client", "O1"),
