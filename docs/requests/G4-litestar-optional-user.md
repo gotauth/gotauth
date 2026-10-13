@@ -5,6 +5,7 @@
 | From | G4 (examples), code review of `examples/litestar-htmx` |
 | For | A2 (`src/gotauth/integrations/asgi/litestar.py`) |
 | Date | 2026-10-12 |
+| Status | Applied 2026-10-13 (issue #9); the example uses `optional_user` |
 
 ## What
 Add an `optional_user` dependency (`User | None`) to `GotAuthPlugin`, next to `principal` and `current_user`. It should resolve the session once, keep the sliding cookie refresh that `principal` does, and return `None` when there is no session or a bad credential. That matches FastAPI's `auth.fastapi.optional_user`.
