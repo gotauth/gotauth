@@ -61,17 +61,16 @@ current: ContextVar[GotAuthAccess | None] = ContextVar(
 def current_access() -> GotAuthAccess | None:
     """The access of the MCP request being handled, or ``None`` outside one.
 
-    Works in FastMCP tools and MCP SDK handlers: it reads GotAuth's own context first,
-    then the framework's access token (the frameworks may run a tool in another task).
+    Works in FastMCP tools and MCP SDK handlers. The framework's access token comes
+    first: it belongs to the request being handled, while a stateful session may run
+    tools in a task that started in an earlier request. GotAuth's own context is the
+    fallback, for apps that wrap a server with the guard alone.
     """
-    found = current.get()
-    if found is not None:
-        return found
     for token in _framework_tokens():
         claims = getattr(token, "claims", None)
         if isinstance(claims, Mapping) and CLAIMS_KEY in claims:
             return GotAuthAccess.from_claims(claims[CLAIMS_KEY])  # pyright: ignore[reportUnknownArgumentType]
-    return None
+    return current.get()
 
 
 def _framework_tokens() -> list[Any]:  # Any: AccessToken of FastMCP or the MCP SDK

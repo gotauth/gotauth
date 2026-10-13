@@ -39,8 +39,20 @@ def normalize_resource(resource: str) -> str:
         parts = urlsplit("")
     scheme = parts.scheme.lower()
     host = (parts.hostname or "").lower()
-    if port == -1 or scheme not in _DEFAULT_PORTS or not host or "#" in resource:
-        msg = "resource must be an absolute http(s) URL without a fragment"
+    dots = any(segment in (".", "..") for segment in parts.path.split("/"))
+    userinfo = parts.username is not None or parts.password is not None
+    if (
+        port == -1
+        or scheme not in _DEFAULT_PORTS
+        or not host
+        or "#" in resource
+        or dots
+        or userinfo
+    ):
+        msg = (
+            "resource must be an absolute http(s) URL without a fragment, user info "
+            "or dot segments"
+        )
         raise ConfigError(msg)
     if ":" in host:
         host = f"[{host}]"

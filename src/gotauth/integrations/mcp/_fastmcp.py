@@ -11,12 +11,16 @@ from fastmcp.utilities.authorization import AuthContext, run_auth_checks_with_sh
 from pydantic import AnyHttpUrl
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from gotauth.integrations.mcp._access import CLAIMS_KEY
 from gotauth.integrations.mcp._guard import McpGuard, Scope, verified_in_request
-from gotauth.integrations.mcp._metadata import advertised_scopes, metadata_path
+from gotauth.integrations.mcp._metadata import (
+    advertised_scopes,
+    metadata_path,
+    protected_resource_metadata,
+)
 from gotauth.integrations.mcp._verify import Verified, Verifier
 
 __all__ = ["GotAuthProvider", "access_token"]
@@ -53,8 +57,9 @@ class _Verifier(TokenVerifier):
 
 
 async def _tool_scopes(scope: Scope, name: str, verified: Verified) -> list[str]:
-    """The scopes a FastMCP tool's ``require_scopes`` checks need and the token lacks
-    (none when the tool is unknown or passes)."""
+    """Every scope a FastMCP tool's ``require_scopes`` checks ask for, whether the
+    token has them or not (none for an unknown tool), so a 403 names all the scopes
+    the call needs. Other checks, such as roles, are left to FastMCP."""
     app = scope.get("app")
     server = getattr(getattr(app, "state", None), "fastmcp_server", None)
     if server is None:
@@ -62,22 +67,13 @@ async def _tool_scopes(scope: Scope, name: str, verified: Verified) -> list[str]
     tool = await _unfiltered_tool(server, name)
     if tool is None or not getattr(tool, "auth", None):
         return []
-    token = access_token("", verified)
-    authorized, missing = await run_auth_checks_with_shortfall(
-        tool.auth, AuthContext(token=token, component=tool)
+    # Checked against a token with no scopes, the shortfall is every scope that
+    # applies to this tool (a tag-restricted check without its tag asks for none).
+    empty = access_token("", verified).model_copy(update={"scopes": []})
+    _, needed = await run_auth_checks_with_shortfall(
+        tool.auth, AuthContext(token=empty, component=tool)
     )
-    if authorized or not missing:
-        return []
-    needed: list[str] = []
-    auth_checks: Any = tool.auth  # Any: FastMCP's AuthCheck or a list of them
-    checks = cast(
-        list[Any], auth_checks if isinstance(auth_checks, list) else [auth_checks]
-    )
-    for check in checks:
-        required = getattr(check, "required_scopes", None)
-        if required and set(required) & set(missing):
-            needed.extend(sorted(required))
-    return [*needed, *sorted(missing)]
+    return sorted(needed)
 
 
 async def _unfiltered_tool(server: Any, name: str) -> Any:  # Any: FastMCP, Tool
@@ -121,31 +117,18 @@ class GotAuthProvider(RemoteAuthProvider):
         )
         self.gotauth = verifier
         self.gotauth_scopes = list(scopes)
-        self._guard = McpGuard(
-            _not_used,
-            verifier=verifier,
-            scopes=scopes,
-            path=lambda: self._mcp_path,
-            tool_scopes=_tool_scopes,
-        )
 
     def get_routes(self, mcp_path: str | None = None) -> list[Route]:
         """The RFC 9728 document at its path form on the resource's host."""
         self.set_mcp_path(mcp_path)
-        guard = self._guard
+        document = protected_resource_metadata(
+            resource=self.gotauth.resource,
+            issuer=self.gotauth.issuer,
+            scopes=self.gotauth_scopes,
+        )
 
-        async def metadata(_: Request) -> Response:
-            response = Response()
-
-            async def send(message: Any) -> None:  # Any: ASGI message
-                if message["type"] == "http.response.start":
-                    response.status_code = message["status"]
-                    response.raw_headers = list(message["headers"])
-                else:
-                    response.body = message["body"]
-
-            await guard.serve_metadata(send)
-            return response
+        async def metadata(_: Request) -> JSONResponse:
+            return JSONResponse(document, headers={"access-control-allow-origin": "*"})
 
         return [
             Route(
@@ -174,7 +157,3 @@ class GotAuthProvider(RemoteAuthProvider):
             super().get_middleware(),  # pyright: ignore[reportUnknownMemberType]
         )
         return [Middleware(guard), *own]
-
-
-async def _not_used(*_: Any) -> None:  # Any: ASGI arguments
-    raise AssertionError("the provider's guard only serves metadata")

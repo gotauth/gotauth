@@ -71,8 +71,8 @@ class GotAuthTokenVerifier:
             app: ``server.streamable_http_app(...)``.
             tool_scopes: Scopes each tool needs beyond the configured ones; a call
                 without them is a 403 ``insufficient_scope`` before the tool runs.
-            path: The MCP endpoint's path inside ``app``; defaults to the resource
-                URL's path.
+            path: Protect only this path of ``app``. By default every path but
+                ``/.well-known/`` needs a token.
         """
         needs = {name: list(scopes) for name, scopes in (tool_scopes or {}).items()}
 

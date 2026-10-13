@@ -72,3 +72,12 @@ async def test_the_sdk_server_with_gotauth() -> None:
         ) == ("created x")
         metadata = await http.get("/.well-known/oauth-protected-resource/mcp")
         assert metadata.json()["authorization_servers"] == [ISSUER]
+
+
+async def test_the_sdk_guard_protects_every_path_by_default() -> None:
+    world = await issuer()
+    guarded, inner = apps_for(world)
+    async with mcp_client(guarded, inner) as http:
+        response = await http.post("/messages/", json={})
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == MISSING

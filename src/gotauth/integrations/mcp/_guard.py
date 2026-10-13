@@ -4,11 +4,11 @@ challenge itself (CONTRACTS 12.4), because FastMCP and the MCP SDK both get them
 
 from __future__ import annotations
 
+import hmac
 import json
 from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from contextvars import ContextVar
 from typing import Any, cast
-from urllib.parse import urlsplit
 
 from gotauth.integrations.mcp import _access
 from gotauth.integrations.mcp._metadata import (
@@ -45,7 +45,9 @@ def verified_in_request(token: str) -> Verified | None:
     """The guard's result for ``token`` in this request, so the framework's own token
     check does not verify it a second time."""
     found = _verified.get()
-    return found[1] if found is not None and found[0] == token else None
+    if found is None or not hmac.compare_digest(found[0].encode(), token.encode()):
+        return None
+    return found[1]
 
 
 def _route_path(scope: Scope) -> str:
@@ -84,11 +86,13 @@ async def _respond(
     await send({"type": "http.response.body", "body": content})
 
 
-def _called_tools(body: bytes) -> list[str]:
+def _called_tools(body: bytes) -> list[str] | None:
+    """The tools a JSON-RPC body calls; ``None`` when it cannot be read, which the
+    guard refuses rather than letting the call skip its tool scopes."""
     try:
         message = json.loads(body)
-    except ValueError:
-        return []
+    except (ValueError, RecursionError):
+        return None
     batch = cast(list[Any], message) if isinstance(message, list) else [message]
     names: list[str] = []
     for item in batch:
@@ -135,11 +139,13 @@ class McpGuard:
             )
         ).encode()
 
-    def _protected_path(self) -> str:
+    def _protects(self, route: str) -> bool:
+        """Without a path, every route of the wrapped app except ``/.well-known/``
+        needs a token (fail closed); with one, only that route."""
         path = self._path() if callable(self._path) else self._path
         if path is None:
-            path = urlsplit(self.verifier.resource).path or "/"
-        return path.rstrip("/") or "/"
+            return not route.startswith("/.well-known/")
+        return route == (path.rstrip("/") or "/")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -149,7 +155,7 @@ class McpGuard:
         if route == self._metadata_path and scope.get("method") in ("GET", "HEAD"):
             await self.serve_metadata(send)
             return
-        if route != self._protected_path() or scope.get("method") == "OPTIONS":
+        if not self._protects(route) or scope.get("method") == "OPTIONS":
             await self.app(scope, receive, send)
             return
         token = _bearer(scope)
@@ -177,7 +183,11 @@ class McpGuard:
             if body is None:
                 await _respond(send, 413, {"error": "request_too_large"})
                 return
-            for name in _called_tools(body):
+            names = _called_tools(body)
+            if names is None:
+                await _respond(send, 400, {"error": "invalid_request"})
+                return
+            for name in names:
                 needed.extend(await self._tool_scopes(scope, name, verified))
             receive = _replay(body, receive)
         needed = list(dict.fromkeys(needed))

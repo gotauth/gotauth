@@ -215,3 +215,39 @@ async def test_configuration_errors() -> None:
         fastmcp_auth(world.auth, resource="/mcp")
     with pytest.raises(ConfigError, match="introspection_client"):
         fastmcp_auth(issuer=ISSUER, resource=RESOURCE, introspect=True)
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_a_403_names_every_scope_the_call_needs() -> None:
+    # The tool's own scope is granted, the server's is not: both are named.
+    world = await issuer()
+    token = await world.token("projects:write")
+    async with mcp_client(app_for(world)) as http:
+        response = await post(http, call("create_project", {"name": "x"}), token)
+    assert response.status_code == 403
+    assert response.headers["www-authenticate"] == STEP_UP
+
+
+async def test_an_unreadable_body_is_refused_not_passed_on() -> None:
+    world = await issuer()
+    token = await world.token("projects:read")
+    async with mcp_client(app_for(world)) as http:
+        for body in (b"[" * 100_000, b'{"id": ' + b"9" * 5000 + b"}", b"{not json"):
+            response = await http.post(
+                "/mcp",
+                content=body,
+                headers={
+                    "accept": "application/json, text/event-stream",
+                    "content-type": "application/json",
+                    "authorization": f"Bearer {token}",
+                },
+            )
+            assert response.status_code == 400, body[:20]
+
+
+def test_resources_that_can_never_match_are_refused() -> None:
+    for resource in ("https://user@host.example/mcp", "https://host.example/a/../mcp"):
+        with pytest.raises(ConfigError, match="resource"):
+            fastmcp_auth(issuer=ISSUER, resource=resource)

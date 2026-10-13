@@ -38,6 +38,11 @@ ASYMMETRIC = frozenset(
 """Algorithms a remote key may use; ``none`` and ``HS*`` never verify."""
 
 JWKS_REFETCH_SECONDS = 30.0
+"""The least time between two JWKS fetch attempts, failed ones included."""
+JWKS_MAX_AGE_SECONDS = 300.0
+"""Keys are refreshed after this, so a key the issuer removed stops verifying."""
+LEEWAY_SECONDS = 30
+"""Allowed clock difference with the issuer for ``exp``, ``nbf`` and ``iat``."""
 INTROSPECTION_CACHE_SECONDS = 5.0
 _INTROSPECTION_CACHE_SIZE = 1024
 _TIMEOUT = httpx.Timeout(5.0)
@@ -122,11 +127,13 @@ def new_http_client() -> httpx.AsyncClient:
 
 
 class RemoteVerifier:
-    """Another process: the issuer's metadata and JWKS, fetched once and cached.
+    """Another process: the issuer's metadata and JWKS, cached.
 
-    A key is used only with its own ``alg``. An unknown ``kid`` refetches the JWKS at
-    most once per 30 seconds. Without introspection a revoked token works until it
-    expires (10 minutes by default); with it, revocation is seen within 5 seconds.
+    A key is used only with its own ``alg``. The JWKS is refreshed every 5 minutes,
+    and an unknown ``kid`` refetches it, but never more than once per 30 seconds,
+    failed attempts included. While the issuer is down the last keys stay in use.
+    Without introspection a revoked token works until it expires (10 minutes by
+    default); with it, revocation is seen within 5 seconds.
     """
 
     def __init__(
@@ -145,6 +152,7 @@ class RemoteVerifier:
         self._metadata: dict[str, Any] | None = None  # Any: JSON
         self._keys: dict[str, dict[str, Any]] = {}  # Any: JWK members
         self._fetched_at: float | None = None
+        self._attempted_at: float | None = None
         self._lock = asyncio.Lock()
         self._introspected: OrderedDict[str, tuple[bool, float]] = OrderedDict()
 
@@ -192,26 +200,50 @@ class RemoteVerifier:
         return self._metadata
 
     async def _key(self, kid: str) -> dict[str, Any] | None:  # Any: JWK members
+        fetched = self._fetched_at
+        if (
+            kid in self._keys
+            and fetched is not None
+            and self._clock() - fetched < JWKS_MAX_AGE_SECONDS
+        ):
+            return self._keys[kid]  # the common case: no lock, no network
         async with self._lock:
             now = self._clock()
-            due = (
+            stale = (
                 self._fetched_at is None
-                or now - self._fetched_at >= JWKS_REFETCH_SECONDS
+                or now - self._fetched_at >= JWKS_MAX_AGE_SECONDS
             )
-            if kid not in self._keys and due:
-                jwks_uri = _string((await self.metadata()).get("jwks_uri"))
-                if jwks_uri is None:
-                    raise VerifierUnavailable("the issuer has no jwks_uri")
-                found = await self._get_json(jwks_uri)
-                self._fetched_at = now
-                keys = (_object(found) or {}).get("keys")
-                members = cast(list[Any], keys) if isinstance(keys, list) else []
-                self._keys = {}
-                for member in members:
-                    jwk = _object(member)
-                    if jwk is not None and isinstance(jwk.get("kid"), str):
-                        self._keys[str(jwk["kid"])] = jwk
+            allowed = (
+                self._attempted_at is None
+                or now - self._attempted_at >= JWKS_REFETCH_SECONDS
+            )
+            if (stale or kid not in self._keys) and allowed:
+                self._attempted_at = now
+                try:
+                    await self._refresh()
+                    self._fetched_at = now
+                except VerifierUnavailable:
+                    if self._fetched_at is None:
+                        raise
+                    # The issuer is down: keep the keys fetched last time.
+            elif self._fetched_at is None:
+                msg = "the issuer could not be reached; retrying in 30 seconds"
+                raise VerifierUnavailable(msg)
             return self._keys.get(kid)
+
+    async def _refresh(self) -> None:
+        jwks_uri = _string((await self.metadata()).get("jwks_uri"))
+        if jwks_uri is None:
+            raise VerifierUnavailable("the issuer has no jwks_uri")
+        found = await self._get_json(jwks_uri)
+        keys = (_object(found) or {}).get("keys")
+        members = cast(list[Any], keys) if isinstance(keys, list) else []
+        fresh: dict[str, dict[str, Any]] = {}  # Any: JWK members
+        for member in members:
+            jwk = _object(member)
+            if jwk is not None and isinstance(jwk.get("kid"), str):
+                fresh[str(jwk["kid"])] = jwk
+        self._keys = fresh
 
     async def verify(self, token: str) -> Verified | None:
         try:
@@ -234,6 +266,7 @@ class RemoteVerifier:
                 audience=self.resource,
                 issuer=self.issuer,
                 options={"require": ["exp", "iss", "aud", "sub", "jti"]},
+                leeway=LEEWAY_SECONDS,
             )
         except (jwt.InvalidTokenError, jwt.PyJWKError):
             return None

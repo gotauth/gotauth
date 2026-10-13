@@ -295,3 +295,38 @@ async def test_an_unreachable_issuer_is_a_503_not_a_401(
         )
     assert response.status_code == 503
     assert "www-authenticate" not in response.headers
+
+
+async def test_a_removed_key_stops_verifying(fake: FakeIssuer) -> None:
+    now = [0.0]
+    check = verifier(clock=lambda: now[0])
+    token = fake.mint()
+    assert await check.verify(token) is not None
+    del fake.keys["k1"]
+    fake.add_key("k2")
+    now[0] = 299.0
+    assert await check.verify(token) is not None  # cached keys, no fetch yet
+    now[0] = 301.0
+    assert await check.verify(token) is None
+    assert fake.jwks_fetches == 2
+
+
+async def test_known_keys_keep_working_while_the_issuer_is_down(
+    fake: FakeIssuer,
+) -> None:
+    now = [0.0]
+    check = verifier(clock=lambda: now[0])
+    assert await check.verify(fake.mint()) is not None
+    original = fake.handler
+    fake.handler = lambda _: httpx.Response(502)  # type: ignore[method-assign]
+    check._http = httpx.AsyncClient(  # pyright: ignore[reportPrivateUsage]
+        transport=httpx.MockTransport(lambda request: fake.handler(request))
+    )
+    now[0] = 400.0
+    assert await check.verify(fake.mint()) is not None
+    fake.handler = original  # type: ignore[method-assign]
+
+
+async def test_a_small_clock_difference_is_allowed(fake: FakeIssuer) -> None:
+    later = int(time.time()) + 10
+    assert await verifier().verify(fake.mint(iat=later, nbf=later)) is not None
