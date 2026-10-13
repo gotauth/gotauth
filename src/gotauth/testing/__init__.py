@@ -26,6 +26,7 @@ from gotauth.testing._clock import (
 from gotauth.testing._conformance import CONFORMANCE_SCHEMA, adapter_conformance
 from gotauth.testing._context import (
     TEST_BASE_URL,
+    TEST_SCRYPT,
     TEST_SECRET,
     FakeApi,
     FakeAuth,
@@ -52,6 +53,7 @@ __all__ = [
     "CONFORMANCE_SCHEMA",
     "DEFAULT_START",
     "TEST_BASE_URL",
+    "TEST_SCRYPT",
     "TEST_SECRET",
     "CapturingMailer",
     "FakeApi",

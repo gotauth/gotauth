@@ -234,19 +234,22 @@ class PasswordHasher:
     directly only outside an event loop.
     """
 
-    __slots__ = ("_algorithm", "_argon2", "_random_bytes")
+    __slots__ = ("_algorithm", "_argon2", "_random_bytes", "_scrypt")
 
     def __init__(
         self,
         algorithm: PasswordAlgorithm = "scrypt",
         *,
         random_bytes: Callable[[int], bytes] = secrets.token_bytes,
+        scrypt: ScryptParams = DEFAULT_SCRYPT,
     ) -> None:
         """Create a hasher.
 
         Args:
             algorithm: The algorithm for new hashes.
             random_bytes: Source of salt bytes; tests replace it.
+            scrypt: Parameters for new scrypt hashes; a stored hash with different
+                parameters reports ``needs_rehash``. Lower them only in tests.
 
         Raises:
             ConfigError: If the algorithm is unknown, or is ``"argon2id"`` without the
@@ -257,6 +260,7 @@ class PasswordHasher:
             raise ConfigError(msg)
         self._algorithm: PasswordAlgorithm = algorithm
         self._random_bytes = random_bytes
+        self._scrypt = scrypt
         self._argon2: argon2.PasswordHasher | None = (
             _new_argon2_hasher("password_algorithm 'argon2id'")
             if algorithm == "argon2id"
@@ -315,8 +319,8 @@ class PasswordHasher:
         if self._argon2 is not None:
             return "argon2id$" + self._argon2.hash(secret)
         salt = self._random_bytes(SCRYPT_SALT_BYTES)
-        key = scrypt_derive(secret, salt, DEFAULT_SCRYPT, SCRYPT_KEY_BYTES)
-        return format_scrypt(DEFAULT_SCRYPT, salt, key)
+        key = scrypt_derive(secret, salt, self._scrypt, SCRYPT_KEY_BYTES)
+        return format_scrypt(self._scrypt, salt, key)
 
     def _check(self, secret: bytes, stored: str) -> tuple[bool, bool] | None:
         """Return ``(ok, outdated)``, or None when ``stored`` is not a usable hash."""
@@ -339,7 +343,7 @@ class PasswordHasher:
         ok = hmac.compare_digest(scrypt_derive(secret, salt, params, len(key)), key)
         outdated = (
             self._algorithm != "scrypt"
-            or params != DEFAULT_SCRYPT
+            or params != self._scrypt
             or len(salt) != SCRYPT_SALT_BYTES
             or len(key) != SCRYPT_KEY_BYTES
         )

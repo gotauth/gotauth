@@ -20,8 +20,9 @@ from gotauth.contracts import (
     User,
     Where,
 )
-from gotauth.crypto import pkce_s256
+from gotauth.crypto import crypto_kit, pkce_s256
 from gotauth.testing import (
+    TEST_SECRET,
     FakeContext,
     call_endpoint,
     fake_oauth_provider,
@@ -288,6 +289,21 @@ def test_make_auth_needs_c1() -> None:
         pytest.skip("C1 has merged; make_auth is covered by C1's tests")
     with pytest.raises(NotImplementedError, match="C1"):
         make_auth()
+
+
+async def test_the_kit_hashes_passwords_at_the_test_cost() -> None:
+    # make_context and make_auth both use TEST_SCRYPT (issue #16).
+    prefix = "scrypt$ln=10,r=8,p=1$"
+    assert (await make_context().crypto.hash_password("pw")).startswith(prefix)
+    auth: Any = make_auth()
+    assert (await auth.crypto.hash_password("pw")).startswith(prefix)
+
+
+async def test_make_auth_keeps_a_crypto_override() -> None:
+    kit = crypto_kit([TEST_SECRET])
+    auth: Any = make_auth(advanced={"crypto": kit})
+    assert auth.crypto is kit
+    assert (await auth.crypto.hash_password("pw")).startswith("scrypt$ln=15,r=8,p=3$")
 
 
 async def test_where_helper_in_kit_context(ctx: FakeContext) -> None:

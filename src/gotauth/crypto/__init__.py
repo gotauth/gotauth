@@ -22,16 +22,23 @@ from gotauth.crypto._errors import ConfigError
 from gotauth.crypto._keys import hkdf_sha256
 from gotauth.crypto._kit import MIN_SECRET_LENGTH, DefaultCryptoKit, crypto_kit
 from gotauth.crypto._otp import hotp, new_otp, new_totp_secret, totp, verify_totp
-from gotauth.crypto._passwords import PasswordAlgorithm, PasswordCheck
+from gotauth.crypto._passwords import (
+    DEFAULT_SCRYPT,
+    PasswordAlgorithm,
+    PasswordCheck,
+    ScryptParams,
+)
 from gotauth.crypto._tokens import equal, hash_token, pkce_s256, random_token
 from gotauth.crypto._ulid import new_ulid
 
 __all__ = [
+    "DEFAULT_SCRYPT",
     "MIN_SECRET_LENGTH",
     "ConfigError",
     "DefaultCryptoKit",
     "PasswordAlgorithm",
     "PasswordCheck",
+    "ScryptParams",
     "crypto_kit",
     "equal",
     "hash_token",

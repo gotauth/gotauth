@@ -35,3 +35,5 @@ async def test_my_endpoint() -> None:
 ## HTTP round trips
 
 `make_auth(**overrides)` builds a real `GotAuth` with the fakes, and `make_client(auth)` returns an `httpx.AsyncClient` over `auth.asgi()` that keeps cookies and sends `Origin` and `Content-Type: application/json`. Both need the core (work package C1); until it merges, `make_auth` raises `NotImplementedError`.
+
+`make_auth` and `make_context` hash passwords with `TEST_SCRYPT` (scrypt `ln=10,r=8,p=1`), about 1/100 of the cost of the production default, so tests that sign users up stay fast. To test with the real cost, pass your own kit: `make_auth(advanced={"crypto": crypto_kit([TEST_SECRET])})`.
