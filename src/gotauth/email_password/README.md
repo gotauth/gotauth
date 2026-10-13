@@ -89,3 +89,43 @@ Reset links go to the app's `redirect_to` page with `?token=gav_...`; that page 
   upgraded on the next successful sign-in.
 - A password reset revokes every session of the user unless
   `revoke_sessions_on_password_reset=False`, and sends a `security_notice` email.
+- **Your own rules: `password_check`.** An async `(password, email) -> str | None`, run
+  on sign-up, reset and change after the length check. Return a message to reject the
+  password (`400 PASSWORD_REJECTED`, with your message) or `None` to accept it. GotAuth
+  ships no password list and calls no outside service unless you add one here.
+
+  Checking breached passwords with [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords).
+  Only the first 5 characters of the password's SHA-1 leave your server (k-anonymity):
+
+  ```python
+  import hashlib
+
+  import httpx
+
+  async def not_breached(password: str, email: str) -> str | None:
+      digest = hashlib.sha1(password.encode()).hexdigest().upper()  # noqa: S324
+      prefix, rest = digest[:5], digest[5:]
+      try:
+          async with httpx.AsyncClient(timeout=3) as client:
+              response = await client.get(f"https://api.pwnedpasswords.com/range/{prefix}")
+              response.raise_for_status()
+      except httpx.HTTPError:
+          return None  # the service is down: accept rather than block sign-ups
+      if any(line.split(":")[0] == rest for line in response.text.splitlines()):
+          return "This password appeared in a data breach. Choose another one."
+      return None
+
+  auth = GotAuth(..., email_password={"password_check": not_breached})
+  ```
+
+  App-specific words (ASVS 6.1.2), for example the product name:
+
+  ```python
+  BANNED = {"gotauth", "acme", "password"}
+
+  async def no_app_words(password: str, email: str) -> str | None:
+      lowered = password.lower()
+      if any(word in lowered for word in BANNED) or email.split("@")[0].lower() in lowered:
+          return "Don't use the app's name or your email in your password."
+      return None
+  ```

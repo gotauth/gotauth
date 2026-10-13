@@ -36,6 +36,7 @@ ERROR_CODES: Mapping[str, tuple[int, str]] = MappingProxyType(
         "TOKEN_EXPIRED": (400, "The token has expired"),
         "PASSWORD_TOO_SHORT": (400, "The password is too short"),
         "PASSWORD_TOO_LONG": (400, "The password is too long"),
+        "PASSWORD_REJECTED": (400, "The password is not allowed"),
         "ACCOUNT_NOT_LINKED": (409, "The account cannot be linked"),
         "LAST_SIGN_IN_METHOD": (409, "The last sign-in method cannot be removed"),
         "PROVIDER_ERROR": (502, "The identity provider returned an error"),

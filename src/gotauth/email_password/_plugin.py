@@ -54,6 +54,16 @@ def _check_length(ctx: EndpointContext, password: str) -> None:
         raise AuthError("PASSWORD_TOO_LONG", 400)
 
 
+async def _check_rules(ctx: EndpointContext, password: str, email: str) -> None:
+    """The app's ``password_check`` (CONTRACTS 9), after the length check."""
+    check = _settings(ctx).password_check
+    if check is None:
+        return
+    reason = await check(password, email)
+    if reason is not None:
+        raise AuthError("PASSWORD_REJECTED", 400, reason or None)
+
+
 def _redirect(ctx: EndpointContext, url: str | None) -> str | None:
     return validate_redirect(url, ctx.auth.config) if url is not None else None
 
@@ -147,6 +157,8 @@ async def _sign_up_email(
 ) -> SignInOut | ChallengeOut | StatusOut:
     settings = _settings(ctx)
     _check_length(ctx, body.password)
+    # Before the existing-email branch, so the answer is the same for every email.
+    await _check_rules(ctx, body.password, body.email)
     callback_url = _redirect(ctx, body.callback_url)
     existing = await _find_user(ctx, body.email)
     if existing is not None and not await _release_abandoned(ctx, existing):
@@ -384,6 +396,8 @@ async def _reset_password(ctx: EndpointContext, body: ResetPasswordIn) -> Status
     account = await _credential(ctx, consumed.user_id) if row is not None else None
     if row is None or account is None:
         raise AuthError("TOKEN_INVALID", 400)
+    # A rejection rolls the transaction back, so the token still works.
+    await _check_rules(ctx, body.new_password, row["email"])
     password_hash = await ctx.crypto.hash_password(body.new_password)
     now = ctx.clock.now()
     await ctx.adapter.update(
@@ -418,6 +432,8 @@ async def _change_password(ctx: EndpointContext, body: ChangePasswordIn) -> Stat
     check = await ctx.crypto.verify_password(body.current_password, stored or "")
     if account is None or not stored or not check.ok:
         raise AuthError("INVALID_CREDENTIALS", 401)
+    user = await _user_by_id(ctx, user_id)
+    await _check_rules(ctx, body.new_password, user["email"] if user else "")
     password_hash = await ctx.crypto.hash_password(body.new_password)
     await ctx.adapter.update(
         "account",
