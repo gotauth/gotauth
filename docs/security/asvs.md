@@ -16,7 +16,7 @@ Test paths use `sec/` for `tests/security/`. Open gaps link their request files.
 
 | Chapter | met | partial | not met | pending | app | n.a. |
 |---|---|---|---|---|---|---|
-| V6 Authentication | 18 | 1 | 4 | 9 | 0 | 3 |
+| V6 Authentication | 18 | 1 | 0 | 9 | 4 | 3 |
 | V7 Session Management | 13 | 4 | 0 | 0 | 1 | 0 |
 | V8 Authorization | 5 | 0 | 0 | 1 | 1 | 0 |
 | V9 Self-contained Tokens | 7 | 0 | 0 | 0 | 0 | 0 |
@@ -28,20 +28,20 @@ Test paths use `sec/` for `tests/security/`. Open gaps link their request files.
 | Id | Status | Where | Test or note |
 |---|---|---|---|
 | 6.1.1 | met | CONTRACTS 10.2; [threat model](threat-model.md) | Rate limits per IP+path and per email, with defaults listed in 10.2 |
-| 6.1.2 | not met | C2 | No list of context-specific words. [Q1-C2-asvs-gaps](../requests/Q1-C2-asvs-gaps.md) |
+| 6.1.2 | app | The app's word list, enforced through [`password_check`](../../src/gotauth/email_password/README.md#passwords) | `tests/email_password/test_http.py::test_password_check_on_sign_up_reset_and_change` |
 | 6.1.3 | met | [threat model](threat-model.md) sections 1-7 | Each sign-in path and its controls |
 | 6.2.1 | met | CONTRACTS 8: min 8, configurable | `tests/email_password/test_flows.py::test_length_boundaries` |
 | 6.2.2 | met | `change_password` | `tests/email_password/test_flows.py::test_change_password` |
 | 6.2.3 | met | `ChangePasswordIn.current_password` | `tests/email_password/test_flows.py::test_change_password` |
-| 6.2.4 | not met | C2 | No check against common passwords. [Q1-C2-asvs-gaps](../requests/Q1-C2-asvs-gaps.md) |
+| 6.2.4 | app | A common-password list through [`password_check`](../../src/gotauth/email_password/README.md#passwords); GotAuth ships none by design (CCR 008) | same test |
 | 6.2.5 | met | C2 checks length only | `tests/email_password/test_flows.py::test_length_boundaries` |
 | 6.2.6 | met | `registry/` sign-in and sign-up forms use `type="password"` | D2 component tests |
 | 6.2.7 | met | `registry/` forms set `autoComplete` and never block paste | D2 component tests |
 | 6.2.8 | met | Passwords are hashed as received; no strip or case change | Imported bcrypt hashes (I1) compare only the first 72 bytes until rehashed at the next sign-in (`tests/email_password/test_flows.py::test_weak_hashes_are_upgraded_after_sign_in`) |
 | 6.2.9 | met | Max 128 characters | `tests/email_password/test_flows.py::test_length_boundaries` |
 | 6.2.10 | met | No expiry on passwords | n/a |
-| 6.2.11 | not met | C2 | See 6.1.2 |
-| 6.2.12 | not met | C2 | No breached-password hook. [Q1-C2-asvs-gaps](../requests/Q1-C2-asvs-gaps.md) |
+| 6.2.11 | app | See 6.1.2 | |
+| 6.2.12 | app | A breached-password service through [`password_check`](../../src/gotauth/email_password/README.md#passwords); the C2 README has a Have I Been Pwned example | same test |
 | 6.3.1 | met | CONTRACTS 10.2 | `sec/test_limits_and_replay.py::test_per_email_limits_hold_across_rotating_ips` |
 | 6.3.2 | met | No account is created by GotAuth itself | n/a |
 | 6.3.3 | pending | P2 (TOTP), P3 (passkeys) | Single factor until they merge |

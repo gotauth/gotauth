@@ -72,6 +72,13 @@ class EmailPasswordConfig(BaseModel):
     reset_token_expires_in: Duration = "1h"  # noqa: S105
     verify_token_expires_in: Duration = "24h"  # noqa: S105
     revoke_sessions_on_password_reset: bool = True
+    password_check: Callable[[str, str], Awaitable[str | None]] | None = None
+    """The app's own password rule, for example a breached-password lookup or a list
+    of words specific to the app: called with ``(password, email)`` on sign-up,
+    password reset and password change, after the length check. Return a message
+    to reject the password (``400 PASSWORD_REJECTED`` with that message) or
+    ``None`` to accept it. An exception fails the request (500): catch your own
+    network errors to fail open instead."""
 
     @field_validator("reset_token_expires_in", "verify_token_expires_in")
     @classmethod

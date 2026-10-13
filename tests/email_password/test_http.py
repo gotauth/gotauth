@@ -130,3 +130,75 @@ async def test_change_email_needs_a_recent_sign_in() -> None:
         )
         assert fresh.status_code == 200, fresh.text
         assert mailer.last("change_email", "new@example.com")
+
+
+async def test_password_check_on_sign_up_reset_and_change() -> None:
+    seen: list[tuple[str, str]] = []
+
+    async def rule(password: str, email: str) -> str | None:
+        seen.append((password, email))
+        return "Too common." if password == "password123" else None
+
+    auth, mailer = build(
+        email_password={"require_email_verification": False, "password_check": rule}
+    )
+    async with make_client(auth) as client:
+        # Sign-up: refused with the hook's message, the same for a new and an
+        # existing email (CONTRACTS 9.1).
+        refused = await client.post(
+            "/sign-up/email",
+            json={"email": "ada@example.com", "password": "password123"},
+        )
+        assert refused.status_code == 400
+        assert refused.json()["error"] == {
+            "code": "PASSWORD_REJECTED",
+            "message": "Too common.",
+            "details": None,
+        }
+        ok = await client.post(
+            "/sign-up/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        assert ok.status_code == 200, ok.text
+        again = await client.post(
+            "/sign-up/email",
+            json={"email": "ada@example.com", "password": "password123"},
+        )
+        assert again.content == refused.content
+        # Change: checked after the current password.
+        changed = await client.post(
+            "/change-password",
+            json={"current_password": PASSWORD, "new_password": "password123"},
+        )
+        assert changed.json()["error"]["code"] == "PASSWORD_REJECTED"
+        # Reset: a rejection keeps the link usable.
+        await client.post(
+            "/request-password-reset",
+            json={"email": "ada@example.com", "redirect_to": "/reset"},
+        )
+        await auth.drain()
+        token = token_from(mailer.last("reset_password", "ada@example.com").data["url"])
+        rejected = await client.post(
+            "/reset-password", json={"token": token, "new_password": "password123"}
+        )
+        assert rejected.json()["error"]["code"] == "PASSWORD_REJECTED"
+        accepted = await client.post(
+            "/reset-password", json={"token": token, "new_password": "a better one!"}
+        )
+        assert accepted.status_code == 200, accepted.text
+    assert ("password123", "ada@example.com") in seen
+
+
+async def test_a_failing_password_check_fails_closed() -> None:
+    async def broken(password: str, email: str) -> str | None:
+        raise RuntimeError("breach service down")
+
+    auth, _ = build(
+        email_password={"require_email_verification": False, "password_check": broken}
+    )
+    async with make_client(auth) as client:
+        response = await client.post(
+            "/sign-up/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+    assert response.status_code == 500
+    assert "breach service" not in response.text
+    assert await auth.database.find_one("user", []) is None

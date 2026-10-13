@@ -1,11 +1,11 @@
-# GotAuth contracts (version 7)
+# GotAuth contracts (version 8)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 7
+CONTRACT_VERSION = 8
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -39,6 +39,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 6 (2026-10-12, [CCR 006](../ccr/006-session-lifetime.md)):** `SessionConfig.absolute_lifetime` (section 7, default `"30d"`) caps every session at `created_at` plus that, however often it slides; and a sign-in ends the session the request's cookie belonged to.
 
 **Version 7 (2026-10-12, [CCR 007](../ccr/007-deferred-work.md)):** `EndpointContext.defer(work)` (section 5) runs work after the request's transaction commits, off the response path outside localhost; C2 uses it so password reset and verification requests take the same time for every email (9.1).
+
+**Version 8 (2026-10-13, [CCR 008](../ccr/008-password-check.md)):** `EmailPasswordConfig.password_check` (13) lets the app reject passwords (breached, common or app-specific) with the new error code `PASSWORD_REJECTED` (6).
 
 ---
 
@@ -429,6 +431,7 @@ class ErrorOut(BaseModel):                           # {"error": {"code", "messa
 | `TOKEN_EXPIRED` | 400 | |
 | `PASSWORD_TOO_SHORT` | 400 | |
 | `PASSWORD_TOO_LONG` | 400 | |
+| `PASSWORD_REJECTED` | 400 | The app's `password_check` refused the password; the message is the hook's |
 | `ACCOUNT_NOT_LINKED` | 409 | |
 | `LAST_SIGN_IN_METHOD` | 409 | |
 | `PROVIDER_ERROR` | 502 | |
@@ -946,7 +949,7 @@ class GotAuth:
 
 | Config | Fields (defaults) |
 |---|---|
-| `EmailPasswordConfig` | `enabled` (True), `require_email_verification` (True), `min_password_length` (8), `max_password_length` (128), `auto_sign_in` (True), `reset_token_expires_in` ("1h"), `verify_token_expires_in` ("24h"), `revoke_sessions_on_password_reset` (True) |
+| `EmailPasswordConfig` | `enabled` (True), `require_email_verification` (True), `min_password_length` (8), `max_password_length` (128), `auto_sign_in` (True), `reset_token_expires_in` ("1h"), `verify_token_expires_in` ("24h"), `revoke_sessions_on_password_reset` (True), `password_check` (None: an async `(password, email) -> str | None` run on sign-up, reset and change) |
 | `AccountLinkingConfig` | `enabled` (True), `trusted_providers` (()), `allow_different_emails` (False) |
 | `SessionConfig` | section 7 |
 | `RateLimitConfig` | section 10.2 |

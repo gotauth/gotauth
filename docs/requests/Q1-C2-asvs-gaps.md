@@ -15,6 +15,8 @@
 
 **Proposed:** add `fresh_session=True` to the `change_email` endpoint and mark it "session, fresh" in the CONTRACTS 13.1 table. It is a one-line code change plus the table edit.
 
+**Items 2 and 3 applied 2026-10-13** as [CCR 008](../ccr/008-password-check.md): a `password_check` hook, and no bundled list (maintainer's choice).
+
 ### 2. No check against common passwords (ASVS 6.2.4, Level 1)
 Sign-up, reset and change accept any password of 8 to 128 characters.
 
