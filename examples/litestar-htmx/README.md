@@ -10,7 +10,7 @@ All of the auth setup is in [app/auth.py](app/auth.py).
 **How it works.**
 - Every change goes from htmx straight to GotAuth's JSON endpoints under `/api/auth`. That covers sign-in, sign-out, and creating and deleting keys.
 - GotAuth checks the `Origin` header and the JSON content type on those endpoints, so a cross-site form cannot use the session cookie.
-- The app's own routes ([app/main.py](app/main.py)) only render pages. They read the session through `GotAuthPlugin`'s `principal` dependency, which also renews an active session's cookie. They call `auth.api` with the browser's cookie for the user and the key list.
+- The app's own routes ([app/main.py](app/main.py)) only render pages. They read the user through `GotAuthPlugin`'s `optional_user` dependency, which also renews an active session's cookie. They call `auth.api` with the browser's cookie for the user and the key list.
 - [app/static/app.js](app/static/app.js) is a small htmx extension that sends forms as JSON. It also turns GotAuth's answers into redirects, messages, and the new key, which is shown once.
 
 Built with Litestar 2.24, Jinja 3.1, htmx 2.0.11 and Python 3.14 (checked 2026-10-12).

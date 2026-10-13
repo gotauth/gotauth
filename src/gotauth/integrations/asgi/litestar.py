@@ -53,6 +53,7 @@ Guard = Callable[
 ]
 
 _STATE_KEY = "gotauth_principal"
+_USER_KEY = "gotauth_user"
 
 
 def _auth_of(connection: ASGIConnection[Any, Any, Any, Any]) -> GotAuth:
@@ -106,7 +107,17 @@ async def _provide_principal(request: Request[Any, Any, Any]) -> Principal | Non
     return await _principal(request)
 
 
-async def _provide_current_user(request: Request[Any, Any, Any]) -> User:
+async def _session_user(request: Request[Any, Any, Any]) -> User | None:
+    """The session's user, or ``None``; read once per request, however many
+    dependencies ask."""
+    scope = cast(dict[str, Any], request.scope)
+    state = cast(dict[str, Any], scope.setdefault("state", {}))
+    if _USER_KEY not in state:
+        state[_USER_KEY] = await _read_session_user(request)
+    return cast(User | None, state[_USER_KEY])
+
+
+async def _read_session_user(request: Request[Any, Any, Any]) -> User | None:
     auth = _auth_of(request)
     scope = cast(dict[str, Any], request.scope)
     headers = headers_from(cast(list[tuple[bytes, bytes]], scope.get("headers", [])))
@@ -125,13 +136,34 @@ async def _provide_current_user(request: Request[Any, Any, Any]) -> User:
         stored.extend(set_cookie_header(cookie) for cookie in out.cookies)
     found = out.body
     if found is None:
-        raise AuthError("UNAUTHENTICATED", 401)
-    session = (
-        found
-        if isinstance(found, SessionWithUserOut)
-        else SessionWithUserOut.model_validate(found)
-    )
+        return None
+    try:
+        session = (
+            found
+            if isinstance(found, SessionWithUserOut)
+            else SessionWithUserOut.model_validate(found)
+        )
+    except Exception as exc:
+        raise AuthError("INTERNAL_ERROR", 500) from exc
     return session.user
+
+
+async def _provide_current_user(request: Request[Any, Any, Any]) -> User:
+    user = await _session_user(request)
+    if user is None:
+        raise AuthError("UNAUTHENTICATED", 401)
+    return user
+
+
+async def _provide_optional_user(request: Request[Any, Any, Any]) -> User | None:
+    # A bad or rejected credential counts as signed out, never a 401 (as FastAPI's
+    # optional_user).
+    try:
+        return await _session_user(request)
+    except AuthError as error:
+        if error.status in (401, 403):
+            return None
+        raise
 
 
 async def _add_cookies(message: Any, scope: Any) -> None:  # Any: ASGI message, scope
@@ -148,8 +180,8 @@ def _handle_auth_error(_: Request[Any, Any, Any], exc: AuthError) -> Response[by
 
 
 class GotAuthPlugin(InitPluginProtocol):
-    """Mounts GotAuth and adds the ``principal`` and ``current_user`` dependencies and
-    the ``AuthError`` handler."""
+    """Mounts GotAuth and adds the ``principal``, ``current_user`` and
+    ``optional_user`` dependencies and the ``AuthError`` handler."""
 
     def __init__(self, auth: GotAuth) -> None:
         self._auth = auth
@@ -197,6 +229,7 @@ class GotAuthPlugin(InitPluginProtocol):
             {
                 "principal": Provide(_provide_principal),
                 "current_user": Provide(_provide_current_user),
+                "optional_user": Provide(_provide_optional_user),
             }
         )
         handlers = cast(

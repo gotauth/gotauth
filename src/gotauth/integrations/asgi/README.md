@@ -87,8 +87,11 @@ app = Litestar(route_handlers=[me, projects], plugins=[GotAuthPlugin(auth)])
 - `GotAuthPlugin` mounts `auth.asgi()` at `base_path` and `auth.well_known()` at
   `/.well-known` (not `/`: a Litestar mount at `/` takes every request, app routes
   included; every GotAuth well-known document lives below `/.well-known`).
-- Dependencies: `principal` (`Principal | None`) and `current_user` (`User`, 401
-  without a session). Guards: `requires_session` and `requires_scopes(*scopes)`.
+- Dependencies: `principal` (`Principal | None`), `current_user` (`User`, 401
+  without a session) and `optional_user` (`User | None`: a missing, bad or rejected
+  credential is `None`, never a 401). The session is read once per request, however
+  many of them a handler takes. Guards: `requires_session` and
+  `requires_scopes(*scopes)`.
 - `AuthError` is rendered in GotAuth's error shape.
 - A sliding session refresh's cookie is added to the response (`before_send`), and
   `auth.drain()` runs on shutdown.

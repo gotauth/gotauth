@@ -13,8 +13,8 @@
 <body hx-ext="gotauth-json">
   <header>
     <nav><a href="/">Home</a> <a href="/keys">API keys</a></nav>
-    {% if session %}
-      <span>{{ session.user.email }}</span>
+    {% if user %}
+      <span>{{ user.email }}</span>
       <button hx-post="/api/auth/sign-out" hx-swap="none" data-done="redirect" data-to="/">Sign out</button>
     {% else %}
       <a href="/sign-in">Sign in</a>

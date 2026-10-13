@@ -196,3 +196,70 @@ async def test_works_under_an_outer_mount_and_drains_on_shutdown() -> None:
         assert response.status_code == 200, response.text
         encoded = await http.get("/v1/api/auth/sess%69on")  # percent-encoded path
         assert encoded.status_code == 200
+
+
+# ------------------------------------------------------------ optional_user (#9)
+
+
+@get("/greeting")
+async def greeting(
+    optional_user: NamedDependency[User | None],
+) -> dict[str, str | None]:
+    return {"email": optional_user.email if optional_user else None}
+
+
+@get("/both")
+async def both(
+    current_user: NamedDependency[User],
+    optional_user: NamedDependency[User | None],
+) -> dict[str, bool]:
+    return {"same": optional_user is not None and optional_user.id == current_user.id}
+
+
+def build_optional() -> tuple[Any, Litestar, list[str]]:
+    auth = make_auth(email_password={"require_email_verification": False})
+    calls: list[str] = []
+    real_call = auth.api.call
+
+    async def counting_call(name: str, **kwargs: Any) -> Any:
+        calls.append(name)
+        return await real_call(name, **kwargs)
+
+    cast(Any, auth.api).call = counting_call
+    app = Litestar(route_handlers=[greeting, both], plugins=[GotAuthPlugin(auth)])
+    return auth, app, calls
+
+
+async def test_optional_user_is_none_when_signed_out() -> None:
+    _, app, _ = build_optional()
+    async with AsyncTestClient(app=app, base_url="http://localhost.local:8000") as http:
+        assert (await http.get("/greeting")).json() == {"email": None}
+        http.cookies.set("gotauth.session_token", "gas_not-a-real-token")
+        response = await http.get("/greeting")
+        assert response.status_code == 200
+        assert response.json() == {"email": None}
+
+
+async def test_optional_user_is_the_user_when_signed_in() -> None:
+    _, app, calls = build_optional()
+    async with AsyncTestClient(app=app, base_url="http://localhost.local:8000") as http:
+        await sign_up(http)
+        assert (await http.get("/greeting")).json() == {"email": "ada@example.com"}
+        calls.clear()
+        assert (await http.get("/both")).json() == {"same": True}
+        # One session read per request, however many dependencies ask.
+        assert calls == ["get_session"]
+
+
+async def test_optional_user_keeps_the_sliding_refresh() -> None:
+    from gotauth.testing import fake_clock
+
+    clock = fake_clock()
+    auth = make_auth(email_password={"require_email_verification": False}, clock=clock)
+    app = Litestar(route_handlers=[greeting], plugins=[GotAuthPlugin(auth)])
+    async with AsyncTestClient(app=app, base_url="http://localhost.local:8000") as http:
+        await sign_up(http)
+        clock.advance("2d")
+        response = await http.get("/greeting")
+        assert response.json() == {"email": "ada@example.com"}
+        assert "gotauth.session_token=gas_" in response.headers.get("set-cookie", "")
