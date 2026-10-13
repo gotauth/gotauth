@@ -5,6 +5,7 @@
 | From | G4 (examples) |
 | For | F1 (`.github/workflows/ci.yml`) |
 | Date | 2026-10-12 |
+| Status | Applied 2026-10-13 (issue #8): the `examples` job in `ci.yml` |
 
 ## What
 Add a CI job for Python example backends. They are separate uv projects, not part of the root project, so `poe test` never runs their tests:

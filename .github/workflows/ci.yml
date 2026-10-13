@@ -89,6 +89,49 @@ jobs:
       - name: Tests
         run: uv run poe test
 
+  # The example backends are separate uv projects, so poe test does not run them.
+  # fastapi-nextjs/backend holds the M2 acceptance test (SQLite and Postgres). Ruff
+  # already covers them through the root poe lint; the frontends are in the node job.
+  examples:
+    name: Example backend (${{ matrix.project }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [examples/fastapi-nextjs/backend, examples/litestar-htmx]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gotauth
+          POSTGRES_PASSWORD: gotauth
+          POSTGRES_DB: gotauth
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gotauth -d gotauth"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      GOTAUTH_TEST_POSTGRES_URL: postgresql://gotauth:gotauth@localhost:5432/gotauth
+      UV_PROJECT_ENVIRONMENT: .venv
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked
+      - name: Types (pyright)
+        run: uv run pyright
+      - name: Tests
+        run: uv run pytest -rs
+
   no-extras:
     name: Import without extras (Python 3.11)
     runs-on: ubuntu-24.04
