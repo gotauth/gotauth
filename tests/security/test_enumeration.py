@@ -11,6 +11,9 @@ from typing import Any
 
 import pytest
 
+from gotauth.crypto import crypto_kit
+from gotauth.testing import TEST_SECRET
+
 from .conftest import PASSWORD, full_app
 
 UNKNOWN = "nobody@example.com"
@@ -94,7 +97,13 @@ async def test_timing_does_not_reveal_accounts(path: str, body: Body) -> None:
     # two-sample t-test over 200 runs per side, interleaved so drift hits both
     # sides alike, and alternating which goes first: the first request after
     # drain() is slower, which would otherwise always count against one side.
-    app = full_app(base_url="https://auth.example.com", rate_limit={"enabled": False})
+    # The production hash cost, not the testing kit's: this measures what a
+    # deployed app does, and the hash's own jitter is part of that.
+    app = full_app(
+        base_url="https://auth.example.com",
+        rate_limit={"enabled": False},
+        advanced={"crypto": crypto_kit([TEST_SECRET])},
+    )
     runs = 200
     known: list[float] = []
     unknown: list[float] = []
