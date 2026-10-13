@@ -186,6 +186,18 @@ class EndpointContext(Protocol):
         """Queue an event; delivered to ``on_event`` after the transaction commits."""
         ...
 
+    def defer(self, work: Callable[[EndpointContext], Awaitable[None]]) -> None:
+        """Run ``work`` after the request's transaction commits, in a transaction of
+        its own; ``work`` gets a context bound to that transaction.
+
+        Off localhost it runs in the background like email delivery, so the reply
+        does not wait (CONTRACTS 9.1: work done only for existing accounts must not
+        show in the response time). On localhost it runs before the reply. Errors
+        are logged without details and never reach the client; a request that
+        rolls back drops its deferred work.
+        """
+        ...
+
 
 @dataclass(frozen=True)
 class HookPayload:

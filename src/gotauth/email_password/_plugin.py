@@ -93,6 +93,10 @@ async def _send(ctx: EndpointContext, kind: EmailKind, to: str, **data: Any) -> 
         _logger.warning("gotauth: %s email failed (%s)", kind, type(exc).__name__)
 
 
+_NO_USER = "usr_" + "0" * 26
+"""A user id no row has: the lookup for an unknown email (CONTRACTS 9.1)."""
+
+
 async def _send_verification(
     ctx: EndpointContext, user_id: str, email: str, callback_url: str | None
 ) -> None:
@@ -270,15 +274,23 @@ async def _send_verification_email(
 ) -> StatusOut:
     callback_url = _redirect(ctx, body.callback_url)
     row = await _find_user(ctx, body.email)
-    # Only password users: a user created through a social provider that did not
-    # verify the email was set up by whoever controls that provider account, and the
-    # email's owner must not be able to verify it for them by clicking a link.
-    if (
-        row is not None
-        and not row["email_verified"]
-        and await _credential(ctx, row["id"]) is not None
-    ):
-        await _send_verification(ctx, row["id"], row["email"], callback_url)
+    target = (row["id"], row["email"]) if row and not row["email_verified"] else None
+
+    async def send(later: EndpointContext) -> None:
+        if target is None:
+            await _credential(later, _NO_USER)  # same work as a real account
+            return
+        user_id, email = target
+        # Only password users: a user created through a social provider that did
+        # not verify the email was set up by whoever controls that provider
+        # account, and the email's owner must not be able to verify it for them by
+        # clicking a link.
+        if await _credential(later, user_id) is not None:
+            await _send_verification(later, user_id, email, callback_url)
+
+    # After the reply, and for every email alike: work done only for existing
+    # accounts must not show in the response time (CONTRACTS 9.1).
+    ctx.defer(send)
     return StatusOut(status="ok")
 
 
@@ -343,16 +355,25 @@ async def _request_password_reset(
 ) -> StatusOut:
     redirect_to = _absolute(ctx, validate_redirect(body.redirect_to, ctx.auth.config))
     row = await _find_user(ctx, body.email)
-    if row is not None and await _credential(ctx, row["id"]) is not None:
+    target = (row["id"], row["email"]) if row else None
+
+    async def send(later: EndpointContext) -> None:
+        if target is None:
+            await _credential(later, _NO_USER)  # same work as a real account
+            return
+        user_id, email = target
+        if await _credential(later, user_id) is None:
+            return
         token = await issue_token(
-            ctx, "reset_password", row["id"], _settings(ctx).reset_token_expires_in
+            later, "reset_password", user_id, _settings(later).reset_token_expires_in
         )
         await _send(
-            ctx,
-            "reset_password",
-            row["email"],
-            url=_with_query(redirect_to, token=token),
+            later, "reset_password", email, url=_with_query(redirect_to, token=token)
         )
+
+    # After the reply, and for every email alike: work done only for existing
+    # accounts must not show in the response time (CONTRACTS 9.1).
+    ctx.defer(send)
     return StatusOut(status="ok")
 
 

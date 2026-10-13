@@ -11,7 +11,7 @@ import asyncio
 import base64
 import json
 import logging
-from collections.abc import Awaitable, Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, overload
 from urllib.parse import urlencode
@@ -176,6 +176,7 @@ class FakeContext:
         self.cookies: list[SetCookie] = []
         self.headers: dict[str, str] = {}
         self.events: list[AuthEvent] = []
+        self._deferred: list[Callable[[EndpointContext], Awaitable[None]]] = []
         self._root_adapter = root_adapter if root_adapter is not None else adapter
 
     def __repr__(self) -> str:
@@ -320,12 +321,27 @@ class FakeContext:
             root_adapter=self._root_adapter,
         )
 
+    def defer(self, work: Callable[[EndpointContext], Awaitable[None]]) -> None:
+        """Queue work for after the commit; :func:`call_endpoint` runs it then."""
+        self._deferred.append(work)
+
+    async def run_deferred(self) -> None:
+        """Run queued deferred work now, each in a transaction of its own (inline,
+        so tests see its effects at once; errors propagate to the test)."""
+        while self._deferred:
+            work = self._deferred.pop(0)
+            async with self._root_adapter.transaction() as adapter:
+                child = self.derive(adapter=adapter, principal=self.principal)
+                await work(child)
+            self.absorb(child, committed=True)
+
     def absorb(self, child: FakeContext, *, committed: bool) -> None:
         """Take over a child's records: all of them on commit, else only failures."""
         if committed:
             self.cookies.extend(child.cookies)
             self.headers.update(child.headers)
             self.events.extend(child.events)
+            self._deferred.extend(child._deferred)
         else:
             self.events.extend(e for e in child.events if e.type == "sign_in.failed")
 
@@ -1021,6 +1037,7 @@ async def run_endpoint(
             ctx.absorb(child, committed=False)
         raise
     ctx.absorb(child, committed=True)
+    await ctx.run_deferred()
     return result, child
 
 
