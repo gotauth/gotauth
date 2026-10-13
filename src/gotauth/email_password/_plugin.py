@@ -246,7 +246,8 @@ async def _sign_in_email(
     if len(body.password) > settings.max_password_length:
         raise await fail("invalid_credentials")  # never hash an over-long input
     row = await _find_user(ctx, body.email)
-    account = await _credential(ctx, row["id"]) if row is not None else None
+    # The same lookup for an unknown email, so it does not answer faster (9.1).
+    account = await _credential(ctx, row["id"] if row is not None else _NO_USER)
     stored = account.get("password_hash") if account is not None else None
     # An empty hash runs a dummy verification, so unknown emails take as long.
     check = await ctx.crypto.verify_password(body.password, stored or "")

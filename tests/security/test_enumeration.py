@@ -51,6 +51,42 @@ async def test_magic_link_otp_and_invitations() -> None:
     raise AssertionError("covered once P4 and P5 merge")
 
 
+async def test_sign_in_does_the_same_reads_for_known_and_unknown_emails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Timing comes down to the work done: a wrong password must read the same
+    # tables whether or not the email has an account (issue #24).
+    from gotauth.storage.memory import _adapter
+
+    calls: list[tuple[str, str]] = []
+    for name in ("create", "find", "find_many", "update", "delete"):
+        real = getattr(_adapter._Store, name)  # pyright: ignore[reportPrivateUsage]
+
+        def record(
+            self: Any, model: str, *args: Any, _n: str = name, _r: Any = real
+        ) -> Any:
+            calls.append((_n, model))
+            return _r(self, model, *args)
+
+        monkeypatch.setattr(_adapter._Store, name, record)  # pyright: ignore[reportPrivateUsage]
+    app = full_app()
+    async with app.client() as http:
+        await http.post(
+            "/sign-up/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        http.cookies.clear()
+        seen: list[list[tuple[str, str]]] = []
+        for email in ("ada@example.com", UNKNOWN):
+            calls.clear()
+            response = await http.post(
+                "/sign-in/email", json={"email": email, "password": "wrong password"}
+            )
+            assert response.status_code == 401
+            seen.append(list(calls))
+    assert seen[0] == seen[1]
+    assert ("find_many", "account") in seen[0]
+
+
 def welch_t(a: list[float], b: list[float]) -> float:
     """Welch's two-sample t statistic."""
     va, vb = statistics.variance(a), statistics.variance(b)
