@@ -155,3 +155,53 @@ async def test_pages_need_no_javascript_to_render(example: Example) -> None:
         apps = await browser.get("/connected-apps", follow_redirects=False)
         assert apps.status_code == 303
         assert apps.headers["location"] == "/sign-in?callback_url=/connected-apps"
+
+
+async def test_mcp_inspector_may_call_from_its_page(example: Example) -> None:
+    async with example.running(), example.mcp_client() as http:
+        for origin, allowed in (
+            ("http://localhost:6274", True),
+            ("https://evil.example", False),
+        ):
+            preflight = await http.options(
+                "/api/auth/oauth2/token",
+                headers={
+                    "origin": origin,
+                    "access-control-request-method": "POST",
+                    "access-control-request-headers": "content-type",
+                },
+            )
+            granted = preflight.headers.get("access-control-allow-origin")
+            assert (granted == origin) is allowed, origin
+            assert "access-control-allow-credentials" not in preflight.headers
+
+
+async def test_a_look_alike_client_is_never_used_for_inspector(
+    example: Example,
+) -> None:
+    async with example.running(), example.mcp_client() as http:
+        seeded = example.app.state.inspector_client_id
+        registered = await http.post(
+            "/api/auth/oauth2/register",
+            json={
+                "client_name": "MCP Inspector",
+                "redirect_uris": ["https://evil.example/callback"],
+                "application_type": "web",
+            },
+        )
+        assert registered.status_code == 201, registered.text
+    async with example.running():  # a restart seeds again
+        assert example.app.state.inspector_client_id == seeded
+
+
+async def test_sign_in_elsewhere_points_to_the_app(example: Example) -> None:
+    async with example.running():
+        other = httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=example.app),
+            base_url="http://127.0.0.1:8000",
+        )
+        async with other:
+            page = await other.get("/sign-in")
+    assert "This app runs at" in page.text
+    async with example.running(), example.browser() as browser:
+        assert "This app runs at" not in (await browser.get("/sign-in")).text

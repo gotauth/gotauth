@@ -44,14 +44,16 @@ The app prints the MCP server's URL and the client id it registered for MCP Insp
 4. Connect. The browser opens the sign-in page, then the consent page.
 5. List the tools and call `list_projects`.
 
-The app registers that client up front because MCP Inspector's callback is a loopback address (`http://localhost:6274/oauth/callback`). Client ID metadata documents on loopback hosts are refused.
+The app registers that client up front because MCP Inspector's callback is a loopback address (`http://localhost:6274/oauth/callback`). Client ID metadata documents on loopback hosts are refused. Inspector runs discovery, the token request and the MCP calls from its own page, so the app allows CORS from `http://localhost:6274`, without credentials.
 
 ## Claude (custom connector)
 
 Claude reaches the server from the internet, so it needs a public https URL:
 1. Start a tunnel to port 8000, for example `cloudflared tunnel --url http://localhost:8000`.
-2. Set `BASE_URL` in `.env` to the tunnel's https URL and restart the app. Tokens are issued for `<BASE_URL>/mcp`.
-3. In Claude, add a custom connector with the URL `<BASE_URL>/mcp`. Claude registers itself (dynamic client registration is on in this example), then opens the sign-in and consent pages.
+2. Set `BASE_URL` in `.env` to the tunnel's https URL. Load it again (`set -a && . ./.env && set +a`), then restart the app. Tokens are issued for `<BASE_URL>/mcp`, and you sign in at `<BASE_URL>`, not at localhost.
+3. In Claude, add a custom connector with the URL `<BASE_URL>/mcp`. Claude registers itself (with a client ID metadata document, or dynamic registration, which is on in this example), then opens the sign-in and consent pages.
+
+A client that registered dynamically can only get the scopes it asked for at registration, so the `projects:write` step-up in the clip needs a client ID metadata document or a registration that asked for both scopes. Issue #33 tracks lifting that limit.
 
 ## The clip
 

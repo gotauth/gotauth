@@ -8,8 +8,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastmcp import FastMCP
@@ -17,7 +19,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import require_scopes
 from pydantic import BaseModel
 
-from app.auth import INSPECTOR_REDIRECT, MCP_URL, SCOPES
+from app.auth import BASE_URL, INSPECTOR_ORIGIN, INSPECTOR_REDIRECT, MCP_URL, SCOPES
 from gotauth import GotAuth, User
 from gotauth.integrations.mcp import current_access, fastmcp_auth
 
@@ -76,7 +78,13 @@ async def seed_inspector_client(auth: GotAuth) -> str:
     hosts, so local tools need a client registered up front."""
     listed = await auth.api.call("list_oauth_clients", body={})
     for client in listed.clients:
-        if client.name == INSPECTOR_CLIENT:
+        # Not by name alone: anyone may register a client called "MCP Inspector".
+        if (
+            client.registration == "static"
+            and client.type == "public"
+            and client.redirect_uris == [INSPECTOR_REDIRECT]
+            and client.disabled_at is None
+        ):
             return str(client.client_id)
     created = await auth.api.call(
         "create_oauth_client",
@@ -104,7 +112,13 @@ def page(title: str, body: str) -> HTMLResponse:
 
 def create_app(auth: GotAuth) -> FastAPI:
     mcp_app = build_mcp(auth).http_app(
-        path="/mcp", stateless_http=True, json_response=True
+        path="/mcp",
+        stateless_http=True,
+        json_response=True,
+        # FastMCP's DNS-rebinding guard: the public host, also behind a tunnel.
+        host_origin_protection=True,
+        allowed_hosts=[urlsplit(BASE_URL).netloc],
+        allowed_origins=[BASE_URL, INSPECTOR_ORIGIN],
     )
     well_known = auth.well_known()
 
@@ -120,6 +134,22 @@ def create_app(auth: GotAuth) -> FastAPI:
         await auth.drain()
 
     app = FastAPI(title="GotAuth fastmcp-server example", lifespan=lifespan)
+    # MCP Inspector runs OAuth discovery, the token request and MCP calls from its
+    # page at localhost:6274. Without credentials: the session cookie is never sent
+    # cross-origin, so GotAuth's own origin checks are unchanged.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[INSPECTOR_ORIGIN],
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=[
+            "authorization",
+            "content-type",
+            "mcp-protocol-version",
+            "mcp-session-id",
+            "last-event-id",
+        ],
+        expose_headers=["www-authenticate", "mcp-session-id"],
+    )
     app.include_router(auth.fastapi.router(), prefix=auth.config.base_path)
     auth.fastapi.add_exception_handlers(app)
     optional_user = Depends(auth.fastapi.optional_user)
@@ -141,11 +171,19 @@ def create_app(auth: GotAuth) -> FastAPI:
         )
 
     @app.get("/sign-in", include_in_schema=False)
-    async def sign_in(callback_url: str = "/") -> HTMLResponse:
+    async def sign_in(request: Request, callback_url: str = "/") -> HTMLResponse:
         callback = html.escape(callback_url, quote=True)
+        here = f"{request.url.scheme}://{request.url.netloc}"
+        elsewhere = (
+            "<p role='alert'>This app runs at "
+            f"<a href='{html.escape(BASE_URL, quote=True)}'>{html.escape(BASE_URL)}</a>"
+            ": sign in there, or the MCP client's sign-in cannot finish.</p>"
+            if here != BASE_URL
+            else ""
+        )
         return page(
             "Sign in",
-            "<h1>Sign in</h1>"
+            f"<h1>Sign in</h1>{elsewhere}"
             f"<form data-sign-in data-callback='{callback}'>"
             "<label>Email <input name='email' type='email' required "
             "autocomplete='username'></label>"

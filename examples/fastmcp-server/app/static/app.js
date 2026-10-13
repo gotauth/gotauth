@@ -45,15 +45,25 @@ document.addEventListener("submit", async (event) => {
   }
 });
 
+function fail(element, message) {
+  const note = document.createElement("p");
+  note.setAttribute("role", "alert");
+  note.textContent = message;
+  element.after(note);
+}
+
 document.addEventListener("click", async (event) => {
   const revoke = event.target.closest("[data-revoke]");
   if (revoke) {
-    await post("/oauth2/grants/revoke", { client_id: revoke.dataset.revoke });
-    window.location.reload();
+    const { ok } = await post("/oauth2/grants/revoke", { client_id: revoke.dataset.revoke });
+    if (ok) window.location.reload();
+    else fail(revoke, "Revoking failed: the app still has access. Reload and try again.");
     return;
   }
-  if (event.target.closest("[data-sign-out]")) {
-    await post("/sign-out");
-    window.location.assign("/");
+  const signOut = event.target.closest("[data-sign-out]");
+  if (signOut) {
+    const { ok } = await post("/sign-out");
+    if (ok) window.location.assign("/");
+    else fail(signOut, "Signing out failed. Reload and try again.");
   }
 });

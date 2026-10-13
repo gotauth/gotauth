@@ -14,6 +14,7 @@ import pytest
 
 # Before the app is imported: app.main builds the default app from the environment.
 os.environ.setdefault("GOTAUTH_SECRET", "test-" + "x" * 40)
+os.environ["BASE_URL"] = "http://localhost:8000"  # not a tunnel URL from .env
 
 from sqlalchemy.ext.asyncio import create_async_engine
 

@@ -18,7 +18,8 @@ BASE_URL = env.get("BASE_URL", "http://localhost:8000").rstrip("/")
 MCP_URL = f"{BASE_URL}/mcp"
 """The MCP server's URL, which access tokens must name as their audience."""
 SCOPES = ("projects:read", "projects:write")
-INSPECTOR_REDIRECT = "http://localhost:6274/oauth/callback"
+INSPECTOR_ORIGIN = "http://localhost:6274"
+INSPECTOR_REDIRECT = f"{INSPECTOR_ORIGIN}/oauth/callback"
 """MCP Inspector's OAuth callback; the app seeds a public client for it."""
 
 

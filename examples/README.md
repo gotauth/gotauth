@@ -6,7 +6,7 @@ Runnable apps that use GotAuth. Work package G4 owns this index; each example is
 |---|---|---|---|
 | [`fastapi-nextjs/`](fastapi-nextjs/) | FastAPI backend and Next.js frontend: email and password, GitHub login, API keys; later 2FA, passkeys and organizations | `cd examples/fastapi-nextjs && docker compose up --build` (after the `.env` step in its README) | G4 |
 | [`litestar-htmx/`](litestar-htmx/) | Server-rendered Litestar and htmx: sign up, sign in, sign out, API keys | see its README (dev container, `uvicorn`) | G4 |
-| `fastmcp-server/` | FastMCP server protected by the GotAuth OAuth 2.1 server | not built yet | O2 |
+| [`fastmcp-server/`](fastmcp-server/) | An MCP server (FastMCP) whose users sign in with GotAuth: consent, tool scopes with step-up, "Connected apps" with revoke; MCP Inspector and Claude connector steps | see its README (dev container, `uvicorn`) | O2 |
 
 ## Format of an example
 
