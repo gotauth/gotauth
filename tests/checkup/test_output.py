@@ -24,6 +24,9 @@ def sample_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A copy of the sample app plus two files that cannot be parsed, as the cwd."""
     root = tmp_path / "sample_app"
     shutil.copytree(FIXTURES / "sample_app", root)
+    # Stored under another name so the repository's dependency graph does not
+    # report the sample app's deliberately old pins (issue #27).
+    (root / "requirements.txt.sample").rename(root / "requirements.txt")
     (root / "broken.py").write_text("def broken(:\n    pass\n")
     (root / "latin1.py").write_bytes(b"# caf\xe9\nimport passlib\n")
     monkeypatch.chdir(root)
