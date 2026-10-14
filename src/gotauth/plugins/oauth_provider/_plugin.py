@@ -509,9 +509,12 @@ def oauth_provider(
             )
         if body.application_type == "web" and any(loopback):
             return invalid("invalid_redirect_uri", "web clients use https redirects")
-        requested = (body.scope or "").split() or list(settings.scopes)
+        requested = (body.scope or "").split()
         if not set(requested) <= set(settings.scopes):
             return invalid("invalid_client_metadata", "unknown scope")
+        # Like a CIMD client, a registered public client may ask for any configured
+        # scope later: MCP clients register with the first scope they see, then
+        # step up (403 insufficient_scope). The user consents to each scope anyway.
         client_row_id = ctx.ids.new("cli")
         now = ctx.clock.now()
         row = await ctx.adapter.create(
@@ -523,7 +526,7 @@ def oauth_provider(
                 "name": body.client_name or "Unnamed client",
                 "redirect_uris": list(uris),
                 "grant_types": sorted(set(grants)),
-                "scopes": sorted(set(requested)),
+                "scopes": list(settings.scopes),
                 "registration": "dynamic",
                 "created_at": now,
             },

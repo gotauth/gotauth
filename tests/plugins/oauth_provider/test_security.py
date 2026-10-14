@@ -374,6 +374,36 @@ async def test_dynamic_registration() -> None:
     assert (await off.http.post("/oauth2/register", json={})).status_code == 404
 
 
+async def test_a_registered_client_can_step_up_to_another_scope() -> None:
+    # Issue #33: an MCP client registers with the first scope it needs and asks for
+    # more after a 403 insufficient_scope.
+    w = await world(allow_dynamic_registration=True)
+    registered = await w.http.post(
+        "/oauth2/register",
+        json={
+            "client_name": "Agent",
+            "redirect_uris": [REDIRECT],
+            "application_type": "web",
+            "scope": "openid",
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    w.client_id = registered.json()["client_id"]
+    assert set(registered.json()["scope"].split()) >= {"openid", "profile", "email"}
+    step_up = await w.authorize(scope="openid profile email")
+    assert step_up.status_code == 200, step_up.text
+    assert sorted(step_up.json()["scopes"]) == ["email", "openid", "profile"]
+    unknown = await w.http.post(
+        "/oauth2/register",
+        json={
+            "redirect_uris": [REDIRECT],
+            "application_type": "web",
+            "scope": "openid admin",
+        },
+    )
+    assert unknown.json()["error"] == "invalid_client_metadata"
+
+
 # ---------------------------------------------------------------- URL rules
 
 

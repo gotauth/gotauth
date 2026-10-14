@@ -27,7 +27,7 @@ app.mount("/", auth.well_known())  # RFC 8414 metadata at the host root, last
 | `POST /oauth2/revoke` | RFC 7009 |
 | `GET /oauth2/jwks`, `GET /oauth2/userinfo` | Keys and OIDC userinfo |
 | `GET /.well-known/openid-configuration` | Discovery; the same document is served at `/.well-known/oauth-authorization-server<base_path>` by `auth.well_known()` |
-| `POST /oauth2/register` | RFC 7591, only with `allow_dynamic_registration=True` (public clients) |
+| `POST /oauth2/register` | RFC 7591, only with `allow_dynamic_registration=True` (public clients). Like a CIMD client, a registered client may later ask for any configured scope (MCP step-up); the user consents per scope |
 | `GET /oauth2/grants` | The signed-in user's authorized apps: client, scopes, resources, `created_at`, `last_used_at` |
 | `POST /oauth2/grants/revoke` | `{client_id}`: deletes the user's consent and unused codes for that app and revokes its tokens, which stop working at once |
 
