@@ -53,7 +53,7 @@ Claude reaches the server from the internet, so it needs a public https URL:
 2. Set `BASE_URL` in `.env` to the tunnel's https URL. Load it again (`set -a && . ./.env && set +a`), then restart the app. Tokens are issued for `<BASE_URL>/mcp`, and you sign in at `<BASE_URL>`, not at localhost.
 3. In Claude, add a custom connector with the URL `<BASE_URL>/mcp`. Claude registers itself (with a client ID metadata document, or dynamic registration, which is on in this example), then opens the sign-in and consent pages.
 
-A client that registered dynamically can only get the scopes it asked for at registration, so the `projects:write` step-up in the clip needs a client ID metadata document or a registration that asked for both scopes. Issue #33 tracks lifting that limit.
+Clients that register themselves can ask for `projects:write` later, so the step-up in the clip works however Claude registers.
 
 ## The clip
 
