@@ -364,3 +364,19 @@ async def test_failure_events_survive_a_failed_call_with_path_params() -> None:
     with pytest.raises(AuthError):
         await ctx.auth.api.call("fail_with_param", ctx=ctx, path_params={"id": "x"})
     assert ctx.event_types() == ["sign_in.failed"]
+
+
+async def test_fake_delete_user_without_a_context_gives_hooks_one() -> None:
+    # As the core does (CCR 011).
+    from gotauth.contracts import DatabaseHooks, ModelHooks, Plugin
+
+    seen: list[object] = []
+
+    async def before_delete(ctx: Any, row: dict[str, Any]) -> None:
+        seen.append(ctx)
+
+    hooks = DatabaseHooks(hooks={"user": ModelHooks(before_delete=before_delete)})
+    ctx = make_context(plugins=[Plugin(id="cleanup", database_hooks=hooks)])
+    user = await new_user(ctx)
+    await ctx.auth.delete_user(None, user.id)
+    assert len(seen) == 1 and seen[0] is not None
