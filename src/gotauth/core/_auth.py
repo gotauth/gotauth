@@ -785,19 +785,26 @@ class GotAuth:
             return await self._with_hooks(ctx, endpoint, data)
         first_event = len(ctx.events)
         first_deferred = len(ctx.deferred)
+        first_failure = len(ctx.failures)
         try:
             async with self._database.transaction() as tx:
                 ctx.adapter = HookedAdapter(tx, self, ctx)
                 result = await self._with_hooks(ctx, endpoint, data)
-        except BaseException:
+        except BaseException as exc:
             new = ctx.events[first_event:]
             del ctx.events[first_event:]
             del ctx.deferred[first_deferred:]  # rolled back: nothing to follow up
+            failures = ctx.failures[first_failure:]
+            del ctx.failures[first_failure:]
+            ctx.adapter = self._database
+            if isinstance(exc, Exception) and failures:
+                await self._run_failures(ctx, failures)
             # Failure events survive a rollback (CONTRACTS 14).
             self._publish([event for event in new if event.type == "sign_in.failed"])
             raise
         finally:
             ctx.adapter = self._database
+        del ctx.failures[first_failure:]  # committed: nothing failed
         self._publish(ctx.events[first_event:])
         works = ctx.deferred[first_deferred:]
         del ctx.deferred[first_deferred:]
@@ -808,6 +815,24 @@ class GotAuth:
                 # After the reply, so its duration does not show (CONTRACTS 9.1).
                 self.background(self._run_deferred(ctx, works, delay=_DEFER_DELAY))
         return result
+
+    async def _run_failures(
+        self, ctx: RequestContext, works: list[Callable[[Any], Awaitable[None]]]
+    ) -> None:
+        """Run on_failure work after a rollback, each in a transaction of its own,
+        before the error goes out (CCR 012)."""
+        for work in works:
+            first_event = len(ctx.events)
+            try:
+                async with self._database.transaction() as tx:
+                    ctx.adapter = HookedAdapter(tx, self, ctx)
+                    await work(ctx)
+            except Exception as exc:
+                # Only the type: messages can carry tokens or addresses.
+                logger.warning("gotauth: failure work failed (%s)", type(exc).__name__)
+            finally:
+                ctx.adapter = self._database
+                del ctx.events[first_event:]
 
     async def _run_deferred(
         self,
@@ -927,6 +952,7 @@ class GotAuth:
                 cookies=ctx.cookies if isinstance(ctx, RequestContext) else None,
                 headers=ctx.headers if isinstance(ctx, RequestContext) else None,
                 deferred=ctx.deferred if isinstance(ctx, RequestContext) else None,
+                failures=ctx.failures if isinstance(ctx, RequestContext) else None,
             )
             await self._check_access(call_ctx, endpoint)
             result = await self._execute(call_ctx, endpoint, data, joined=True)
@@ -939,6 +965,8 @@ class GotAuth:
                     ctx.set_cookie(cookie)
                 for work in call_ctx.deferred:
                     ctx.defer(work)
+                for work in call_ctx.failures:
+                    ctx.on_failure(work)
         else:
             call_ctx = RequestContext(
                 auth=self, request=request, adapter=self._database, path_params=params

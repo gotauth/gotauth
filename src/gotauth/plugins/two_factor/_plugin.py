@@ -23,7 +23,7 @@ from gotauth.contracts.endpoints import (
     SignInChallenge,
 )
 from gotauth.contracts.errors import AuthError
-from gotauth.contracts.http import AuthResponse, SetCookie
+from gotauth.contracts.http import SetCookie
 from gotauth.contracts.http_models import SignInOut, StatusOut
 from gotauth.contracts.primitives import Duration, to_timedelta
 from gotauth.contracts.protection import RateLimitRule
@@ -567,9 +567,7 @@ def two_factor(
         await ctx.email.send("otp", user["email"], code=code)
         return StatusOut(status="sent")
 
-    async def verify_otp(
-        ctx: EndpointContext, body: CodeIn
-    ) -> SignInOut | AuthResponse:
+    async def verify_otp(ctx: EndpointContext, body: CodeIn) -> SignInOut:
         state = factor(ctx, "email_otp")
         row = await active_row(ctx, state.user_id)
         identifier = otp_identifier(state.user_id)
@@ -585,33 +583,34 @@ def two_factor(
             [Where("identifier", identifier), Where("value_hash", expected)],
         )
         if found is None:
+            pending_id = pending["id"]
             attempts = int(pending.get("attempts") or 0)
-            if attempts + 1 >= OTP_MAX_ATTEMPTS:
-                await ctx.adapter.delete("verification", [Where("id", pending["id"])])
-            else:
-                counted_row = await ctx.adapter.update(
+
+            async def count(later: EndpointContext) -> None:
+                # After the rollback, in its own transaction (CCR 012).
+                if attempts + 1 >= OTP_MAX_ATTEMPTS:
+                    await later.adapter.delete(
+                        "verification", [Where("id", pending_id)]
+                    )
+                    return
+                counted_row = await later.adapter.update(
                     "verification",
-                    [Where("id", pending["id"]), Where("attempts", attempts)],
+                    [Where("id", pending_id), Where("attempts", attempts)],
                     {"attempts": attempts + 1},
                 )
                 if counted_row is None:  # a concurrent guess: fail closed
-                    await ctx.adapter.delete(
-                        "verification", [Where("id", pending["id"])]
+                    await later.adapter.delete(
+                        "verification", [Where("id", pending_id)]
                     )
+
+            ctx.on_failure(count)
             await ctx.emit(
                 "sign_in.failed",
                 user_id=state.user_id,
                 method=state.method,
                 reason="invalid_second_factor",
             )
-            # Answered, not raised: an error would roll the count back, and the
-            # 5-attempt limit would never be reached.
-            error = _error("TWO_FACTOR_INVALID_CODE")
-            return AuthResponse(
-                status=error.status,
-                body=error.to_out(),
-                headers={"cache-control": "no-store"},
-            )
+            raise _error("TWO_FACTOR_INVALID_CODE")
         deleted = await ctx.adapter.delete("verification", [Where("id", found["id"])])
         if not deleted:  # used concurrently
             raise _error("TWO_FACTOR_INVALID_CODE")

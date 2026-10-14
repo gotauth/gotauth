@@ -181,6 +181,7 @@ class FakeContext:
         self.headers: dict[str, str] = {}
         self.events: list[AuthEvent] = []
         self._deferred: list[Callable[[EndpointContext], Awaitable[None]]] = []
+        self._failures: list[Callable[[EndpointContext], Awaitable[None]]] = []
         self._root_adapter = root_adapter if root_adapter is not None else adapter
 
     def __repr__(self) -> str:
@@ -329,6 +330,19 @@ class FakeContext:
         """Queue work for after the commit; :func:`call_endpoint` runs it then."""
         self._deferred.append(work)
 
+    def on_failure(self, work: Callable[[EndpointContext], Awaitable[None]]) -> None:
+        """Queue work for after a rollback; :func:`call_endpoint` runs it then."""
+        self._failures.append(work)
+
+    async def run_failures(
+        self, works: list[Callable[[EndpointContext], Awaitable[None]]]
+    ) -> None:
+        """Run on_failure work, each in a transaction of its own (inline; errors
+        propagate to the test)."""
+        for work in works:
+            async with self._root_adapter.transaction() as adapter:
+                await work(self.derive(adapter=adapter, principal=self.principal))
+
     async def run_deferred(self) -> None:
         """Run queued deferred work now, each in a transaction of its own (inline,
         so tests see its effects at once; errors propagate to the test)."""
@@ -346,6 +360,7 @@ class FakeContext:
             self.headers.update(child.headers)
             self.events.extend(child.events)
             self._deferred.extend(child._deferred)
+            self._failures.extend(child._failures)
         else:
             self.events.extend(e for e in child.events if e.type == "sign_in.failed")
 
@@ -1043,9 +1058,11 @@ async def run_endpoint(
         async with ctx.adapter.transaction() as adapter:
             child = ctx.derive(adapter=adapter, principal=principal)
             result = await endpoint.handler(child, data)
-    except BaseException:
+    except BaseException as exc:
         if child is not None:
             ctx.absorb(child, committed=False)
+            if isinstance(exc, Exception) and child._failures:  # pyright: ignore[reportPrivateUsage]
+                await ctx.run_failures(child._failures)  # pyright: ignore[reportPrivateUsage]
         raise
     ctx.absorb(child, committed=True)
     await ctx.run_deferred()
