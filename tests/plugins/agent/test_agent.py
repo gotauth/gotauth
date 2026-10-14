@@ -14,9 +14,10 @@ from gotauth.contracts import ConfigError
 from gotauth.contracts.oauth import PLUGIN_ENDPOINTS
 from gotauth.plugins.agent import agent
 from gotauth.plugins.api_key import api_key
-from gotauth.testing import make_auth
+from gotauth.plugins.oauth_provider import oauth_provider
+from gotauth.testing import make_auth, stub_plugin
 
-from .conftest import REDIRECT, world
+from .conftest import REDIRECT, SCOPES, world
 
 
 def test_endpoints_match_the_contract_table() -> None:
@@ -166,8 +167,10 @@ async def test_re_enabling_keeps_old_keys_dead() -> None:
     w = await world()
     agent_id = (await w.new_agent())["id"]
     old = await w.agent_key(agent_id)
-    disabled = await w.ada.patch(f"/agents/{agent_id}", json={"enabled": False})
-    assert disabled.json()["disabled_at"] is not None
+    refused = await w.ada.patch(f"/agents/{agent_id}", json={"enabled": False})
+    assert refused.status_code == 400  # disabling goes through revoke (fresh)
+    disabled = await w.ada.post(f"/agents/{agent_id}/revoke")
+    assert disabled.json()["agent"]["disabled_at"] is not None
     enabled = await w.ada.patch(f"/agents/{agent_id}", json={"enabled": True})
     assert enabled.json()["disabled_at"] is None
     assert await w.key_principal(old) is None
@@ -298,3 +301,93 @@ async def test_client_credentials_of_a_user_s_agent_act_for_that_user() -> None:
     assert response.status_code == 200, response.text
     principal = await w.token_principal(response.json()["access_token"])
     assert (principal.agent_id, principal.user_id) == (agent_id, w.ada_id)
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_tokens_from_before_the_link_are_revoked_too() -> None:
+    w = await world()
+    agent_id = (await w.new_agent())["id"]
+    client_id = await w.client()
+    before = await w.tokens(client_id)  # no act claim, no agent id on the grant
+    await w.ada.post(f"/agents/{agent_id}/clients", json={"client_id": client_id})
+    revoked = (await w.ada.post(f"/agents/{agent_id}/revoke")).json()
+    assert revoked["oauth_tokens"] >= 1
+    assert await w.token_principal(before["access_token"]) is None
+    # Even if the app enables the client again, the old grant stays dead.
+    await w.auth.api.call(
+        "update_oauth_client", body={"client_id": client_id, "disabled": False}
+    )
+    assert await w.token_principal(before["access_token"]) is None
+
+
+async def test_a_disabled_client_is_not_relinked_silently() -> None:
+    w = await world()
+    agent_id = (await w.new_agent())["id"]
+    client_id = await w.client()
+    await w.ada.post(f"/agents/{agent_id}/clients", json={"client_id": client_id})
+    await w.ada.post(f"/agents/{agent_id}/revoke")
+    await w.ada.patch(f"/agents/{agent_id}", json={"enabled": True})
+    again = await w.ada.post(
+        f"/agents/{agent_id}/clients", json={"client_id": client_id}
+    )
+    assert again.status_code == 409
+    assert again.json()["error"]["code"] == "AGENT_CLIENT_DISABLED"
+
+
+async def test_revoke_agents_counts_only_what_it_revoked() -> None:
+    w = await world()
+    await w.new_agent("one")
+    await w.new_agent("two")
+    body = {"owner_type": "user", "owner_id": w.ada_id}
+    first = await w.auth.api.call("revoke_agents", body=body)
+    second = await w.auth.api.call("revoke_agents", body=body)
+    assert (first.revoked, second.revoked) == (2, 0)
+
+
+async def test_organization_agents_follow_the_organization_s_permissions() -> None:
+    granted: dict[str, set[str]] = {"agent": set(), "api_key": set()}
+    asked: list[dict[str, Any]] = []
+
+    async def has_permission(
+        permissions: dict[str, list[str]], organization_id: str | None = None
+    ) -> dict[str, bool]:
+        asked.append(permissions)
+        ok = all(
+            set(acts) <= granted.get(res, set()) for res, acts in permissions.items()
+        )
+        return {"success": ok}
+
+    org = stub_plugin("organization", {"has_permission": has_permission})
+    w = await world(
+        plugins=[
+            api_key(allowed_scopes=["projects:read"]),
+            oauth_provider(scopes=SCOPES),
+            agent(),
+            org,
+        ]
+    )
+    body = {"name": "Team bot", "organization_id": "org_1"}
+    assert (await w.ada.post("/agents", json=body)).status_code == 403
+    granted["agent"] = {"create", "read", "update"}
+    created = await w.ada.post("/agents", json=body)
+    assert created.status_code == 200, created.text
+    agent_id = created.json()["id"]
+    assert created.json()["owner_type"] == "organization"
+    assert (await w.ada.get(f"/agents/{agent_id}")).status_code == 200
+    # A key acts for the organization: P1's api_key create right is needed too.
+    key = {"name": "k", "scopes": ["projects:read"]}
+    assert (
+        await w.ada.post(f"/agents/{agent_id}/api-keys", json=key)
+    ).status_code == 404
+    granted["api_key"] = {"create"}
+    minted = await w.ada.post(f"/agents/{agent_id}/api-keys", json=key)
+    assert minted.status_code == 200, minted.text
+    principal = await w.key_principal(minted.json()["key"])
+    assert (principal.agent_id, principal.user_id) == (agent_id, None)
+    assert principal.organization_id == "org_1"
+    # Without the read right the agent does not exist for the caller.
+    granted["agent"] = set()
+    assert (await w.ada.get(f"/agents/{agent_id}")).status_code == 404
+    assert {"agent": ["update"], "api_key": ["create"]} in asked

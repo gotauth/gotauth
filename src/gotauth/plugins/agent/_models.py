@@ -63,9 +63,9 @@ class ListAgentsIn(BaseModel):
 
 
 class UpdateAgentIn(BaseModel):
-    """``update_agent`` input; only the fields given change. ``enabled=False`` revokes
-    the agent like ``revoke_agent``; ``enabled=True`` re-enables it, and what was
-    revoked stays revoked."""
+    """``update_agent`` input; only the fields given change. ``enabled=True``
+    re-enables a revoked agent, and what was revoked stays revoked. ``enabled=False``
+    is refused: disable an agent with ``revoke_agent``, which needs a fresh session."""
 
     model_config = ConfigDict(extra="forbid")
 

@@ -36,6 +36,7 @@ __all__ = ["agent"]
 ERROR_CODES: dict[str, tuple[int, str]] = {
     "AGENT_DISABLED": (403, "The agent is disabled"),
     "AGENT_CLIENT_ALREADY_LINKED": (409, "The client is linked to another agent"),
+    "AGENT_CLIENT_DISABLED": (409, "The client is disabled"),
 }
 
 
@@ -66,51 +67,69 @@ def _event_data(row: dict[str, Any]) -> dict[str, Any]:  # Any: event data
     }
 
 
-async def _org_permission(
-    ctx: EndpointContext, organization_id: str, action: str
-) -> None:
-    """P5's ``has_permission`` for ``{"agent": [action]}``; without P5, refused."""
+async def _allowed(
+    ctx: EndpointContext,
+    organization_id: str,
+    permissions: dict[str, list[str]],
+) -> bool:
+    """P5's ``has_permission`` for the session user; without P5, never."""
     if "organization" not in ctx.auth.plugin_ids:
-        raise AuthError(
-            "FORBIDDEN", 403, "Organization agents need the organization plugin"
-        )
+        return False
     result = await ctx.auth.api.call(
         "has_permission",
-        body={"organization_id": organization_id, "permissions": {"agent": [action]}},
+        body={"organization_id": organization_id, "permissions": permissions},
         ctx=ctx,
     )
-    allowed = (
+    return (
         result.success
         if isinstance(result, HasPermissionOut)
         else bool(getattr(result, "success", False))
     )
-    if not allowed:
+
+
+async def _org_permission(
+    ctx: EndpointContext, organization_id: str, action: str
+) -> None:
+    """For an organization the caller names (create, list): FORBIDDEN without the
+    permission."""
+    if "organization" not in ctx.auth.plugin_ids:
+        raise AuthError(
+            "FORBIDDEN", 403, "Organization agents need the organization plugin"
+        )
+    if not await _allowed(ctx, organization_id, {"agent": [action]}):
         raise AuthError("FORBIDDEN", 403)
 
 
 async def _owned(
-    ctx: EndpointContext, agent_id: str, action: str
+    ctx: EndpointContext,
+    agent_id: str,
+    action: str,
+    also: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:  # Any: row
-    """The agent the session user may act on, else NOT_FOUND (FORBIDDEN for an
-    organization member without the permission)."""
+    """The agent the session user may act on. Anything else is NOT_FOUND, so an
+    agent id says nothing to someone who may not use it."""
     user_id = _session_user(ctx)
     row = await ctx.adapter.find_one("agent", [Where("id", agent_id)])
     if row is None:
         raise AuthError("NOT_FOUND", 404)
     if row["owner_type"] == "user" and row["owner_id"] == user_id:
         return row
-    if row["owner_type"] == "organization":
-        await _org_permission(ctx, row["owner_id"], action)
+    if row["owner_type"] == "organization" and await _allowed(
+        ctx, row["owner_id"], {"agent": [action], **(also or {})}
+    ):
         return row
     raise AuthError("NOT_FOUND", 404)
 
 
 async def _revoke(
     ctx: EndpointContext, row: dict[str, Any]
-) -> tuple[dict[str, Any], int, int, int]:  # Any: row
-    """Disable the agent and revoke everything it holds, in the caller's transaction.
-    Idempotent: a second run revokes nothing more."""
-    if row.get("disabled_at") is None:
+) -> tuple[dict[str, Any], bool, int, int, int]:  # Any: row
+    """Disable the agent and revoke everything it holds, in the caller's
+    transaction: its keys, its linked clients and every token of those clients (also
+    tokens from before the link, which carry no agent id). Idempotent; returns the
+    row, whether it was enabled, and the counts."""
+    newly = row.get("disabled_at") is None
+    if newly:
         updated = await ctx.adapter.update(
             "agent", [Where("id", row["id"])], {"disabled_at": ctx.clock.now()}
         )
@@ -122,38 +141,46 @@ async def _revoke(
     )
     clients = tokens = 0
     if "oauth_provider" in ctx.auth.plugin_ids:
-        linked = await ctx.adapter.find_many(
-            "oauth_client",
-            [Where("agent_id", row["id"]), Where("disabled_at", True, "is_null")],
+        listed = await ctx.auth.api.call(
+            "list_oauth_clients", body={"agent_id": row["id"]}, ctx=ctx
         )
-        for client in linked:
-            await ctx.auth.api.call(
-                "update_oauth_client",
-                body={"client_id": client["client_id"], "disabled": True},
-                ctx=ctx,
+        for client in listed.clients:
+            if client.disabled_at is None:
+                await ctx.auth.api.call(
+                    "update_oauth_client",
+                    body={"client_id": client.client_id, "disabled": True},
+                    ctx=ctx,
+                )
+                clients += 1
+            by_client = await ctx.auth.api.call(
+                "revoke_oauth_tokens", body={"client_id": client.client_id}, ctx=ctx
             )
-        clients = len(linked)
-        revoked = await ctx.auth.api.call(
+            tokens += by_client.revoked
+        by_agent = await ctx.auth.api.call(
             "revoke_oauth_tokens", body={"agent_id": row["id"]}, ctx=ctx
         )
-        tokens = revoked.revoked
-    await ctx.emit(
-        "agent.revoked",
-        api_keys=keys.revoked,
-        oauth_clients=clients,
-        oauth_tokens=tokens,
-        **_event_data(row),
-    )
-    return row, keys.revoked, clients, tokens
+        tokens += by_agent.revoked
+    if newly or keys.revoked or clients or tokens:
+        await ctx.emit(
+            "agent.revoked",
+            api_keys=keys.revoked,
+            oauth_clients=clients,
+            oauth_tokens=tokens,
+            **_event_data(row),
+        )
+    return row, newly, keys.revoked, clients, tokens
 
 
 async def _revoke_owner(ctx: EndpointContext, owner_type: str, owner_id: str) -> int:
+    """Revoke every agent of an owner; the number that were still enabled."""
     rows = await ctx.adapter.find_many(
         "agent", [Where("owner_type", owner_type), Where("owner_id", owner_id)]
     )
+    count = 0
     for row in rows:
-        await _revoke(ctx, row)
-    return len(rows)
+        _, newly, *_ = await _revoke(ctx, row)
+        count += newly
+    return count
 
 
 def agent() -> Plugin:
@@ -213,16 +240,24 @@ def agent() -> Plugin:
     async def update(ctx: EndpointContext, body: UpdateAgentIn) -> AgentOut:
         row = await _owned(ctx, ctx.path_params["id"], "update")
         if body.enabled is False:
-            row, *_ = await _revoke(ctx, row)
+            # Disabling revokes everything, which needs the revoke right and a fresh
+            # session: the revoke endpoint has both.
+            raise AuthError(
+                "INVALID_REQUEST", 400, "Disable an agent with POST /agents/{id}/revoke"
+            )
         changes: dict[str, Any] = {  # Any: field values
             name: getattr(body, name)
             for name in ("name", "description", "metadata")
             if name in body.model_fields_set and getattr(body, name) is not None
         }
         if body.enabled is True and row.get("disabled_at") is not None:
-            # Re-enabling needs the right to revoke; revoked keys and tokens stay so.
-            if row["owner_type"] == "organization":
-                await _org_permission(ctx, row["owner_id"], "revoke")
+            # Re-enabling needs the right to revoke. Revoke again first: a key or
+            # link created while the agent was being revoked must not come back.
+            if row["owner_type"] == "organization" and not await _allowed(
+                ctx, row["owner_id"], {"agent": ["revoke"]}
+            ):
+                raise AuthError("FORBIDDEN", 403)
+            await _revoke(ctx, row)
             changes["disabled_at"] = None
         if changes:
             row = (
@@ -233,7 +268,7 @@ def agent() -> Plugin:
 
     async def revoke(ctx: EndpointContext, _: None) -> RevokeAgentOut:
         row = await _owned(ctx, ctx.path_params["id"], "revoke")
-        row, keys, clients, tokens = await _revoke(ctx, row)
+        row, _newly, keys, clients, tokens = await _revoke(ctx, row)
         return RevokeAgentOut(
             agent=_out(ctx, row),
             api_keys=keys,
@@ -244,7 +279,11 @@ def agent() -> Plugin:
     async def create_key(
         ctx: EndpointContext, body: CreateAgentApiKeyIn
     ) -> IssueApiKeyOut:
-        row = await _owned(ctx, ctx.path_params["id"], "update")
+        # An organization's agent key acts for the organization: P1's right to
+        # create organization keys too.
+        row = await _owned(
+            ctx, ctx.path_params["id"], "update", also={"api_key": ["create"]}
+        )
         if row.get("disabled_at") is not None:
             raise _error("AGENT_DISABLED")
         out = await ctx.auth.api.call(
@@ -281,20 +320,25 @@ def agent() -> Plugin:
         row = await _owned(ctx, ctx.path_params["id"], "update")
         if row.get("disabled_at") is not None:
             raise _error("AGENT_DISABLED")
-        client = await ctx.adapter.find_one(
-            "oauth_client", [Where("client_id", body.client_id)]
-        )
+        found = await ctx.auth.api.call(
+            "get_oauth_client", body={"client_id": body.client_id}, ctx=ctx
+        )  # NOT_FOUND for an unknown client
+        client = found.client
         # The client must belong to the agent's owning user (for an organization's
         # agent, to the member linking it); anything else looks like no client.
         owner = row["owner_id"] if row["owner_type"] == "user" else _session_user(ctx)
-        if client is None or client.get("owner_user_id") != owner:
+        if client.owner_user_id != owner:
             raise AuthError("NOT_FOUND", 404)
-        if client.get("agent_id") not in (None, row["id"]):
+        if client.agent_id not in (None, row["id"]):
             raise _error("AGENT_CLIENT_ALREADY_LINKED")
-        if client.get("agent_id") != row["id"]:
+        if client.disabled_at is not None:
+            # Disabled by a revoke, or by the app: enabling it again is the app's
+            # call (update_oauth_client), never a side effect of linking.
+            raise _error("AGENT_CLIENT_DISABLED")
+        if client.agent_id != row["id"]:
             await ctx.auth.api.call(
                 "update_oauth_client",
-                body={"client_id": client["client_id"], "agent_id": row["id"]},
+                body={"client_id": client.client_id, "agent_id": row["id"]},
                 ctx=ctx,
             )
         return _out(ctx, row)

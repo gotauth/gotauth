@@ -812,8 +812,15 @@ class FakeAuth:
         if ctx is not None:
             await self._delete_user(ctx, ctx.adapter, user_id)
             return
+        # As the core does (CCR 011): the hooks get a context in this transaction.
         async with self.adapter.transaction() as adapter:
-            await self._delete_user(None, adapter, user_id)
+            ctx = FakeContext(
+                auth=self,
+                request=make_request(self.config),
+                adapter=adapter,
+                root_adapter=self.adapter,
+            )
+            await self._delete_user(ctx, adapter, user_id)
 
     async def _delete_user(
         self, ctx: EndpointContext | None, adapter: Adapter, user_id: str
