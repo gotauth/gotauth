@@ -198,6 +198,17 @@ class EndpointContext(Protocol):
         """
         ...
 
+    def on_failure(self, work: Callable[[EndpointContext], Awaitable[None]]) -> None:
+        """Run ``work`` if the request fails, after its transaction rolled back, in a
+        transaction of its own (CCR 012).
+
+        For writes that must outlast the failure they record, such as an attempt
+        counter for one-time codes: raising rolls the request back, which would
+        also undo the count. Runs before the error reaches the client; errors in
+        ``work`` are logged without details. A request that succeeds drops it.
+        """
+        ...
+
 
 @dataclass(frozen=True)
 class HookPayload:

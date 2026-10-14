@@ -174,6 +174,7 @@ class RequestContext:
         cookies: list[SetCookie] | None = None,
         headers: dict[str, str] | None = None,
         deferred: list[Callable[[Any], Awaitable[None]]] | None = None,
+        failures: list[Callable[[Any], Awaitable[None]]] | None = None,
     ) -> None:
         self._auth = auth
         self._request = request
@@ -187,6 +188,10 @@ class RequestContext:
         # Work to run after the commit (defer); shared with nested server calls.
         self.deferred: list[Callable[[Any], Awaitable[None]]] = (
             deferred if deferred is not None else []
+        )
+        # Work to run if the request fails (on_failure); shared the same way.
+        self.failures: list[Callable[[Any], Awaitable[None]]] = (
+            failures if failures is not None else []
         )
 
     def __repr__(self) -> str:
@@ -252,6 +257,12 @@ class RequestContext:
     def defer(self, work: Callable[[Any], Awaitable[None]]) -> None:  # Any: context
         """Queue ``work`` for after the commit (CONTRACTS 5)."""
         self.deferred.append(work)
+
+    def on_failure(
+        self, work: Callable[[Any], Awaitable[None]]
+    ) -> None:  # Any: context
+        """Queue ``work`` for after a rollback (CCR 012)."""
+        self.failures.append(work)
 
     async def emit(
         self, event_type: AuthEventType, **data: Any

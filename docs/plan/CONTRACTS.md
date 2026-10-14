@@ -1,11 +1,11 @@
-# GotAuth contracts (version 11)
+# GotAuth contracts (version 12)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 11
+CONTRACT_VERSION = 12
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -46,6 +46,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 10 (2026-10-13, [CCR 010](../ccr/010-oauth-grants.md)):** O1 adds `list_oauth_grants` and `revoke_oauth_grant` (12.3), so a signed-in user can see and revoke the apps they authorized.
 
 **Version 11 (2026-10-14, [CCR 011](../ccr/011-delete-user-context.md)):** `delete_user(None, ...)` (13) runs the user delete hooks with a server context in one transaction and emits `user.deleted`, so a plugin can revoke what the user owns in the same transaction.
+
+**Version 12 (2026-10-14, [CCR 012](../ccr/012-on-failure.md)):** `EndpointContext.on_failure(work)` (section 5) runs work after a failed request's rollback, in its own transaction, so attempt counters outlast the error they record.
 
 ---
 
