@@ -47,11 +47,58 @@ async def test_same_status_and_body_for_known_and_unknown_emails() -> None:
         assert sign_in[0].content == sign_in[1].content
 
 
-@pytest.mark.skip(
-    reason="P4 (magic link, email OTP) and P5 (invitations) have not merged"
-)
 async def test_magic_link_otp_and_invitations() -> None:
-    raise AssertionError("covered once P4 and P5 merge")
+    # The same status and body whether or not the email has an account (9.1).
+
+    from gotauth.plugins.magic_link import email_otp, magic_link
+    from gotauth.plugins.organization import organization
+    from gotauth.testing import fake_clock, make_auth, make_client
+
+    clock = fake_clock()
+    auth: Any = make_auth(
+        clock=clock,
+        email_password={"require_email_verification": False},
+        plugins=[
+            magic_link(allow_sign_up=False),
+            email_otp(allow_sign_up=False),
+            organization(),
+        ],
+    )
+    async with make_client(auth) as http:
+        await http.post(
+            "/sign-up/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        org = await http.post(
+            "/organization/create", json={"name": "Acme", "slug": "acme"}
+        )
+        org_id = org.json()["id"]
+        cases = [
+            ("/magic-link/send", {}),
+            ("/email-otp/send", {"type": "sign_in"}),
+            ("/email-otp/send", {"type": "reset_password"}),
+        ]
+        for path, extra in cases:
+            answers = []
+            for email in ("ada@example.com", UNKNOWN):
+                clock.advance("61s")  # outside the send cooldown and the IP limit
+                response = await http.post(path, json={"email": email, **extra})
+                answers.append((response.status_code, response.content))
+            assert answers[0] == answers[1], path
+        async with make_client(auth) as other:  # an account that is not a member
+            await other.post(
+                "/sign-up/email",
+                json={"email": "bob@example.com", "password": PASSWORD},
+            )
+        invited = []
+        for email in ("bob@example.com", UNKNOWN):
+            response = await http.post(
+                "/organization/invite-member",
+                json={"organization_id": org_id, "email": email},
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            invited.append((response.status_code, sorted(body), body["status"]))
+        assert invited[0] == invited[1]
 
 
 async def test_sign_in_does_the_same_reads_for_known_and_unknown_emails(
