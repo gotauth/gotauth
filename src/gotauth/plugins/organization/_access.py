@@ -10,11 +10,7 @@ from types import MappingProxyType
 from gotauth.contracts.errors import ConfigError
 from gotauth.contracts.oauth import ORGANIZATION_STATEMENTS
 
-__all__ = ["DEFAULT_ROLES", "AccessControl", "access_control"]
-
-DEFAULT_ROLES = ("owner", "admin", "member")
-"""``owner``: every permission. ``admin``: all but ``organization:delete``.
-``member``: none."""
+__all__ = ["AccessControl", "access_control"]
 
 
 @dataclass(frozen=True)

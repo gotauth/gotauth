@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from gotauth.contracts.adapter import Where
+from gotauth.contracts.config import DatabaseHooks, ModelHooks
 from gotauth.contracts.core_schema import User
 from gotauth.contracts.endpoints import Endpoint, EndpointContext, Plugin
 from gotauth.contracts.errors import AuthError, UniqueViolation
@@ -217,23 +218,67 @@ def organization(
         row = await ctx.adapter.find_one("organization", [Where("id", org_id)])
         if row is None:
             raise _error("ORG_NOT_A_MEMBER")
+        # created_at never changes, so this write cannot undo a concurrent rename.
         await ctx.adapter.update(
-            "organization", [Where("id", org_id)], {"name": row["name"]}
+            "organization", [Where("id", org_id)], {"created_at": row["created_at"]}
         )
         return row
+
+    async def locked_member(
+        ctx: EndpointContext, org_id: str | None, user_id: str, permission: str | None
+    ) -> dict[str, Any]:  # Any: row
+        """Membership checked, then the organization locked, then the membership and
+        permission checked again: a concurrent demotion of the caller counts."""
+        first = await member(ctx, org_id, user_id)
+        if permission is not None:
+            require(first, permission)
+        await lock(ctx, first["organization_id"])
+        mine = await member(ctx, first["organization_id"], user_id)
+        if permission is not None:
+            require(mine, permission)
+        return mine
+
+    def may_assign(mine: dict[str, Any], role: str) -> bool:  # Any: row
+        """A caller can only give or take away roles within their own rights; only
+        owners touch ``owner``."""
+        if mine["role"] == "owner":
+            return True
+        if role == "owner":
+            return False
+        return control.permissions(role) <= control.permissions(mine["role"])
 
     async def owners(ctx: EndpointContext, org_id: str) -> int:
         return await ctx.adapter.count(
             "member", [Where("organization_id", org_id), Where("role", "owner")]
         )
 
+    async def forget_sessions(
+        ctx: EndpointContext,
+        sessions: list[dict[str, Any]],  # Any: rows
+    ) -> None:
+        """Drop C3's secondary-storage copies of these sessions (key format
+        ``session:<token hash>``), now and again after the commit, so no request in
+        between puts the old row back for 5 minutes."""
+        storage = ctx.auth.secondary_storage
+        if storage is None or not sessions:
+            return
+        keys = [f"session:{row['token_hash']}" for row in sessions]
+
+        async def drop(_: Any) -> None:  # Any: the deferred context
+            for key in keys:
+                await storage.delete(key)
+
+        await drop(None)
+        ctx.defer(drop)
+
     async def clear_active(ctx: EndpointContext, user_id: str, org_id: str) -> None:
         """A user who leaves an organization stops having it active."""
+        where = [Where("user_id", user_id), Where("active_organization_id", org_id)]
+        affected = await ctx.adapter.find_many("session", where)
         await ctx.adapter.update_many(
-            "session",
-            [Where("user_id", user_id), Where("active_organization_id", org_id)],
-            {"active_organization_id": None},
+            "session", where, {"active_organization_id": None}
         )
+        await forget_sessions(ctx, affected)
 
     async def seats(ctx: EndpointContext, org_id: str) -> int:
         members = await ctx.adapter.count("member", [Where("organization_id", org_id)])
@@ -391,7 +436,12 @@ def organization(
         user_id = _session_user(ctx)
         mine = await member(ctx, target_org(ctx, body.organization_id), user_id)
         require(mine, "organization:delete")
-        org_id = mine["organization_id"]
+        await remove_organization(ctx, mine["organization_id"], user_id)
+        return StatusOut(status="ok")
+
+    async def remove_organization(
+        ctx: EndpointContext, org_id: str, user_id: str | None
+    ) -> None:
         # Org-owned keys and agents have a polymorphic owner: no foreign key ends
         # them, so revoke them through their plugins (CONTRACTS 12.3, 12.5).
         if "api_key" in ctx.auth.plugin_ids:
@@ -408,7 +458,30 @@ def organization(
             )
         await ctx.adapter.delete("organization", [Where("id", org_id)])
         await ctx.emit("org.deleted", user_id=user_id, **_event_data(org_id))
-        return StatusOut(status="ok")
+
+    async def before_user_delete(
+        ctx: EndpointContext | None,
+        row: dict[str, Any],  # Any: row
+    ) -> None:
+        """An account that is the last owner of an organization: with other members,
+        it cannot be deleted (ORG_LAST_OWNER) until ownership moves; alone, its
+        organization goes with it."""
+        if ctx is None:  # the core always passes one (CCR 011)
+            return
+        for mine in await ctx.adapter.find_many(
+            "member", [Where("user_id", row["id"]), Where("role", "owner")]
+        ):
+            org_id = mine["organization_id"]
+            await lock(ctx, org_id)
+            if await owners(ctx, org_id) > 1:
+                continue
+            others = await ctx.adapter.count(
+                "member",
+                [Where("organization_id", org_id), Where("user_id", row["id"], "ne")],
+            )
+            if others:
+                raise _error("ORG_LAST_OWNER")
+            await remove_organization(ctx, org_id, row["id"])
 
     async def set_active(ctx: EndpointContext, body: SetActiveIn) -> SetActiveOut:
         user_id = _session_user(ctx)
@@ -425,9 +498,7 @@ def organization(
         if session is not None:
             # The session caches (secondary storage, session data cookie) hold the
             # old value: drop them so the next request reads the row.
-            storage = ctx.auth.secondary_storage
-            if storage is not None:
-                await storage.delete(f"session:{session['token_hash']}")
+            await forget_sessions(ctx, [session])
             config = ctx.auth.config
             ctx.set_cookie(
                 SetCookie(
@@ -451,7 +522,7 @@ def organization(
         require(mine, "invitation:create")
         check_role(body.role)
         org_id = mine["organization_id"]
-        if body.role == "owner" and mine["role"] != "owner":
+        if not may_assign(mine, body.role):
             raise _error("ORG_FORBIDDEN")
         org = await ctx.adapter.find_one("organization", [Where("id", org_id)])
         if org is None:
@@ -622,20 +693,19 @@ def organization(
 
     async def remove(ctx: EndpointContext, body: RemoveMemberIn) -> StatusOut:
         user_id = _session_user(ctx)
-        mine = await member(ctx, target_org(ctx, body.organization_id), user_id)
-        require(mine, "member:delete")
+        mine = await locked_member(
+            ctx, target_org(ctx, body.organization_id), user_id, "member:delete"
+        )
         org_id = mine["organization_id"]
-        await lock(ctx, org_id)
         target = await ctx.adapter.find_one(
             "member", [Where("organization_id", org_id), Where("user_id", body.user_id)]
         )
         if target is None:
             raise AuthError("NOT_FOUND", 404)
-        if target["role"] == "owner":
-            if mine["role"] != "owner":
-                raise _error("ORG_FORBIDDEN")
-            if await owners(ctx, org_id) <= 1:
-                raise _error("ORG_LAST_OWNER")
+        if not may_assign(mine, target["role"]):
+            raise _error("ORG_FORBIDDEN")
+        if target["role"] == "owner" and await owners(ctx, org_id) <= 1:
+            raise _error("ORG_LAST_OWNER")
         await ctx.adapter.delete("member", [Where("id", target["id"])])
         await clear_active(ctx, body.user_id, org_id)
         await ctx.emit(
@@ -647,20 +717,18 @@ def organization(
 
     async def update_role(ctx: EndpointContext, body: UpdateMemberRoleIn) -> MemberOut:
         user_id = _session_user(ctx)
-        mine = await member(ctx, target_org(ctx, body.organization_id), user_id)
-        require(mine, "member:update")
         check_role(body.role)
+        mine = await locked_member(
+            ctx, target_org(ctx, body.organization_id), user_id, "member:update"
+        )
         org_id = mine["organization_id"]
-        await lock(ctx, org_id)
-        # Re-read after the lock: a concurrent change may have demoted the caller.
-        mine = await member(ctx, org_id, user_id)
         target = await ctx.adapter.find_one(
             "member", [Where("organization_id", org_id), Where("user_id", body.user_id)]
         )
         if target is None:
             raise AuthError("NOT_FOUND", 404)
-        touches_owner = body.role == "owner" or target["role"] == "owner"
-        if touches_owner and mine["role"] != "owner":
+        # Both the role taken away and the role given must be within the caller's.
+        if not (may_assign(mine, target["role"]) and may_assign(mine, body.role)):
             raise _error("ORG_FORBIDDEN")
         if (
             target["role"] == "owner"
@@ -687,10 +755,10 @@ def organization(
 
     async def leave(ctx: EndpointContext, body: OrganizationIdIn) -> StatusOut:
         user_id = _session_user(ctx)
-        mine = await member(ctx, target_org(ctx, body.organization_id), user_id)
+        mine = await locked_member(
+            ctx, target_org(ctx, body.organization_id), user_id, None
+        )
         org_id = mine["organization_id"]
-        await lock(ctx, org_id)
-        mine = await member(ctx, org_id, user_id)
         if mine["role"] == "owner" and await owners(ctx, org_id) <= 1:
             raise _error("ORG_LAST_OWNER")
         await ctx.adapter.delete("member", [Where("id", mine["id"])])
@@ -718,6 +786,13 @@ def organization(
         ]
         if not org_id or not required:
             return HasPermissionOut(success=False)
+        if (
+            principal.via != "session"
+            and principal.organization_id is not None
+            and principal.organization_id != org_id
+        ):
+            # An organization's key or token counts in that organization only.
+            return HasPermissionOut(success=False)
         if principal.user_id is None:
             # An org-owned key or agent: its scopes only, for its own organization.
             ok = (
@@ -733,8 +808,7 @@ def organization(
         if row is None:
             return HasPermissionOut(success=False)
         # The role grants it, and a key or token acting for the user narrows it.
-        granted = control.permissions(row["role"])
-        ok = all(item in granted for item in required) and principal.has_scopes(
+        ok = control.allows(row["role"], body.permissions) and principal.has_scopes(
             *required
         )
         return HasPermissionOut(success=ok)
@@ -899,5 +973,8 @@ def organization(
         },
         endpoints=endpoints,
         error_codes=ERROR_CODES,
+        database_hooks=DatabaseHooks(
+            hooks={"user": ModelHooks(before_delete=before_user_delete)}
+        ),
         requires_email=True,
     )

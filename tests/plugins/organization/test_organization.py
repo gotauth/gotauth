@@ -4,7 +4,8 @@ rules, cross-organization isolation and ``has_permission``."""
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from collections.abc import AsyncGenerator
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -12,7 +13,7 @@ from fastapi import Depends, FastAPI
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from gotauth.contracts import ConfigError, Principal, Where
+from gotauth.contracts import AuthError, ConfigError, Principal, Where
 from gotauth.contracts.oauth import PLUGIN_ENDPOINTS
 from gotauth.plugins.organization import access_control, organization
 from gotauth.testing import stub_plugin
@@ -211,43 +212,67 @@ async def test_the_last_owner_stays() -> None:
     assert last.json()["error"]["code"] == "ORG_LAST_OWNER"
 
 
-@pytest.mark.parametrize("database", ["memory", "sqlite"])
+@pytest.mark.parametrize("database", ["memory", "sqlite", "postgres"])
 async def test_concurrent_cross_demotions_leave_an_owner(
     database: str, tmp_path: Any
 ) -> None:
-    options: dict[str, Any] = {}
-    engine = None
+    import os
+
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from gotauth.storage.sqlalchemy import create_missing, sqlalchemy_adapter
+    from gotauth.testing import fresh_database_url
+
+    databases = None
+    url = None
     if database == "sqlite":
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        from gotauth.storage.sqlalchemy import sqlalchemy_adapter
-
-        engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'db.sqlite'}")
-        options["database"] = sqlalchemy_adapter(engine)
-    w = world(**options)
-    if engine is not None:
-        from gotauth.storage.sqlalchemy import create_missing
-
-        await create_missing(engine, w.auth.schema)
-    org_id = await w.org("ada")
-    await w.join("ada", org_id, "bob", role="owner")
-    ada, bob = await w.user("ada"), await w.user("bob")
-    await asyncio.gather(
-        ada.post(
-            "/organization/update-member-role",
-            json={"organization_id": org_id, "user_id": w.ids["bob"], "role": "member"},
-        ),
-        bob.post(
-            "/organization/update-member-role",
-            json={"organization_id": org_id, "user_id": w.ids["ada"], "role": "member"},
-        ),
-    )
-    owners = await w.auth.database.count(
-        "member", [Where("organization_id", org_id), Where("role", "owner")]
-    )
-    assert owners >= 1
-    if engine is not None:
-        await engine.dispose()
+        url = f"sqlite+aiosqlite:///{tmp_path / 'db.sqlite'}"
+    elif database == "postgres":
+        base = os.environ.get("GOTAUTH_TEST_POSTGRES_URL")
+        if not base:
+            pytest.skip("GOTAUTH_TEST_POSTGRES_URL is not set")
+        databases = cast(
+            "AsyncGenerator[str, None]",
+            fresh_database_url(
+                base.replace("postgresql://", "postgresql+asyncpg://", 1)
+            ),
+        )
+        url = await anext(databases)
+    engine = create_async_engine(url) if url else None
+    try:
+        w = world(database=sqlalchemy_adapter(engine)) if engine else world()
+        if engine is not None:
+            await create_missing(engine, w.auth.schema)
+        org_id = await w.org("ada")
+        await w.join("ada", org_id, "bob", role="owner")
+        ada, bob = await w.user("ada"), await w.user("bob")
+        await asyncio.gather(
+            ada.post(
+                "/organization/update-member-role",
+                json={
+                    "organization_id": org_id,
+                    "user_id": w.ids["bob"],
+                    "role": "member",
+                },
+            ),
+            bob.post(
+                "/organization/update-member-role",
+                json={
+                    "organization_id": org_id,
+                    "user_id": w.ids["ada"],
+                    "role": "member",
+                },
+            ),
+        )
+        owners = await w.auth.database.count(
+            "member", [Where("organization_id", org_id), Where("role", "owner")]
+        )
+        assert owners >= 1
+    finally:
+        if engine is not None:
+            await engine.dispose()
+        if databases is not None:
+            await databases.aclose()
 
 
 # ---------------------------------------------------------------- isolation
@@ -451,3 +476,93 @@ async def test_fastapi_require_permission_uses_the_member_s_role() -> None:
         ) as http:
             statuses[name] = (await http.post("/projects")).status_code
     assert statuses == {"bob": 403, "carol": 200}
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_roles_cannot_be_given_beyond_your_own() -> None:
+    access = access_control(
+        statements={"project": ["create", "read", "update", "delete"]},
+        roles={
+            "admin": {"member": ["update"], "invitation": ["create"]},
+            "superadmin": {"organization": ["update", "delete"], "member": ["update"]},
+        },
+    )
+    w = world(plugins=[organization(access=access)])
+    org_id = await w.org("ada")
+    await w.join("ada", org_id, "bob", role="admin")
+    bob = await w.user("bob")
+    self_promotion = await bob.post(
+        "/organization/update-member-role",
+        json={"organization_id": org_id, "user_id": w.ids["bob"], "role": "superadmin"},
+    )
+    assert self_promotion.json()["error"]["code"] == "ORG_FORBIDDEN"
+    accomplice = await bob.post(
+        "/organization/invite-member",
+        json={
+            "organization_id": org_id,
+            "email": "eve@example.com",
+            "role": "superadmin",
+        },
+    )
+    assert accomplice.json()["error"]["code"] == "ORG_FORBIDDEN"
+
+
+async def test_an_organization_key_never_acts_in_another_organization() -> None:
+    w = world()
+    org_a = await w.org("ada", "alpha")
+    org_b = await w.org("ada", "beta")
+    issued = await w.auth.api.call(
+        "issue_api_key",
+        body={
+            "owner_type": "organization",
+            "owner_id": org_a,
+            "user_id": w.ids["ada"],
+            "name": "k",
+            "scopes": ["project:read"],
+        },
+    )
+    response = await (await w.user("ada")).post(
+        "/organization/has-permission",
+        json={"organization_id": org_b, "permissions": {"project": ["read"]}},
+        headers={"authorization": f"Bearer {issued.key}"},
+    )
+    assert response.json() == {"success": False}
+
+
+async def test_the_last_owner_s_account_and_its_organizations() -> None:
+    w = world()
+    shared = await w.org("ada", "shared")
+    await w.org("ada", "alone")
+    await w.join("ada", shared, "bob")
+    with pytest.raises(AuthError) as blocked:
+        await w.auth.delete_user(None, w.ids["ada"])
+    assert blocked.value.code == "ORG_LAST_OWNER"
+    await (await w.user("ada")).post(
+        "/organization/update-member-role",
+        json={"organization_id": shared, "user_id": w.ids["bob"], "role": "owner"},
+    )
+    await w.auth.delete_user(None, w.ids["ada"])
+    remaining = {
+        row["id"] for row in await w.auth.database.find_many("organization", [])
+    }
+    assert remaining == {shared}  # "alone" went with its only member
+
+
+async def test_removal_clears_the_active_organization_at_once() -> None:
+    from gotauth.sessions import memory_secondary_storage
+
+    w = world(secondary_storage=memory_secondary_storage())
+    org_id = await w.org("ada")
+    await w.join("ada", org_id, "bob")
+    bob = await w.user("bob")
+    await bob.post("/organization/set-active", json={"organization_id": org_id})
+    cookies = dict(bob.cookies.items())
+    assert (await w.auth.get_principal({}, cookies)).organization_id == org_id
+    await (await w.user("ada")).post(
+        "/organization/remove-member",
+        json={"organization_id": org_id, "user_id": w.ids["bob"]},
+    )
+    await w.auth.drain()
+    assert (await w.auth.get_principal({}, cookies)).organization_id is None

@@ -64,12 +64,12 @@ defaults to the session's active organization.
 | `POST /organization/update` | `organization:update` |
 | `POST /organization/delete` | `organization:delete`, fresh session. Also revokes the organization's API keys (P1) and agents (O3) |
 | `POST /organization/set-active` | membership; `null` clears it |
-| `POST /organization/invite-member` | `invitation:create`; only owners invite owners |
+| `POST /organization/invite-member` | `invitation:create`; only roles within your own rights, only owners invite owners |
 | `POST /organization/accept-invitation`, `/reject-invitation` | `{invitation_id, token}` from the email, signed in with the invited email |
 | `POST /organization/cancel-invitation` | `invitation:cancel` |
 | `GET /organization/list-invitations` | `invitation:create` |
-| `POST /organization/remove-member` | `member:delete`; only owners remove owners |
-| `POST /organization/update-member-role` | `member:update`; only owners grant or change `owner` |
+| `POST /organization/remove-member` | `member:delete`; only members whose role is within your own rights, only owners remove owners |
+| `POST /organization/update-member-role` | `member:update`; the old and new role must both be within your own rights, and only owners grant or change `owner` |
 | `POST /organization/leave` | membership |
 | `POST /organization/has-permission` | `{organization_id?, permissions: {resource: [action]}}` gives `{success}`; a denial is `success: false` |
 
@@ -78,6 +78,8 @@ defaults to the session's active organization.
 - **A session:** the member's role must grant every pair.
 - **A key or token acting for a user:** the role, and the key's scopes must include every pair.
 - **An organization's own key or agent:** its scopes only, and only for its own organization.
+- **Any key or token tied to an organization** counts in that organization only, even when it also acts for a user.
+- **Not covered yet:** an organization agent's OAuth token carries no organization (issue #42), so it gets `success: false`.
 - **A non-member, an unknown organization or an empty request:** `success: false`.
 
 ## Rules
@@ -85,14 +87,17 @@ defaults to the session's active organization.
 - **Membership:** an unknown organization and a non-member both answer `ORG_NOT_A_MEMBER` (403), so organization ids say nothing.
 - **Missing permission:** `ORG_FORBIDDEN` (403).
 - **The last owner** cannot leave, be removed or be demoted: `ORG_LAST_OWNER` (409).
-  - Owner changes write the organization row first and then count the owners, in one transaction, so two owners who demote each other at the same time leave one.
+  - Owner and role changes write the organization row first (a column that never changes), then read the caller's membership and permission again and count the owners, in one transaction. Two owners who demote each other at the same time leave one, and a caller demoted meanwhile is refused. Tested on memory, SQLite and Postgres.
+  - **Deleting the last owner's account:** blocked (`ORG_LAST_OWNER`) while the organization has other members; an organization whose last owner is its only member is deleted with the account.
 - **Invitations:**
   - **Token:** a `gav_` token, of which only the hash is stored. Each invitation works once.
   - **Every failure** (a wrong token, used, expired, canceled, or another email) answers `ORG_INVITATION_INVALID` (400).
   - **Same answer for any email:** inviting gives the same response whether or not the email has an account.
   - **Replacement:** a new invitation for the same email cancels the pending one.
-- **Leaving:** removing a member or leaving clears that organization from the user's active sessions.
-- **Setting the active organization** also drops the cached copies of the session (secondary storage, session data cookie).
+- **Leaving:** removing a member or leaving clears that organization from the user's active sessions, and drops their secondary-storage copies, now and again after the commit.
+- **Setting the active organization** also drops the cached copies of the session (secondary storage, and the session data cookie of that browser).
+- **Stale caches:** another browser's session data cookie keeps the old value until it expires (`cookie_cache.max_age`). `has_permission` always checks membership, so a stale `Principal.organization_id` grants nothing.
+- **Coupling:** the cache keys follow C3's `session:<token hash>` format.
 - **Events:** `org.created`, `org.deleted`, `org.member_added`, `org.member_removed`, `org.role_changed`, `org.invitation_sent` and `org.invitation_accepted` carry ids and roles, never the token.
 - **Slugs:** 3 to 48 characters of `a-z`, `0-9` and `-`, unique (`ORG_SLUG_TAKEN`, 409).
 
