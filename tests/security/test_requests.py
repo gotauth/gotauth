@@ -164,6 +164,39 @@ async def test_cookie_flags_on_https() -> None:
         assert flag in cookie, flag
 
 
-@pytest.mark.skip(reason="P2 (finish_challenge after a second factor) has not merged")
 async def test_second_factor_completion_issues_a_new_token() -> None:
-    raise AssertionError("covered once P2 merges")
+    # Session fixation (ASVS 7.2.4): the token after the second factor is new, and
+    # the session the browser held before is gone.
+    from typing import Any
+    from urllib.parse import parse_qs, urlsplit
+
+    from gotauth.crypto import totp
+    from gotauth.plugins.two_factor import two_factor
+    from gotauth.testing import fake_clock, make_auth, make_client
+
+    clock = fake_clock()
+    auth: Any = make_auth(
+        clock=clock,
+        email_password={"require_email_verification": False},
+        plugins=[two_factor()],
+    )
+    http = make_client(auth)
+    body = {"email": "ada@example.com", "password": "correct horse battery"}
+    await http.post("/sign-up/email", json=body)
+    started = await http.post("/two-factor/enable", json={"password": body["password"]})
+    secret = parse_qs(urlsplit(started.json()["totp_uri"]).query)["secret"][0]
+    await http.post(
+        "/two-factor/verify-totp", json={"code": totp(secret, at=clock.now())}
+    )
+    clock.advance("30s")
+    before = http.cookies.get("gotauth.session_token")
+    assert before
+    challenged = await http.post("/sign-in/email", json=body)
+    assert "challenge" in challenged.json()
+    done = await http.post(
+        "/two-factor/verify-totp", json={"code": totp(secret, at=clock.now())}
+    )
+    assert done.status_code == 200, done.text
+    after = http.cookies.get("gotauth.session_token")
+    assert after and after != before
+    assert len(await auth.database.find_many("session", [])) == 1
