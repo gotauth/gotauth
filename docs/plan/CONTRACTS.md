@@ -1,11 +1,11 @@
-# GotAuth contracts (version 10)
+# GotAuth contracts (version 11)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 10
+CONTRACT_VERSION = 11
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -44,6 +44,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 
 **Version 9 (2026-10-13, [CCR 009](../ccr/009-crypto-override.md)):** `crypto_kit` (13.2) takes `scrypt_params`, and `AdvancedConfig.crypto` (13) replaces the kit `GotAuth` builds; the testing kit uses both to hash passwords at a low cost.
 **Version 10 (2026-10-13, [CCR 010](../ccr/010-oauth-grants.md)):** O1 adds `list_oauth_grants` and `revoke_oauth_grant` (12.3), so a signed-in user can see and revoke the apps they authorized.
+
+**Version 11 (2026-10-14, [CCR 011](../ccr/011-delete-user-context.md)):** `delete_user(None, ...)` (13) runs the user delete hooks with a server context in one transaction and emits `user.deleted`, so a plugin can revoke what the user owns in the same transaction.
 
 ---
 
@@ -1004,7 +1006,8 @@ A `before_*` hook may return modified data, or raise `AuthError` to abort. The c
     async def delete_user(self, ctx: EndpointContext | None, user_id: str) -> None: ...
     # Owned by C1. The only way to delete a user (C2 delete_user, P6 remove_user):
     # runs user before_delete/after_delete hooks from config and plugins, deletes (FK cascades)
-    # and emits "user.deleted".
+    # and emits "user.deleted". With ctx=None it creates a server context: the hooks always
+    # get a context in the delete's transaction, and the events follow the commit (CCR 011).
     def background(self, coro: Awaitable[None]) -> None: ...                 # C1; tracked task; errors logged
 ```
 **Permission checks:** when P5 is installed, it registers `has_permission` (section 12.3). A1's `require(permission=...)` calls it through `auth.api.call("has_permission", ...)`. Without P5, asking for a permission raises `ConfigError` at startup.
