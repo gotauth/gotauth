@@ -138,7 +138,8 @@ async def test_registering_the_same_credential_twice_is_refused() -> None:
     assert len(again_options["excludeCredentials"]) == 1
     again = _client_data(created, challenge=again_options["challenge"])
     response = await w.http.post("/passkey/register/verify", json={"response": again})
-    assert response.status_code in (401, 409)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PASSKEY_ALREADY_REGISTERED"
 
 
 # ---------------------------------------------------------------- challenges
@@ -274,6 +275,7 @@ async def test_rename_and_delete_with_their_rules() -> None:
     await w.auth.database.delete("account", [Where("user_id", w.user_id)])
     last = await w.http.delete(f"/passkeys/{passkey_id}")
     assert last.json()["error"]["code"] == "LAST_SIGN_IN_METHOD"
+    w.device = SoftAuthenticator(origin=ORIGIN)  # a second device
     await w.register(name="Second")
     assert (await w.http.delete(f"/passkeys/{passkey_id}")).status_code == 200
 
@@ -346,3 +348,79 @@ async def test_rp_id_must_cover_every_origin() -> None:
         plugins=[passkey(rp_id="example.com")],
     )
     await fine.get_principal({}, {})  # wildcard origins are ignored
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_without_user_verification_a_passkey_is_not_a_sign_in() -> None:
+    # Possession alone must not pass as a passkey sign-in, which two-factor skips.
+    w = await world()
+    w.device.user_verified = False
+    await w.register()
+    refused = await w.sign_in(w.device.get(await w.options()))
+    assert refused.json()["error"]["code"] == "PASSKEY_VERIFICATION_FAILED"
+    lax = await world(plugins=[passkey(user_verification="discouraged")])
+    lax.device.user_verified = False
+    await lax.register()
+    assert (await lax.sign_in(lax.device.get(await lax.options()))).status_code == 200
+
+
+async def test_origins_are_compared_as_browsers_report_them() -> None:
+    clock = fake_clock()
+    auth: Any = make_auth(
+        clock=clock,
+        base_url="https://Auth.Example.com:443",
+        email_password={"require_email_verification": False},
+        plugins=[passkey()],
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=auth.asgi()),
+        base_url="https://auth.example.com/api/auth",
+        headers={"origin": "https://auth.example.com"},
+    ) as http:
+        await http.post(
+            "/sign-up/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        device = SoftAuthenticator(origin="https://auth.example.com")
+        options = (await http.post("/passkey/register/options")).json()
+        registered = await http.post(
+            "/passkey/register/verify", json={"response": device.create(options)}
+        )
+        assert registered.status_code == 200, registered.text
+
+
+async def test_a_password_that_was_never_set_is_not_a_sign_in_method() -> None:
+    w = await world()
+    passkey_id = (await w.register()).json()["id"]
+    await w.auth.database.update(
+        "account", [Where("user_id", w.user_id)], {"password_hash": None}
+    )
+    last = await w.http.delete(f"/passkeys/{passkey_id}")
+    assert last.json()["error"]["code"] == "LAST_SIGN_IN_METHOD"
+
+
+async def test_both_ceremonies_can_be_pending_in_one_browser() -> None:
+    w = await world()
+    register_options = (await w.http.post("/passkey/register/options")).json()
+    await w.options()  # e.g. conditional UI in another tab
+    registered = await w.http.post(
+        "/passkey/register/verify",
+        json={"response": w.device.create(register_options)},
+    )
+    assert registered.status_code == 200, registered.text
+
+
+async def test_challenges_do_not_pile_up() -> None:
+    w = await world()
+    for _ in range(3):
+        await w.http.post("/passkey/register/options")
+    rows = await w.auth.database.find_many("verification", [])
+    assert (
+        len([r for r in rows if r["identifier"].startswith("passkey:register:")]) == 1
+    )
+    await w.options()
+    w.clock.advance("6m")
+    await w.options()
+    rows = await w.auth.database.find_many("verification", [])
+    assert len([r for r in rows if r["identifier"] == "passkey:sign_in"]) == 1

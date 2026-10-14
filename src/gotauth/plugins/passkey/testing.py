@@ -52,12 +52,15 @@ class SoftAuthenticator:
         counting: Increase the signature counter on each assertion; False behaves
             like a synced passkey, which always reports 0.
         backed_up: Report the credential as backed up (a multi-device passkey).
+        user_verified: Report user verification (PIN or biometrics); False behaves
+            like a security key without a PIN.
         credentials: What was created, by base64url credential id.
     """
 
     origin: str
     counting: bool = True
     backed_up: bool = False
+    user_verified: bool = True
     credentials: dict[str, SoftCredential] = field(
         default_factory=dict[str, SoftCredential]
     )
@@ -72,7 +75,7 @@ class SoftAuthenticator:
         return json.dumps(data, separators=(",", ":")).encode()
 
     def _flags(self, attested: bool) -> int:
-        flags = _UP | _UV
+        flags = _UP | (_UV if self.user_verified else 0)
         if self.backed_up:
             flags |= _BE | _BS
         return flags | (_AT if attested else 0)
@@ -83,6 +86,12 @@ class SoftAuthenticator:
         """Answer ``PublicKeyCredentialCreationOptions`` (JSON) like
         ``navigator.credentials.create()``; returns the credential as JSON."""
         the_rp_id = rp_id or options["rp"].get("id") or urlsplit(self.origin).hostname
+        # Like a browser: a credential the server excludes is not created again.
+        excluded_list: list[dict[str, Any]] = options.get("excludeCredentials") or []
+        for excluded in excluded_list:
+            if excluded["id"] in self.credentials:
+                msg = "InvalidStateError: the authenticator already holds a credential"
+                raise ValueError(msg)
         credential_id = secrets.token_bytes(16)
         key = ec.generate_private_key(ec.SECP256R1())
         numbers = key.public_key().public_numbers()
@@ -136,13 +145,21 @@ class SoftAuthenticator:
         """Answer ``PublicKeyCredentialRequestOptions`` (JSON) like
         ``navigator.credentials.get()`` with a stored credential (the only one, or
         ``credential_id``); ``user_handle`` overrides the handle sent."""
+        allow_list: list[dict[str, Any]] = options.get("allowCredentials") or []
+        allowed = [str(item["id"]) for item in allow_list]
         if credential_id is None:
-            credential_id = next(iter(self.credentials))
+            usable = [c for c in self.credentials if not allowed or c in allowed]
+            if not usable:
+                msg = "NotAllowedError: no credential for this request"
+                raise ValueError(msg)
+            credential_id = usable[0]
         credential = self.credentials[credential_id]
+        # The relying party the browser asks for, as in navigator.credentials.get().
+        rp_id = str(options.get("rpId") or credential.rp_id)
         if self.counting:
             credential.sign_count += 1
         auth_data = (
-            hashlib.sha256(credential.rp_id.encode()).digest()
+            hashlib.sha256(rp_id.encode()).digest()
             + bytes([self._flags(attested=False)])
             + struct.pack(">I", credential.sign_count)
         )

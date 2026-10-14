@@ -233,8 +233,9 @@ def verify_assertion(
     public_key: str,
     current_sign_count: int,
     require_user_verification: bool,
-) -> int:
-    """Verify a ``navigator.credentials.get()`` response; the new sign count.
+) -> tuple[int, bool]:
+    """Verify a ``navigator.credentials.get()`` response; the new sign count and
+    whether the user was verified (PIN or biometrics, not presence alone).
 
     Raises:
         Rejected: If anything does not verify, including a sign count that did not
@@ -252,4 +253,4 @@ def verify_assertion(
         )
     except (WebAuthnException, ValueError, KeyError, TypeError) as exc:
         raise Rejected(str(exc)) from exc
-    return verified.new_sign_count
+    return verified.new_sign_count, verified.user_verified

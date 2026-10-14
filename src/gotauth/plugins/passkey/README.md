@@ -14,10 +14,10 @@ auth = GotAuth(..., plugins=[passkey()])
 
 Options:
 - **`rp_id`:** the host of `base_url` by default. It must be that host or a parent domain of every origin, checked before the first request (`ConfigError`).
-  - The origins are `base_url`'s plus the exact `trusted_origins`; wildcard origins are ignored.
+  - The origins are `base_url`'s plus the exact `trusted_origins`, normalized as browsers report them (lower case, no default port); wildcard origins are ignored.
   - **Changing `rp_id` later orphans every registered passkey.**
 - **`rp_name`:** what browsers show; `rp_id` by default.
-- **`user_verification`:** `"preferred"` by default.
+- **`user_verification`:** `"preferred"` by default. A sign-in without user verification (a security key without a PIN) is refused unless this is `"discouraged"`. Possession alone is one factor, and two-factor lets passkey sign-ins through. With `"discouraged"`, also remove `"passkey"` from two-factor's `skip_for_methods`.
 - **`reject_sign_count_regression`:** `True` by default.
 
 ## Endpoints
@@ -30,7 +30,7 @@ Options:
 | `POST /passkey/sign-in/verify` | none | `{response, remember_me?}`: signs in through `complete_sign_in` with method `passkey`. Two-factor skips passkeys by default |
 | `GET /passkeys` | session | Your passkeys, never the public keys |
 | `PATCH /passkeys/{id}` | session | `{name}` |
-| `DELETE /passkeys/{id}` | fresh session | Emits `passkey.removed`. `LAST_SIGN_IN_METHOD` (409) for the only passkey of an account without a password or social login |
+| `DELETE /passkeys/{id}` | fresh session | Emits `passkey.removed`. `LAST_SIGN_IN_METHOD` (409) for the only passkey of an account without a set password or a social login. Deletes for one user run one at a time |
 
 Another user's passkey id answers 404. The registry's `webauthn.ts` helpers send and
 read these JSON shapes.
@@ -39,12 +39,13 @@ read these JSON shapes.
 
 - **Challenges:**
   - 32 random bytes, stored hashed as a `verification` row for 5 minutes
-  - bound to the browser by the signed cookie `gotauth.passkey_challenge`
+  - bound to the browser by the signed cookie `gotauth.passkey_challenge`, with one slot each for registration and sign-in, so starting one keeps the other
+  - one pending registration challenge per user; expired sign-in challenges are removed when new ones are made
   - consumed before the response is verified, so a response works once, only in the browser that asked, for the same ceremony
 - **Verification:** py_webauthn checks the origin, the `rp_id` hash, the type, the signature and user presence (and verification, when required).
 - **Ownership:** the `userHandle` must be the passkey's owner.
 - **No probing:** unknown credentials and wrong owners answer `PASSKEY_VERIFICATION_FAILED` (401), like a bad signature.
-- **Sign counts:** a count that did not go up is refused and logged as a possibly cloned authenticator. Synced passkeys that always report 0 are accepted. The new count is stored with a compare-and-set.
+- **Sign counts:** a count that did not go up is refused and logged as a possibly cloned authenticator. Synced passkeys that always report 0 are accepted.
 - **Rate limits:** `/passkey/*` allows 10 requests per minute per IP (CONTRACTS 10.2).
 
 ## Tests without a browser
@@ -60,5 +61,7 @@ options = (await http.post("/passkey/sign-in/options")).json()
 await http.post("/passkey/sign-in/verify", json={"response": device.get(options)})
 ```
 
-`counting=False` behaves like a synced passkey; `backed_up=True` reports a
-multi-device credential.
+Like a browser, it honors `rpId`, `allowCredentials` and `excludeCredentials`.
+`counting=False` behaves like a synced passkey, `backed_up=True` reports a
+multi-device credential, and `user_verified=False` behaves like a security key
+without a PIN.

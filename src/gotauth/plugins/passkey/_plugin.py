@@ -20,10 +20,11 @@ from gotauth.contracts.adapter import Where
 from gotauth.contracts.config import GotAuthInstance
 from gotauth.contracts.core_schema import User
 from gotauth.contracts.endpoints import Endpoint, EndpointContext, Plugin
-from gotauth.contracts.errors import AuthError, ConfigError
+from gotauth.contracts.errors import AuthError, ConfigError, UniqueViolation
 from gotauth.contracts.http import SetCookie
 from gotauth.contracts.http_models import ChallengeOut, SignInOut, StatusOut
 from gotauth.contracts.primitives import to_timedelta
+from gotauth.contracts.protection import normalize_origin
 from gotauth.contracts.schema import Field, ModelSchema, Reference, returned_only
 from gotauth.contracts.sessions import cookie_name, secure_cookies
 
@@ -83,6 +84,30 @@ class PasskeyOut(BaseModel):
     last_used_at: datetime | None
 
 
+class CreationOptionsOut(BaseModel):
+    """``PublicKeyCredentialCreationOptions`` as WebAuthn JSON (base64url values),
+    for ``navigator.credentials.create()``."""
+
+    model_config = ConfigDict(extra="allow")
+
+    challenge: str
+    rp: dict[str, Any]  # Any: JSON
+    user: dict[str, Any]  # Any: JSON
+    pubKeyCredParams: list[dict[str, Any]]
+    excludeCredentials: list[dict[str, Any]] = []
+
+
+class RequestOptionsOut(BaseModel):
+    """``PublicKeyCredentialRequestOptions`` as WebAuthn JSON, for
+    ``navigator.credentials.get()``."""
+
+    model_config = ConfigDict(extra="allow")
+
+    challenge: str
+    rpId: str
+    allowCredentials: list[dict[str, Any]] = []
+
+
 class PasskeyListOut(BaseModel):
     """``list_passkeys`` output."""
 
@@ -130,11 +155,13 @@ class _Settings:
         """``(rp_id, rp_name, origins)``: the origins are ``base_url``'s origin plus
         the exact (non-wildcard) trusted origins."""
         base = urlsplit(auth.config.base_url)
-        rp_id = self.rp_id or base.hostname or ""
-        origins = [f"{base.scheme}://{base.netloc}"]
-        for origin in auth.config.trusted_origins:
-            if "*" not in origin and origin not in origins:
-                origins.append(origin.rstrip("/"))
+        rp_id = (self.rp_id or base.hostname or "").lower()
+        origins: list[str] = []
+        # As browsers report them in clientDataJSON: lower case, no default port.
+        for origin in (auth.config.base_url, *auth.config.trusted_origins):
+            normalized = None if "*" in origin else normalize_origin(origin)
+            if normalized is not None and normalized not in origins:
+                origins.append(normalized)
         return rp_id, self.rp_name or rp_id, origins
 
 
@@ -209,11 +236,47 @@ def passkey(
 
     # -------------------------------------------------------- challenges
 
-    async def new_challenge(ctx: EndpointContext, identifier: str) -> bytes:
+    def slots(ctx: EndpointContext) -> dict[str, str]:
+        """The browser's pending challenge ids, by ceremony (``register``,
+        ``sign_in``): one cookie, so starting one ceremony keeps the other."""
+        signed = ctx.request.cookies.get(_cookie(ctx))
+        value = (
+            ctx.crypto.unsign(signed, purpose="passkey_challenge") if signed else None
+        )
+        found: dict[str, str] = {}
+        for part in (value or "").split("|"):
+            kind, _, row_id = part.partition(":")
+            if kind in ("register", "sign_in") and row_id:
+                found[kind] = row_id
+        return found
+
+    def write_slots(ctx: EndpointContext, found: dict[str, str]) -> None:
+        value = "|".join(f"{kind}:{row_id}" for kind, row_id in sorted(found.items()))
+        ctx.set_cookie(
+            SetCookie(
+                name=_cookie(ctx),
+                value=ctx.crypto.sign(value, purpose="passkey_challenge")
+                if value
+                else "",
+                max_age=int(CHALLENGE_TTL.total_seconds()) if value else 0,
+                secure=secure_cookies(ctx.auth.config.base_url),
+            )
+        )
+
+    async def new_challenge(ctx: EndpointContext, kind: str, identifier: str) -> bytes:
         """A random challenge, stored hashed and bound to this browser by a cookie."""
         challenge = ctx.crypto.random_token(nbytes=32).encode()
         row_id = ctx.ids.new("ver")
         now = ctx.clock.now()
+        # 5. No piling up: the user's earlier registration challenge, and every
+        # expired sign-in challenge, go.
+        if kind == "register":
+            await ctx.adapter.delete("verification", [Where("identifier", identifier)])
+        else:
+            await ctx.adapter.delete(
+                "verification",
+                [Where("identifier", identifier), Where("expires_at", now, "lte")],
+            )
         await ctx.adapter.create(
             "verification",
             {
@@ -224,25 +287,18 @@ def passkey(
                 "created_at": now,
             },
         )
-        ctx.set_cookie(
-            SetCookie(
-                name=_cookie(ctx),
-                value=ctx.crypto.sign(row_id, purpose="passkey_challenge"),
-                max_age=int(CHALLENGE_TTL.total_seconds()),
-                secure=secure_cookies(ctx.auth.config.base_url),
-            )
-        )
+        found = slots(ctx)
+        found[kind] = row_id
+        write_slots(ctx, found)
         return challenge
 
     async def consume_challenge(
-        ctx: EndpointContext, identifier: str, response: dict[str, Any]
+        ctx: EndpointContext, kind: str, identifier: str, response: dict[str, Any]
     ) -> bytes:
         """Consume the challenge the response signed: it must be this browser's, for
         this ceremony, unexpired and unused. Returns the challenge bytes."""
-        signed = ctx.request.cookies.get(_cookie(ctx))
-        row_id = (
-            ctx.crypto.unsign(signed, purpose="passkey_challenge") if signed else None
-        )
+        found = slots(ctx)
+        row_id = found.get(kind)
         challenge = ceremony.client_challenge(response)
         if row_id is None or challenge is None:
             raise _error("PASSKEY_CHALLENGE_INVALID")
@@ -257,45 +313,40 @@ def passkey(
         )
         if consumed != 1:
             raise _error("PASSKEY_CHALLENGE_INVALID")
-        ctx.set_cookie(
-            SetCookie(
-                name=_cookie(ctx),
-                value="",
-                max_age=0,
-                secure=secure_cookies(ctx.auth.config.base_url),
-            )
-        )
+        del found[kind]
+        write_slots(ctx, found)
         return challenge
 
     # -------------------------------------------------------- registration
 
-    async def registration_options(
-        ctx: EndpointContext, _: None
-    ) -> dict[str, Any]:  # Any: JSON
+    async def registration_options(ctx: EndpointContext, _: None) -> CreationOptionsOut:
         user_id = _session_user(ctx)
         user = await ctx.adapter.find_one("user", [Where("id", user_id)])
         if user is None:
             raise AuthError("UNAUTHENTICATED", 401)
         existing = await ctx.adapter.find_many("passkey", [Where("user_id", user_id)])
         rp_id_value, rp_name_value, _origins = settings.rp(ctx.auth)
-        challenge = await new_challenge(ctx, f"passkey:register:{user_id}")
-        return ceremony.registration_options(
-            rp_id=rp_id_value,
-            rp_name=rp_name_value,
-            user_id=user_id,
-            user_name=str(user["email"]),
-            display_name=str(user.get("name") or user["email"]),
-            challenge=challenge,
-            exclude=[
-                (row["credential_id"], row.get("transports") or []) for row in existing
-            ],
-            user_verification=settings.user_verification,
+        challenge = await new_challenge(ctx, "register", f"passkey:register:{user_id}")
+        return CreationOptionsOut.model_validate(
+            ceremony.registration_options(
+                rp_id=rp_id_value,
+                rp_name=rp_name_value,
+                user_id=user_id,
+                user_name=str(user["email"]),
+                display_name=str(user.get("name") or user["email"]),
+                challenge=challenge,
+                exclude=[
+                    (row["credential_id"], row.get("transports") or [])
+                    for row in existing
+                ],
+                user_verification=settings.user_verification,
+            )
         )
 
     async def verify_registration(ctx: EndpointContext, body: RegisterIn) -> PasskeyOut:
         user_id = _session_user(ctx)
         challenge = await consume_challenge(
-            ctx, f"passkey:register:{user_id}", body.response
+            ctx, "register", f"passkey:register:{user_id}", body.response
         )
         rp_id_value, _name, origins = settings.rp(ctx.auth)
         try:
@@ -313,40 +364,43 @@ def passkey(
         )
         if taken is not None:
             raise _error("PASSKEY_ALREADY_REGISTERED")
-        row = await ctx.adapter.create(
-            "passkey",
-            {
-                "id": ctx.ids.new("pky"),
-                "user_id": user_id,
-                "credential_id": verified.credential_id,
-                "public_key": verified.public_key,
-                "sign_count": verified.sign_count,
-                "transports": verified.transports,
-                "device_type": verified.device_type,
-                "backed_up": verified.backed_up,
-                "name": body.name,
-                "created_at": ctx.clock.now(),
-                "last_used_at": None,
-            },
-        )
+        try:
+            row = await ctx.adapter.create(
+                "passkey",
+                {
+                    "id": ctx.ids.new("pky"),
+                    "user_id": user_id,
+                    "credential_id": verified.credential_id,
+                    "public_key": verified.public_key,
+                    "sign_count": verified.sign_count,
+                    "transports": verified.transports,
+                    "device_type": verified.device_type,
+                    "backed_up": verified.backed_up,
+                    "name": body.name,
+                    "created_at": ctx.clock.now(),
+                    "last_used_at": None,
+                },
+            )
+        except UniqueViolation as exc:  # registered concurrently
+            raise _error("PASSKEY_ALREADY_REGISTERED") from exc
         await ctx.emit("passkey.added", user_id=user_id, passkey_id=row["id"])
         return _out(ctx, row)
 
     # -------------------------------------------------------- sign-in
 
-    async def sign_in_options(
-        ctx: EndpointContext, _: None
-    ) -> dict[str, Any]:  # Any: JSON
+    async def sign_in_options(ctx: EndpointContext, _: None) -> RequestOptionsOut:
         rp_id_value, _name, _origins = settings.rp(ctx.auth)
-        challenge = await new_challenge(ctx, _SIGN_IN)
-        return ceremony.authentication_options(
-            rp_id=rp_id_value,
-            challenge=challenge,
-            user_verification=settings.user_verification,
+        challenge = await new_challenge(ctx, "sign_in", _SIGN_IN)
+        return RequestOptionsOut.model_validate(
+            ceremony.authentication_options(
+                rp_id=rp_id_value,
+                challenge=challenge,
+                user_verification=settings.user_verification,
+            )
         )
 
     async def sign_in(ctx: EndpointContext, body: SignInIn) -> SignInOut | ChallengeOut:
-        challenge = await consume_challenge(ctx, _SIGN_IN, body.response)
+        challenge = await consume_challenge(ctx, "sign_in", _SIGN_IN, body.response)
         presented = ceremony.assertion_ids(body.response)
         # Unknown credentials and wrong owners answer like a bad signature, so
         # credential ids cannot be probed.
@@ -361,7 +415,7 @@ def passkey(
         rp_id_value, _name, origins = settings.rp(ctx.auth)
         stored = int(row.get("sign_count") or 0)
         try:
-            new_count = ceremony.verify_assertion(
+            new_count, user_verified = ceremony.verify_assertion(
                 body.response,
                 challenge=challenge,
                 rp_id=rp_id_value,
@@ -379,13 +433,16 @@ def passkey(
                     row["id"],
                 )
             raise _error("PASSKEY_VERIFICATION_FAILED") from exc
-        claimed = await ctx.adapter.update(
+        if not user_verified and settings.user_verification != "discouraged":
+            # Possession alone (no PIN or biometrics) is one factor: it must not
+            # count as a passkey sign-in, which two-factor lets through.
+            raise _error("PASSKEY_VERIFICATION_FAILED")
+        # The consumed challenge already makes each assertion single-use.
+        await ctx.adapter.update(
             "passkey",
-            [Where("id", row["id"]), Where("sign_count", stored)],
+            [Where("id", row["id"])],
             {"sign_count": new_count, "last_used_at": ctx.clock.now()},
         )
-        if claimed is None:  # the same assertion used concurrently
-            raise _error("PASSKEY_VERIFICATION_FAILED")
         user_row = await ctx.adapter.find_one("user", [Where("id", row["user_id"])])
         if user_row is None:
             raise _error("PASSKEY_VERIFICATION_FAILED")
@@ -421,13 +478,23 @@ def passkey(
 
     async def delete(ctx: EndpointContext, _: None) -> StatusOut:
         row = await owned(ctx)
+        user_id = row["user_id"]
+        # Writing the user row first takes its lock, so two deletes for one user
+        # run one after the other and cannot both pass the check below.
+        await ctx.adapter.update(
+            "user", [Where("id", user_id)], {"updated_at": ctx.clock.now()}
+        )
         others = await ctx.adapter.count(
-            "passkey", [Where("user_id", row["user_id"]), Where("id", row["id"], "ne")]
+            "passkey", [Where("user_id", user_id), Where("id", row["id"], "ne")]
         )
-        accounts = await ctx.adapter.count(
-            "account", [Where("user_id", row["user_id"])]
+        accounts = await ctx.adapter.find_many("account", [Where("user_id", user_id)])
+        # As social's unlink counts them: a password only once it is set.
+        methods = others + sum(
+            1
+            for account in accounts
+            if account["provider_id"] != "credential" or account.get("password_hash")
         )
-        if others == 0 and accounts == 0:
+        if methods == 0:
             raise AuthError("LAST_SIGN_IN_METHOD", 409)
         await ctx.adapter.delete("passkey", [Where("id", row["id"])])
         await ctx.emit("passkey.removed", user_id=row["user_id"], passkey_id=row["id"])
@@ -440,6 +507,7 @@ def passkey(
             "POST",
             "/passkey/register/options",
             registration_options,
+            output=CreationOptionsOut,
             auth="session",
             summary="Options for navigator.credentials.create()",
             tags=tags,
@@ -460,6 +528,7 @@ def passkey(
             "POST",
             "/passkey/sign-in/options",
             sign_in_options,
+            output=RequestOptionsOut,
             summary="Options for navigator.credentials.get() (usernameless)",
             tags=tags,
         ),
