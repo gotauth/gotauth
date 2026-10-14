@@ -1187,8 +1187,30 @@ class GotAuth:
         if ctx is not None:
             await self._delete_user(ctx, unwrap(ctx.adapter), user_id)
             return
-        async with self._database.transaction() as adapter:
-            await self._delete_user(None, adapter, user_id)
+        # No caller context: a server context, so the user delete hooks can join
+        # this transaction (plugins revoke what the user owns) and the events go
+        # out after the commit, as for an endpoint (CCR 011).
+        await self._ensure_init()
+        request = AuthRequest(
+            method="DELETE",
+            path="/",
+            url=self._config.base_url,
+            query={},
+            headers={},
+            cookies={},
+            body=b"",
+            client_ip=None,
+        )
+        server_ctx = RequestContext(auth=self, request=request, adapter=self._database)
+        try:
+            async with self._database.transaction() as tx:
+                server_ctx.adapter = HookedAdapter(tx, self, server_ctx)
+                await self._delete_user(server_ctx, tx, user_id)
+        finally:
+            server_ctx.adapter = self._database
+        self._publish(server_ctx.events)
+        if server_ctx.deferred:
+            await self._run_deferred(server_ctx, list(server_ctx.deferred))
 
     async def _delete_user(
         self, ctx: EndpointContext | None, adapter: Adapter, user_id: str

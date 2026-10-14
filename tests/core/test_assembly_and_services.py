@@ -8,6 +8,7 @@ import pytest
 
 from gotauth.contracts import (
     AuthError,
+    AuthEvent,
     AuthResponse,
     ConfigError,
     DatabaseHooks,
@@ -231,6 +232,42 @@ async def test_delete_user_runs_hooks_and_a_raising_hook_aborts() -> None:
     with pytest.raises(AuthError) as missing:
         await auth.delete_user(None, gone.id)
     assert missing.value.code == "NOT_FOUND"
+
+
+async def test_delete_user_without_a_context_gives_hooks_one(
+    events: list[AuthEvent],
+) -> None:
+    # CCR 011: the hooks join the delete's transaction and the events follow it.
+    seen: list[Any] = []
+
+    async def before_delete(ctx: Any, row: dict[str, Any]) -> None:
+        assert ctx is not None
+        seen.append(await ctx.auth.api.call("count_users", ctx=ctx))
+
+    async def after_delete(ctx: Any, row: dict[str, Any]) -> None:
+        if row["email"] == "fail@example.com":
+            raise AuthError("FORBIDDEN", 403)
+
+    async def record(event: AuthEvent) -> None:
+        events.append(event)
+
+    hooks = DatabaseHooks(
+        hooks={
+            "user": ModelHooks(before_delete=before_delete, after_delete=after_delete)
+        }
+    )
+    auth = build(Plugin(id="cleanup", database_hooks=hooks), on_event=record)
+    gone = await auth.create_user_record(None, {"email": "gone@example.com"})
+    fail = await auth.create_user_record(None, {"email": "fail@example.com"})
+    await auth.delete_user(None, gone.id)
+    await auth.drain()
+    assert seen == [{"users": 2}]  # read inside the delete's transaction
+    assert [e.type for e in events if e.type == "user.deleted"] == ["user.deleted"]
+    with pytest.raises(AuthError):
+        await auth.delete_user(None, fail.id)
+    await auth.drain()
+    assert await auth.api.call("count_users") == {"users": 1}  # rolled back
+    assert [e.type for e in events].count("user.deleted") == 1
 
 
 # ------------------------------------------------------------------ server calls
