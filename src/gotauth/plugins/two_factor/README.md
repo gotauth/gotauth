@@ -61,7 +61,10 @@ sign-in.
   - a TOTP time step is accepted once, and never an earlier step than the last one used
   - a backup code is claimed with a compare-and-set, so it works once even under concurrent requests
   - a wrong email code is counted, and the code is deleted at the 5th failure
-- **Rate limits:** besides the 5 per minute per IP on `/two-factor/*`, the verify endpoints allow 10 tries per user per 15 minutes, across IPs.
+- **Rate limits:** besides the 5 per minute per IP on `/two-factor/*`, the verify endpoints allow 10 tries per user per 15 minutes, and the other two-factor endpoints (enable and disable check the password, send-otp sends email) 20, across IPs.
+- **Failed attempts:** a wrong second factor emits `sign_in.failed` (reason `invalid_second_factor`).
+- **Wrong email codes:** `verify-otp` answers a wrong code with a 401 response rather than raising, so the attempt count commits. Server-side callers get that response object, not an `AuthError`. Issue #39 tracks a core way to keep such counters.
+- **Leftover challenge cookies:** a stale, expired or invalid challenge cookie never stands in the way of a valid session; setup then uses the session.
 - **Challenge cookie problems** answer `TOKEN_INVALID` or `TOKEN_EXPIRED` (after 10 minutes).
 - **Errors:** `TWO_FACTOR_INVALID_CODE` (401), `TWO_FACTOR_NOT_ENABLED` (400), `TWO_FACTOR_ALREADY_ENABLED` (409), `TWO_FACTOR_CONFLICT` (409).
 

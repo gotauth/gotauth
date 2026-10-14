@@ -430,3 +430,78 @@ async def test_two_users_can_hold_the_same_email_code(
     for client in (w.http, bob):
         done = await client.post("/two-factor/verify-otp", json={"code": "424242"})
         assert done.status_code == 200, done.text
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_a_stale_challenge_cookie_does_not_block_the_session() -> None:
+    w = await world()
+    await w.enable()
+    async with make_client(w.auth) as other:
+        await w.sign_in(other)
+        stale = other.cookies.get("gotauth.challenge")
+    assert stale
+    w.http.cookies.set("gotauth.challenge", stale)  # next to the fresh session
+    w.clock.advance("11m")  # the challenge expired; the session is still fresh
+    await w.http.post("/two-factor/disable", json={"password": PASSWORD})
+    again = await w.http.post("/two-factor/enable", json={"password": PASSWORD})
+    assert again.status_code == 200, again.text
+
+
+async def test_a_wrong_second_factor_is_a_failed_sign_in() -> None:
+    events: list[Any] = []
+
+    async def record(event: Any) -> None:
+        events.append(event)
+
+    w = await world(auth_options={"on_event": record})
+    await w.enable()
+    await w.sign_in()
+    await w.http.post("/two-factor/verify-totp", json={"code": "000000"})
+    await w.http.post("/two-factor/verify-backup-code", json={"code": "00000-00000"})
+    await w.auth.drain()
+    failed = [e for e in events if e.type == "sign_in.failed"]
+    assert len(failed) == 2
+    assert {e.data["reason"] for e in failed} == {"invalid_second_factor"}
+
+
+async def test_password_checks_are_capped_per_user_across_ips() -> None:
+    w = await world(
+        auth_options={
+            "advanced": {
+                "ip_headers": ("x-forwarded-for",),
+                "trusted_proxies": ("127.0.0.1",),
+            }
+        }
+    )
+    await w.enable()
+    statuses = [
+        (
+            await w.http.post(
+                "/two-factor/disable",
+                json={"password": "wrong"},
+                headers={"x-forwarded-for": f"10.0.1.{attempt}"},
+            )
+        ).status_code
+        for attempt in range(21)
+    ]
+    assert statuses[-1] == 429
+
+
+async def test_the_authenticator_uri_is_percent_encoded() -> None:
+    w = await world(issuer="Acme Corp")
+    started = await w.http.post("/two-factor/enable", json={"password": PASSWORD})
+    uri = started.json()["totp_uri"]
+    assert uri.startswith("otpauth://totp/Acme%20Corp%3Aada%40example.com?")
+    assert "issuer=Acme%20Corp" in uri
+
+
+async def test_one_email_code_is_live_at_a_time() -> None:
+    w = await world(email_otp=True)
+    await w.enable()
+    await w.sign_in()
+    await w.http.post("/two-factor/send-otp")
+    await w.http.post("/two-factor/send-otp")
+    rows = await w.auth.database.find_many("verification", [])
+    assert len([r for r in rows if r["identifier"].startswith("two_factor_otp:")]) == 1

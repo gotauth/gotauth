@@ -7,7 +7,7 @@ import inspect
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypeVar
 from urllib.parse import quote, urlencode, urlsplit
 
 from pydantic import BaseModel, ConfigDict
@@ -27,7 +27,7 @@ from gotauth.contracts.http import AuthResponse, SetCookie
 from gotauth.contracts.http_models import SignInOut, StatusOut
 from gotauth.contracts.primitives import Duration, to_timedelta
 from gotauth.contracts.protection import RateLimitRule
-from gotauth.contracts.schema import Field, ModelSchema, Reference
+from gotauth.contracts.schema import Field, ModelSchema, Reference, returned_only
 from gotauth.contracts.sessions import cookie_name, secure_cookies
 
 __all__ = ["TWO_FACTOR_MODEL", "two_factor"]
@@ -73,6 +73,7 @@ OTP_MAX_ATTEMPTS = 5
 BACKUP_CODE_DIGITS = 10
 
 Enforce = Callable[[User], bool | Awaitable[bool]]
+T = TypeVar("T")
 
 
 def _error(code: str) -> AuthError:
@@ -193,6 +194,20 @@ async def _require_fresh(ctx: EndpointContext) -> str:
     if row is None or ctx.clock.now() - row["created_at"] >= fresh_age:
         raise AuthError("FRESH_SESSION_REQUIRED", 403)
     return user_id
+
+
+def _usable_challenge(ctx: EndpointContext) -> ChallengeState | None:
+    """The pending sign-in challenge if it is valid and unexpired, else None (a stale
+    cookie never stands in the way of a session)."""
+    try:
+        return _challenge(ctx)
+    except AuthError:
+        return None
+
+
+def _user(ctx: EndpointContext, row: dict[str, Any]) -> User:  # Any: row
+    """The user as the core builds it (returned fields only)."""
+    return User.model_validate(returned_only(ctx.auth.schema["user"], row))
 
 
 def _challenge(ctx: EndpointContext) -> ChallengeState | None:
@@ -363,6 +378,22 @@ def two_factor(
             raise AuthError("FORBIDDEN", 403)
         return state
 
+    async def counted(
+        ctx: EndpointContext, state: ChallengeState, check: Awaitable[T]
+    ) -> T:
+        """Run a code check; a wrong code emits ``sign_in.failed`` for the user."""
+        try:
+            return await check
+        except AuthError as error:
+            if error.code == "TWO_FACTOR_INVALID_CODE":
+                await ctx.emit(
+                    "sign_in.failed",
+                    user_id=state.user_id,
+                    method=state.method,
+                    reason="invalid_second_factor",
+                )
+            raise
+
     async def active_row(
         ctx: EndpointContext, user_id: str
     ) -> dict[str, Any]:  # Any: row
@@ -374,11 +405,14 @@ def two_factor(
     # -------------------------------------------------------- endpoints
 
     async def enable(ctx: EndpointContext, body: PasswordIn) -> EnableOut:
-        state = _challenge(ctx)
+        state = _usable_challenge(ctx)
         if state is not None and state.type == "two_factor_setup":
             # Required setup during sign-in: the password was just checked.
             user_id = state.user_id
         else:
+            if _session_user(ctx) is None:
+                _challenge(ctx)  # a bad challenge cookie says why
+                raise AuthError("UNAUTHENTICATED", 401)
             user_id = await _require_fresh(ctx)
             await _check_password(ctx, user_id, body.password)
         existing = await _row(ctx, user_id)
@@ -405,7 +439,7 @@ def two_factor(
             },
         )
         issuer_name = _issuer(ctx, settings)
-        label = quote(f"{issuer_name}:{user['email']}")
+        label = quote(f"{issuer_name}:{user['email']}", safe="")
         query = urlencode(
             {
                 "secret": secret,
@@ -413,7 +447,8 @@ def two_factor(
                 "algorithm": "SHA1",
                 "digits": 6,
                 "period": 30,
-            }
+            },
+            quote_via=quote,
         )
         return EnableOut(totp_uri=f"otpauth://totp/{label}?{query}", backup_codes=codes)
 
@@ -442,20 +477,21 @@ def two_factor(
         return row
 
     async def verify_totp(ctx: EndpointContext, body: CodeIn) -> BaseModel:
-        state = _challenge(ctx)
+        state = _usable_challenge(ctx)
         if state is not None:
             if "totp" not in state.methods:
                 raise AuthError("FORBIDDEN", 403)
             if state.type == "two_factor_setup":
-                row = await confirm(ctx, state.user_id, body)
+                row = await counted(ctx, state, confirm(ctx, state.user_id, body))
                 return await finish(ctx, state, "totp", row, body.trust_device)
             if state.type != "two_factor":
                 raise AuthError("FORBIDDEN", 403)
             row = await active_row(ctx, state.user_id)
-            await _use_totp(ctx, row, body.code)
+            await counted(ctx, state, _use_totp(ctx, row, body.code))
             return await finish(ctx, state, "totp", row, body.trust_device)
         user_id = _session_user(ctx)
         if user_id is None:
+            _challenge(ctx)  # a bad challenge cookie says why
             raise AuthError("UNAUTHENTICATED", 401)
         await confirm(ctx, user_id, body)
         return StatusOut(status="enabled")
@@ -463,19 +499,17 @@ def two_factor(
     async def verify_backup_code(ctx: EndpointContext, body: CodeIn) -> SignInOut:
         state = factor(ctx, "backup_code")
         row = await active_row(ctx, state.user_id)
-        await _use_backup_code(ctx, row, body.code)
+        await counted(ctx, state, _use_backup_code(ctx, row, body.code))
         return await finish(ctx, state, "backup_code", row, body.trust_device)
 
     async def disable(ctx: EndpointContext, body: PasswordIn) -> StatusOut:
-        user_id = await _require_fresh(ctx)
+        user_id = _session_user(ctx) or ""  # session and freshness: the endpoint
         await _check_password(ctx, user_id, body.password)
         row = await _row(ctx, user_id)
         if row is None:
             raise _error("TWO_FACTOR_NOT_ENABLED")
         user_row = await ctx.adapter.find_one("user", [Where("id", user_id)])
-        if user_row is not None and await settings.enforced(
-            User.model_validate(user_row)
-        ):
+        if user_row is not None and await settings.enforced(_user(ctx, user_row)):
             raise AuthError("FORBIDDEN", 403, "Two-factor is required for this account")
         await ctx.adapter.delete("two_factor", [Where("id", row["id"])])
         await ctx.adapter.update(
@@ -488,7 +522,7 @@ def two_factor(
         return StatusOut(status="disabled")
 
     async def regenerate(ctx: EndpointContext, _: None) -> BackupCodesOut:
-        user_id = await _require_fresh(ctx)
+        user_id = _session_user(ctx) or ""  # session and freshness: the endpoint
         row = await active_row(ctx, user_id)
         codes, hashes = _new_backup_codes(ctx, user_id, settings.backup_code_count)
         claimed = await ctx.adapter.update(
@@ -512,10 +546,11 @@ def two_factor(
         await ctx.adapter.delete("verification", [Where("identifier", identifier)])
         code = ctx.crypto.new_otp(6)
         now = ctx.clock.now()
+        new_id = ctx.ids.new("ver")
         await ctx.adapter.create(
             "verification",
             {
-                "id": ctx.ids.new("ver"),
+                "id": new_id,
                 "identifier": identifier,
                 # Short codes: hashed with their identifier (CONTRACTS 2.1).
                 "value_hash": ctx.crypto.hash_token(f"{identifier}:{code}"),
@@ -523,6 +558,11 @@ def two_factor(
                 "created_at": now,
                 "attempts": 0,
             },
+        )
+        # One live code per user, also when two sends overlap.
+        await ctx.adapter.delete(
+            "verification",
+            [Where("identifier", identifier), Where("id", new_id, "ne")],
         )
         await ctx.email.send("otp", user["email"], code=code)
         return StatusOut(status="sent")
@@ -549,11 +589,21 @@ def two_factor(
             if attempts + 1 >= OTP_MAX_ATTEMPTS:
                 await ctx.adapter.delete("verification", [Where("id", pending["id"])])
             else:
-                await ctx.adapter.update(
+                counted_row = await ctx.adapter.update(
                     "verification",
                     [Where("id", pending["id"]), Where("attempts", attempts)],
                     {"attempts": attempts + 1},
                 )
+                if counted_row is None:  # a concurrent guess: fail closed
+                    await ctx.adapter.delete(
+                        "verification", [Where("id", pending["id"])]
+                    )
+            await ctx.emit(
+                "sign_in.failed",
+                user_id=state.user_id,
+                method=state.method,
+                reason="invalid_second_factor",
+            )
             # Answered, not raised: an error would roll the count back, and the
             # 5-attempt limit would never be reached.
             error = _error("TWO_FACTOR_INVALID_CODE")
@@ -670,6 +720,15 @@ def two_factor(
                 path="/two-factor/verify-*",
                 window="15m",
                 max=10,
+                key="identifier",
+                identifier=verifier,
+            ),
+            # Enable and disable check the password, send-otp sends email: capped
+            # per user too, not only per IP.
+            RateLimitRule(
+                path="/two-factor/*",
+                window="15m",
+                max=20,
                 key="identifier",
                 identifier=verifier,
             ),
