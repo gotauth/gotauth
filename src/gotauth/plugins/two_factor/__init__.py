@@ -1,8 +1,13 @@
-"""Two-factor authentication plugin (TOTP, backup codes, email OTP).
+"""Two-factor authentication (work package P2): TOTP, single-use backup codes and an
+optional email OTP fallback, required at every sign-in::
 
-Skeleton created by work package F1. Work package P2 implements it.
+    from gotauth.plugins.two_factor import two_factor
+
+    auth = GotAuth(..., plugins=[two_factor()])
 """
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from gotauth.plugins.two_factor._plugin import TWO_FACTOR_MODEL, two_factor
+
+__all__ = ["TWO_FACTOR_MODEL", "two_factor"]
