@@ -39,20 +39,32 @@ use the email code instead.
    - A code goes out only when the type applies:
      - `sign_in`: the account exists, or sign-up is allowed
      - `verify_email`: the account exists and is unverified
-     - `reset_password`: the account exists
+     - `reset_password`: the account exists and has a password (a reset changes a password, never adds one, as with email + password)
 2. **`POST /email-otp/verify`** `{email, otp, type, new_password?}`:
    - `sign_in`: signs in (method `email_otp`), creating the account if allowed.
    - `verify_email`: marks the email verified and emits `user.email_verified`.
    - `reset_password`:
      - sets the password (it must pass the email/password length rules and `password_check`)
-     - ends every session
-     - emits `password.reset`
+     - ends every session if `revoke_sessions_on_password_reset` is on
+     - drops pending email + password reset links
+     - sends a `security_notice` email and emits `password.reset`
 
 Every failure answers `EMAIL_OTP_INVALID` (400), unknown emails included. A code works
 once and only for its type and email. Five wrong codes delete it: the count is kept
 with `ctx.on_failure` (CCR 012).
 
 ## Security
+
+- **Pre-registered accounts:** an email link or code proves the address. When it signs into, verifies or resets an account that was never verified, these go first, because someone else may have registered the address before its owner:
+  - the password
+  - passkeys
+  - the two-factor setup
+  - every session
+
+  The account's data and its social logins stay.
+- **Wrong codes:** a wrong code does the same reads and the same counting transaction whether or not a code (and so an account) exists, so timing says nothing.
+- **One live link or code** per email and type, also when two sends overlap. Concurrent wrong guesses fail closed.
+- **Email links ignore extra query parameters** (click tracking). A sign-in refused after the link was used (for example by a sign-in interceptor) also goes to `error_callback_url`.
 
 - **Stored only as hashes:**
   - link tokens by the long-token rule

@@ -352,3 +352,142 @@ async def test_at_most_one_success_and_none_after_five_failures(
         else:
             failures += 1
     assert successes <= 1
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_a_pre_registered_account_is_claimed_cleanly() -> None:
+    # Someone signs up with the victim's email before the victim (pre-account
+    # hijacking); the victim then signs in by link.
+    w = world()
+    async with make_client(w.auth) as attacker:
+        await attacker.post(
+            "/sign-up/email", json={"email": ADA, "password": "attacker's password"}
+        )
+        assert (await attacker.get("/session")).json() is not None
+        await w.http.post("/magic-link/send", json={"email": ADA})
+        assert (await visit(w, w.link())).status_code == 302
+        assert (await attacker.get("/session")).json() is None
+        again = await attacker.post(
+            "/sign-in/email", json={"email": ADA, "password": "attacker's password"}
+        )
+        assert again.status_code == 401
+    assert (await w.http.get("/session")).json()["user"]["email"] == ADA
+
+
+async def test_a_wrong_code_does_the_same_reads_for_any_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gotauth.storage.memory import _adapter
+
+    calls: list[tuple[str, str]] = []
+    for name in ("create", "find", "find_many", "update", "delete"):
+        real = getattr(_adapter._Store, name)  # pyright: ignore[reportPrivateUsage]
+
+        def record(
+            self: Any, model: str, *a: Any, _n: str = name, _r: Any = real
+        ) -> Any:
+            calls.append((_n, model))
+            return _r(self, model, *a)
+
+        monkeypatch.setattr(_adapter._Store, name, record)  # pyright: ignore[reportPrivateUsage]
+    w = world(plugins=[email_otp(allow_sign_up=False)])
+    await w.http.post("/sign-up/email", json={"email": ADA, "password": PASSWORD})
+    await w.http.post("/email-otp/send", json={"email": ADA, "type": "reset_password"})
+    await w.auth.drain()
+    seen = []
+    for email in (ADA, "nobody@example.com"):
+        w.clock.advance("13s")
+        calls.clear()
+        response = await w.http.post(
+            "/email-otp/verify",
+            json={
+                "email": email,
+                "otp": "000000",
+                "type": "reset_password",
+                "new_password": "a brand new password",
+            },
+        )
+        assert response.json()["error"]["code"] == "EMAIL_OTP_INVALID"
+        seen.append([c for c in calls if c[1] != "session"])
+    assert seen[0] == seen[1]
+
+
+async def test_concurrent_wrong_guesses_fail_closed() -> None:
+    w = world()
+    await w.http.post("/email-otp/send", json={"email": ADA, "type": "sign_in"})
+    code = w.code()
+    wrong = "000000" if code != "000000" else "111111"
+    clients = [make_client(w.auth) for _ in range(3)]
+    await asyncio.gather(
+        *(
+            c.post(
+                "/email-otp/verify",
+                json={"email": ADA, "otp": wrong, "type": "sign_in"},
+            )
+            for c in clients
+        )
+    )
+    rows = await w.auth.database.find_many("verification", [])
+    remaining = [r for r in rows if r["identifier"] == f"email_otp:sign_in:{ADA}"]
+    # Every wrong guess was counted, or the code is gone: never fewer than sent.
+    assert not remaining or remaining[0]["attempts"] == 3
+
+
+async def test_a_link_with_tracking_parameters_works() -> None:
+    w = world()
+    await w.http.post("/magic-link/send", json={"email": ADA})
+    response = await visit(w, w.link() + "&utm_source=email")
+    assert response.status_code == 302
+
+
+async def test_a_refused_sign_in_goes_to_the_error_callback() -> None:
+    from gotauth.contracts import AuthError, Plugin
+
+    async def refuse(ctx: Any, user: Any, method: str) -> None:
+        raise AuthError("FORBIDDEN", 403)
+
+    w = world(
+        plugins=[magic_link(), Plugin(id="refuse", sign_in_interceptors=(refuse,))]
+    )
+    await w.http.post(
+        "/magic-link/send", json={"email": ADA, "error_callback_url": "/sign-in"}
+    )
+    response = await visit(w, w.link())
+    assert response.headers["location"] == "/sign-in?error=FORBIDDEN"
+
+
+async def test_a_code_reset_changes_an_existing_password_only() -> None:
+    w = world()
+    # A user without a password, as after a social sign-in.
+    await w.auth.create_user_record(None, {"email": ADA, "email_verified": True})
+    await w.http.post("/email-otp/send", json={"email": ADA, "type": "reset_password"})
+    await w.auth.drain()
+    assert not [m for m in w.mailer.sent if m.kind == "otp"]
+
+
+async def test_a_code_reset_notifies_and_drops_reset_links() -> None:
+    w = world()
+    await w.http.post("/sign-up/email", json={"email": ADA, "password": PASSWORD})
+    await w.http.post(
+        "/request-password-reset", json={"email": ADA, "redirect_to": "/reset"}
+    )
+    await w.auth.drain()
+    link_rows = await w.auth.database.find_many("verification", [])
+    assert any(r["identifier"].startswith("reset_password:") for r in link_rows)
+    w.clock.advance("61s")
+    await w.http.post("/email-otp/send", json={"email": ADA, "type": "reset_password"})
+    reset = await w.http.post(
+        "/email-otp/verify",
+        json={
+            "email": ADA,
+            "otp": w.code(),
+            "type": "reset_password",
+            "new_password": "a brand new password",
+        },
+    )
+    assert reset.json() == {"status": "ok"}
+    rows = await w.auth.database.find_many("verification", [])
+    assert not any(r["identifier"].startswith("reset_password:") for r in rows)
+    assert w.mailer.last("security_notice", ADA) is not None

@@ -93,6 +93,7 @@ async def _signed_in_user(
         )
     if not row["email_verified"]:
         # The link or code went to this address, so its owner proved control of it.
+        await _claim(ctx, row)
         row = (
             await ctx.adapter.update(
                 "user",
@@ -103,6 +104,27 @@ async def _signed_in_user(
         )
         await ctx.emit("user.email_verified", user_id=row["id"])
     return _user(ctx, row)
+
+
+async def _claim(ctx: EndpointContext, row: dict[str, Any]) -> None:  # Any: row
+    """Someone may have registered this address before its owner (pre-account
+    hijacking): the password, passkeys, two-factor setup and sessions of an
+    unverified account were set up without proof of the email, so they go before
+    the owner signs in. The account's data and social logins stay."""
+    user_id = row["id"]
+    await ctx.adapter.delete(
+        "account", [Where("user_id", user_id), Where("provider_id", "credential")]
+    )
+    schema = ctx.auth.schema
+    if "passkey" in schema:
+        await ctx.adapter.delete("passkey", [Where("user_id", user_id)])
+    if "two_factor" in schema:
+        await ctx.adapter.delete("two_factor", [Where("user_id", user_id)])
+        if "two_factor_enabled" in schema["user"].fields:
+            await ctx.adapter.update(
+                "user", [Where("id", user_id)], {"two_factor_enabled": False}
+            )
+    await ctx.sessions.revoke_all(ctx, user_id)
 
 
 def _with_query(url: str, **params: str) -> str:
@@ -122,8 +144,10 @@ class SendMagicLinkIn(_In):
     error_callback_url: str | None = None
 
 
-class VerifyMagicLinkIn(_In):
-    """``verify_magic_link`` query."""
+class VerifyMagicLinkIn(BaseModel):
+    """``verify_magic_link`` query; other parameters (click tracking) are ignored."""
+
+    model_config = ConfigDict(extra="ignore")
 
     token: str = Field(min_length=1, max_length=256)
 
@@ -175,10 +199,11 @@ def magic_link(
             )
             token = later.crypto.random_token(MAGIC_PREFIX)
             now = later.clock.now()
+            new_id = later.ids.new("ver")
             await later.adapter.create(
                 "verification",
                 {
-                    "id": later.ids.new("ver"),
+                    "id": new_id,
                     "identifier": identifier,
                     "value_hash": later.crypto.hash_token(token),
                     "expires_at": now + ttl,
@@ -189,8 +214,13 @@ def magic_link(
                     },
                 },
             )
-            base = config.base_url.rstrip("/") + config.base_path.rstrip("/")
-            url = f"{base}/magic-link/verify?{urlencode({'token': token})}"
+            # One live link per email, also when two sends overlap.
+            await later.adapter.delete(
+                "verification",
+                [Where("identifier", identifier), Where("id", new_id, "ne")],
+            )
+            # A "/..." url is joined to base_url + base_path by the email service.
+            url = f"/magic-link/verify?{urlencode({'token': token})}"
             await _send(later, "magic_link", email, url=url)
 
         # After the reply and for every email alike (CONTRACTS 9.1).
@@ -230,7 +260,12 @@ def magic_link(
         )
         if user is None:
             return fail("TOKEN_INVALID", 400)
-        result = await ctx.auth.complete_sign_in(ctx, user, method="magic_link")
+        try:
+            result = await ctx.auth.complete_sign_in(ctx, user, method="magic_link")
+        except AuthError as error:  # e.g. a sign-in interceptor refused
+            if not error_callback:
+                raise
+            return AuthResponse(redirect=_with_query(error_callback, error=error.code))
         callback = str(data.get("callback_url") or "/")
         if isinstance(result, ChallengeOut):
             callback = _with_query(callback, challenge=result.challenge.type)
@@ -311,16 +346,30 @@ def email_otp(
         status, message = ERROR_CODES["EMAIL_OTP_INVALID"]
         return AuthError("EMAIL_OTP_INVALID", status, message)
 
-    async def applies(
-        ctx: EndpointContext,
+    def applies(
         kind: OtpType,
         row: dict[str, Any] | None,  # Any: row
+        has_password: bool,
     ) -> bool:
         if kind == "sign_in":
             return row is not None or allow_sign_up
         if kind == "verify_email":
             return row is not None and not row["email_verified"]
-        return row is not None
+        # As C2: a reset changes an existing password, never adds one.
+        return row is not None and has_password
+
+    async def password_account(
+        ctx: EndpointContext,
+        row: dict[str, Any] | None,  # Any: row
+    ) -> dict[str, Any] | None:  # Any: row
+        # The same lookup for an unknown email (CONTRACTS 9.1).
+        return await ctx.adapter.find_one(
+            "account",
+            [
+                Where("user_id", row["id"] if row is not None else _NO_USER),
+                Where("provider_id", "credential"),
+            ],
+        )
 
     async def send(ctx: EndpointContext, body: SendEmailOtpIn) -> StatusOut:
         try:
@@ -328,7 +377,8 @@ def email_otp(
         except ValueError as exc:
             raise AuthError("INVALID_REQUEST", 400) from exc
         row = await _find_user(ctx, email)
-        wanted = await applies(ctx, body.type, row)
+        account = await password_account(ctx, row)
+        wanted = applies(body.type, row, account is not None)
 
         async def deliver(later: EndpointContext) -> None:
             identifier = f"email_otp:{body.type}:{email}"
@@ -342,10 +392,11 @@ def email_otp(
             )
             code = later.crypto.new_otp(6)
             now = later.clock.now()
+            new_id = later.ids.new("ver")
             await later.adapter.create(
                 "verification",
                 {
-                    "id": later.ids.new("ver"),
+                    "id": new_id,
                     "identifier": identifier,
                     # Short codes: hashed with their identifier (CONTRACTS 2.1).
                     "value_hash": later.crypto.hash_token(f"{identifier}:{code}"),
@@ -354,7 +405,12 @@ def email_otp(
                     "attempts": 0,
                 },
             )
-            await _send(later, "otp", email, code=code)
+            # One live code per email and type, also when two sends overlap.
+            await later.adapter.delete(
+                "verification",
+                [Where("identifier", identifier), Where("id", new_id, "ne")],
+            )
+            await _send(later, "otp", email, code=code, purpose=body.type)
 
         ctx.defer(deliver)
         return StatusOut(status="ok")
@@ -372,12 +428,17 @@ def email_otp(
         pending = await ctx.adapter.find_one(
             "verification", [Where("identifier", identifier)]
         )
-        if pending is None or ctx.clock.now() >= pending["expires_at"]:
-            raise invalid()
         expected = ctx.crypto.hash_token(f"{identifier}:{body.otp.strip()}")
-        if not ctx.crypto.equal(str(pending.get("value_hash", "")), expected):
+        usable = pending is not None and ctx.clock.now() < pending["expires_at"]
+        if (
+            pending is None
+            or not usable
+            or not ctx.crypto.equal(str(pending.get("value_hash", "")), expected)
+        ):
+            # The same reads and the same counting transaction whether or not a code
+            # (and so an account) exists: timing says nothing (CONTRACTS 9.1).
             row = await _find_user(ctx, email)
-            await count_failure(ctx, pending)
+            await count_failure(ctx, pending if usable else None)
             if row is not None and body.type == "sign_in":
                 await ctx.emit(
                     "sign_in.failed",
@@ -400,6 +461,8 @@ def email_otp(
             return await ctx.auth.complete_sign_in(ctx, user, method="email_otp")
         if row is None:
             raise invalid()
+        if body.type == "reset_password" and await password_account(ctx, row) is None:
+            raise invalid()
         if body.type == "verify_email":
             await _signed_in_user(ctx, row, email, allow_sign_up=False)
             return StatusOut(status="verified")
@@ -408,11 +471,12 @@ def email_otp(
 
     async def count_failure(
         ctx: EndpointContext,
-        pending: dict[str, Any],  # Any: row
+        pending: dict[str, Any] | None,  # Any: row
     ) -> None:
-        """Count a wrong code after the rollback (CCR 012); the 5th deletes it."""
-        pending_id = pending["id"]
-        attempts = int(pending.get("attempts") or 0)
+        """Count a wrong code after the rollback (CCR 012); the 5th deletes it.
+        Without a code, the same update runs on an id no row has."""
+        pending_id = pending["id"] if pending is not None else "ver_" + "0" * 26
+        attempts = int(pending.get("attempts") or 0) if pending is not None else 0
 
         async def count(later: EndpointContext) -> None:
             if attempts + 1 >= OTP_MAX_ATTEMPTS:
@@ -445,6 +509,9 @@ def email_otp(
             message = await settings.password_check(password, row["email"])
             if message is not None:
                 raise AuthError("PASSWORD_REJECTED", 400, message)
+        # An unverified account loses what an unproven party set up first (_claim),
+        # then gets the password its proven owner just chose.
+        await _signed_in_user(ctx, row, row["email"], allow_sign_up=False)
         password_hash = await ctx.crypto.hash_password(password)
         now = ctx.clock.now()
         account = await ctx.adapter.find_one(
@@ -469,8 +536,21 @@ def email_otp(
                 [Where("id", account["id"])],
                 {"password_hash": password_hash, "updated_at": now},
             )
-        await ctx.sessions.revoke_all(ctx, row["id"])
-        await _signed_in_user(ctx, row, row["email"], allow_sign_up=False)
+        if settings.revoke_sessions_on_password_reset:
+            await ctx.sessions.revoke_all(ctx, row["id"])
+        # Reset links from email + password (C2's "reset_password:<user id>") would
+        # set the password again later: they go.
+        await ctx.adapter.delete(
+            "verification", [Where("identifier", f"reset_password:{row['id']}")]
+        )
+        await _send(
+            ctx,
+            "security_notice",
+            row["email"],
+            event="password.reset",
+            at=ctx.clock.now().isoformat(),
+            ip_address=ctx.request.client_ip,
+        )
         await ctx.emit("password.reset", user_id=row["id"])
 
     return Plugin(
