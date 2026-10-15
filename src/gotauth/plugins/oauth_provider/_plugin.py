@@ -43,7 +43,15 @@ from ._rules import (
     normalize_resource,
     valid_redirect_uri,
 )
-from ._server import AuthorizeIn, ConsentIn, OAuthServer, TokenIn, TokenRequestIn
+from ._server import (
+    AuthorizeIn,
+    ConsentIdIn,
+    ConsentIn,
+    OAuthConsentOut,
+    OAuthServer,
+    TokenIn,
+    TokenRequestIn,
+)
 
 if TYPE_CHECKING:
     from gotauth.contracts.config import GotAuthInstance
@@ -569,6 +577,17 @@ def oauth_provider(
             input_format="form",
             auth="session",
             summary="Approve or deny a consent request",
+            tags=tags,
+        ),
+        Endpoint(
+            "get_oauth_consent",
+            "GET",
+            "/oauth2/consent",
+            server.consent_details,
+            input=ConsentIdIn,
+            output=OAuthConsentOut,
+            auth="session",
+            summary="What a consent request asks for (for your own consent page)",
             tags=tags,
         ),
         Endpoint(
