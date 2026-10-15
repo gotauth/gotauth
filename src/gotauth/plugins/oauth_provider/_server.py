@@ -69,6 +69,35 @@ class ConsentIn(BaseModel):
     scopes: str | None = None
 
 
+class ConsentIdIn(BaseModel):
+    """``get_oauth_consent`` query."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    consent_id: str
+
+
+class ConsentClientOut(BaseModel):
+    """The app asking for access. ``host`` is set for a CIMD client (its URL's host)."""
+
+    client_id: str
+    name: str
+    host: str | None
+
+
+class OAuthConsentOut(BaseModel):
+    """What a consent screen shows (``get_oauth_consent``, and ``oauth_authorize`` in
+    JSON mode). ``redirect_host`` must be on screen (MCP authorization 2026-07-28);
+    ``loopback_only`` means every redirect URI of the client is a loopback address."""
+
+    consent_id: str
+    client: ConsentClientOut
+    scopes: list[str]
+    resource: str | None
+    redirect_host: str
+    loopback_only: bool
+
+
 class TokenIn(BaseModel):
     """``oauth_token`` form."""
 
@@ -156,6 +185,28 @@ def _error_page(message: str) -> AuthResponse:
         "Authorization error",
         f"<h1>Authorization error</h1><p>{html.escape(message)}</p>",
         status=400,
+    )
+
+
+def _consent_details(
+    client: Mapping[str, Any],  # Any: row
+    consent_id: str,
+    scopes: Sequence[str],
+    resource: str | None,
+    redirect_uri: str,
+) -> OAuthConsentOut:
+    client_id = str(client["client_id"])
+    return OAuthConsentOut(
+        consent_id=consent_id,
+        client=ConsentClientOut(
+            client_id=client_id,
+            name=str(client["name"]),
+            host=urlsplit(client_id).netloc if is_cimd_url(client_id) else None,
+        ),
+        scopes=list(scopes),
+        resource=resource,
+        redirect_host=urlsplit(redirect_uri).netloc,
+        loopback_only=all(is_loopback_redirect(uri) for uri in client["redirect_uris"]),
     )
 
 
@@ -374,12 +425,10 @@ class OAuthServer:
         resource: str | None,
         redirect_uri: str,
     ) -> AuthResponse:
-        redirect_host = urlsplit(redirect_uri).netloc
-        loopback_only = all(
-            is_loopback_redirect(uri) for uri in client["redirect_uris"]
-        )
-        client_id = str(client["client_id"])
-        cimd_host = urlsplit(client_id).netloc if is_cimd_url(client_id) else None
+        details = _consent_details(client, consent_id, scopes, resource, redirect_uri)
+        redirect_host = details.redirect_host
+        loopback_only = details.loopback_only
+        cimd_host = details.client.host
         if ctx.request.headers.get("accept", "").startswith("application/json"):
             if self.settings.consent_page:
                 return AuthResponse(
@@ -389,20 +438,7 @@ class OAuthServer:
                         )
                     }
                 )
-            return AuthResponse(
-                body={
-                    "consent_id": consent_id,
-                    "client": {
-                        "client_id": client["client_id"],
-                        "name": client["name"],
-                        "host": cimd_host,
-                    },
-                    "scopes": list(scopes),
-                    "resource": resource,
-                    "redirect_host": redirect_host,
-                    "loopback_only": loopback_only,
-                }
-            )
+            return AuthResponse(body=details)
         if self.settings.consent_page:
             return AuthResponse(
                 redirect=_with_query(
@@ -448,6 +484,29 @@ class OAuthServer:
             "</form>"
         )
         return _page(f"Allow {client['name']}?", body)
+
+    async def consent_details(
+        self, ctx: EndpointContext, query: ConsentIdIn
+    ) -> OAuthConsentOut:
+        """What the consent request ``consent_id`` asks for, for an app's own consent
+        page (``consent_page`` gets only the id). Only the user it was made for can
+        read it."""
+        principal = ctx.principal
+        if principal is None or principal.user_id is None:
+            raise AuthError("UNAUTHENTICATED", 401)
+        payload = self._read_consent(ctx, query.consent_id, principal.user_id)
+        client = await ctx.adapter.find_one(
+            "oauth_client", [Where("client_id", payload["c"])]
+        )
+        if client is None or client.get("disabled_at") is not None:
+            raise AuthError("TOKEN_INVALID", 400, "Unknown client")
+        return _consent_details(
+            client,
+            query.consent_id,
+            list(payload["s"]),
+            cast(str | None, payload.get("res")),
+            str(payload["r"]),
+        )
 
     async def consent(self, ctx: EndpointContext, form: ConsentIn) -> AuthResponse:
         principal = ctx.principal

@@ -1,11 +1,11 @@
-# GotAuth contracts (version 13)
+# GotAuth contracts (version 14)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 13
+CONTRACT_VERSION = 14
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -50,6 +50,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 12 (2026-10-14, [CCR 012](../ccr/012-on-failure.md)):** `EndpointContext.on_failure(work)` (section 5) runs work after a failed request's rollback, in its own transaction, so attempt counters outlast the error they record.
 
 **Version 13 (2026-10-15, [CCR 013](../ccr/013-sort-ties-admin-cookie.md)):** `find_many` breaks `sort_by` ties by `id` in the same direction (section 3), so paging is stable. The `admin_session` cookie and purpose string (P6) join the registries in sections 7 and 8.
+
+**Version 14 (2026-10-15, [CCR 014](../ccr/014-oauth-consent-details.md)):** O1 adds `get_oauth_consent` (12.3), so an app's own consent page can show what a consent request asks for.
 
 ---
 
@@ -820,6 +822,7 @@ An unknown prefix gives `UNAUTHENTICATED`. After resolution, every `Plugin.princ
 | `revoke_api_keys` | server_only (by owner or key) | | P1 |
 | `oauth_authorize` | GET `/oauth2/authorize` | optional | O1 |
 | `oauth_consent` | POST `/oauth2/consent` (form) | session | O1 |
+| `get_oauth_consent` | GET `/oauth2/consent?consent_id=`: what the consent request asks for (`{consent_id, client: {client_id, name, host}, scopes, resource, redirect_host, loopback_only}`), for an app's own `consent_page`; only for the user it was made for | session | O1 |
 | `oauth_token` | POST `/oauth2/token` (form, `error_format="oauth"`) | none (client auth) | O1 |
 | `oauth_introspect` | POST `/oauth2/introspect` (form, oauth errors) | none (client auth) | O1 |
 | `oauth_revoke` | POST `/oauth2/revoke` (form, oauth errors) | none (client auth) | O1 |

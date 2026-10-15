@@ -22,6 +22,7 @@ app.mount("/", auth.well_known())  # RFC 8414 metadata at the host root, last
 |---|---|
 | `GET /oauth2/authorize` | Authorization code + PKCE (S256 only) |
 | `POST /oauth2/consent` | The consent form (built-in page, or your `consent_page`) |
+| `GET /oauth2/consent?consent_id=` | For your own `consent_page`: what the request asks for (client name and CIMD host, scopes, resource, `redirect_host`, `loopback_only`); only for the user it was made for |
 | `POST /oauth2/token` | `authorization_code`, `refresh_token`, `client_credentials` |
 | `POST /oauth2/introspect` | RFC 7662, confidential clients |
 | `POST /oauth2/revoke` | RFC 7009 |

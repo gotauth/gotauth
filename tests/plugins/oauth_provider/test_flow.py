@@ -478,3 +478,33 @@ async def test_userinfo() -> None:
         bad.status_code == 401
         and 'error="invalid_token"' in bad.headers["www-authenticate"]
     )
+
+
+async def test_consent_details_for_an_app_consent_page() -> None:
+    # CCR 014: consent_page gets only the id; the page reads the request with it.
+    w = await world()
+    consent_id = (await w.authorize(resource=RESOURCE)).json()["consent_id"]
+    details = await w.http.get("/oauth2/consent", params={"consent_id": consent_id})
+    assert details.status_code == 200, details.text
+    body = details.json()
+    assert body["consent_id"] == consent_id
+    assert body["client"]["client_id"] == w.client_id
+    assert body["client"]["host"] is None
+    assert body["redirect_host"] == "app.example.com"
+    assert body["resource"] == RESOURCE
+    assert body["loopback_only"] is False
+    assert "openid" in body["scopes"]
+    forged = await w.http.get(
+        "/oauth2/consent", params={"consent_id": consent_id[:-2] + "xx"}
+    )
+    assert forged.status_code == 400
+    w.http.cookies = httpx.Cookies()
+    await w.http.post(
+        "/sign-up/email",
+        json={"email": "bob@example.com", "password": "another password"},
+    )
+    other_user = await w.http.get("/oauth2/consent", params={"consent_id": consent_id})
+    assert other_user.status_code == 400
+    w.http.cookies = httpx.Cookies()
+    anonymous = await w.http.get("/oauth2/consent", params={"consent_id": consent_id})
+    assert anonymous.status_code == 401
