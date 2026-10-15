@@ -1,38 +1,44 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useGotAuthClient } from "@/components/gotauth/gotauth-provider"
 import { FormMessage } from "@/components/gotauth/form-message"
 import { PasskeyButton } from "@/components/gotauth/passkey-button"
 import { TwoFactorSetup } from "@/components/gotauth/two-factor-setup"
 import { useSession } from "@/hooks/use-session"
-import type { GotAuthError, PasskeyOut } from "@/lib/gotauth-client"
+import type { GotAuthError, PasskeyListOut, PasskeyOut, Result } from "@/lib/gotauth-client"
 
 function Passkeys() {
   const client = useGotAuthClient()
+  const id = useId()
   const [passkeys, setPasskeys] = useState<PasskeyOut[] | null>(null)
   const [error, setError] = useState<GotAuthError | null>(null)
+  const [name, setName] = useState("")
 
-  const load = useCallback(async () => {
-    const result = await client.passkey.listPasskeys()
+  const show = useCallback((result: Result<PasskeyListOut>) => {
     if (result.error) setError(result.error)
     else setPasskeys(result.data.passkeys)
-  }, [client])
+  }, [])
+  const load = useCallback(
+    async () => show(await client.passkey.listPasskeys()),
+    [client, show],
+  )
 
   useEffect(() => {
+    // State is set in the callback, so it never changes during the effect itself.
     let live = true
     void client.passkey.listPasskeys().then((result) => {
-      if (!live) return
-      if (result.error) setError(result.error)
-      else setPasskeys(result.data.passkeys)
+      if (live) show(result)
     })
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, show])
 
   async function remove(passkey: PasskeyOut) {
     setError(null)
@@ -66,8 +72,23 @@ function Passkeys() {
       ) : passkeys ? (
         <p className="text-sm">No passkeys yet.</p>
       ) : null}
-      <div className="max-w-sm">
-        <PasskeyButton mode="register" name="This device" onRegistered={() => void load()} />
+      <div className="grid max-w-sm gap-2">
+        <Label htmlFor={`${id}-name`}>Name for a new passkey</Label>
+        <Input
+          id={`${id}-name`}
+          placeholder="For example: Work laptop"
+          maxLength={64}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <PasskeyButton
+          mode="register"
+          name={name.trim() || undefined}
+          onRegistered={() => {
+            setName("")
+            void load()
+          }}
+        />
       </div>
       <FormMessage error={error} />
     </section>

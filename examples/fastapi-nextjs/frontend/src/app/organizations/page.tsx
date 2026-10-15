@@ -11,6 +11,10 @@ import { FormMessage } from "@/components/gotauth/form-message"
 import { useSession } from "@/hooks/use-session"
 import type { FullOrganizationOut, GotAuthError, InvitationOut } from "@/lib/gotauth-client"
 
+// The organization plugin's rule for slugs: 3 to 48 of [a-z0-9-], not starting or
+// ending with "-".
+const SLUG_PATTERN = "[a-z0-9][a-z0-9\\-]{1,46}[a-z0-9]"
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -25,15 +29,19 @@ function CreateOrganization() {
   const id = useId()
   const [error, setError] = useState<GotAuthError | null>(null)
   const [pending, setPending] = useState(false)
+  const [name, setName] = useState("")
+  // Follows the name until edited by hand.
+  const [slug, setSlug] = useState<string | null>(null)
+  const shownSlug = slug ?? slugify(name)
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const formElement = event.currentTarget
-    const form = new FormData(formElement)
-    const name = String(form.get("name") ?? "").trim()
     setPending(true)
     setError(null)
-    const created = await client.organization.createOrganization({ name, slug: slugify(name) })
+    const created = await client.organization.createOrganization({
+      name: name.trim(),
+      slug: shownSlug,
+    })
     if (created.error) {
       setPending(false)
       setError(created.error)
@@ -43,8 +51,12 @@ function CreateOrganization() {
       organization_id: created.data.id,
     })
     setPending(false)
-    if (active.error) setError(active.error)
-    else formElement.reset()
+    if (active.error) {
+      setError(active.error)
+      return
+    }
+    setName("")
+    setSlug(null)
   }
 
   return (
@@ -52,7 +64,26 @@ function CreateOrganization() {
       <h2 className="text-lg font-semibold">Create an organization</h2>
       <div className="grid gap-2">
         <Label htmlFor={`${id}-name`}>Name</Label>
-        <Input id={`${id}-name`} name="name" required minLength={3} maxLength={48} />
+        <Input
+          id={`${id}-name`}
+          name="name"
+          required
+          maxLength={100}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={`${id}-slug`}>URL name</Label>
+        <Input
+          id={`${id}-slug`}
+          name="slug"
+          required
+          pattern={SLUG_PATTERN}
+          title="3 to 48 lowercase letters, digits or dashes"
+          value={shownSlug}
+          onChange={(event) => setSlug(event.target.value.toLowerCase())}
+        />
       </div>
       <FormMessage error={error} />
       <Button type="submit" disabled={pending}>
@@ -70,6 +101,7 @@ function ActiveOrganization({ organizationId }: { organizationId: string }) {
   const [invitations, setInvitations] = useState<InvitationOut[]>([])
   const [error, setError] = useState<GotAuthError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [inviting, setInviting] = useState(false)
 
   const fetchAll = useCallback(
     () =>
@@ -107,11 +139,14 @@ function ActiveOrganization({ organizationId }: { organizationId: string }) {
     setError(null)
     setNotice(null)
     const email = String(form.get("email") ?? "")
+    // One send at a time: a second invitation replaces the first, whose link stops working.
+    setInviting(true)
     const result = await client.organization.inviteMember({
       email,
       role: String(form.get("role") ?? "member"),
       organization_id: organizationId,
     })
+    setInviting(false)
     if (result.error) {
       setError(result.error)
       return
@@ -188,7 +223,9 @@ function ActiveOrganization({ organizationId }: { organizationId: string }) {
           </select>
         </div>
         <FormMessage error={error} message={notice} />
-        <Button type="submit">Send invitation</Button>
+        <Button type="submit" disabled={inviting}>
+          {inviting ? "Sending..." : "Send invitation"}
+        </Button>
       </form>
     </section>
   )

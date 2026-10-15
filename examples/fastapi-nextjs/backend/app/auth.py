@@ -39,7 +39,7 @@ def build_auth(
     if database is None:
         url = env.get("DATABASE_URL", "sqlite+aiosqlite:///app.db")
         database = sqlalchemy_adapter(create_async_engine(url))
-    base_url = env.get("BASE_URL", "http://localhost:3000")  # the Next.js origin
+    base_url = env.get("BASE_URL", "http://localhost:3000").rstrip("/")  # Next.js
     return GotAuth(
         database=database,
         secret=env["GOTAUTH_SECRET"],

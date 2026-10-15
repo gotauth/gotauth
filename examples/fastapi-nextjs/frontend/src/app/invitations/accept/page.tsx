@@ -1,20 +1,51 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useGotAuthClient } from "@/components/gotauth/gotauth-provider"
 import { FormMessage } from "@/components/gotauth/form-message"
+import { PasskeyButton } from "@/components/gotauth/passkey-button"
 import { SignInForm } from "@/components/gotauth/sign-in-form"
+import { SignUpForm } from "@/components/gotauth/sign-up-form"
 import { useSession } from "@/hooks/use-session"
+import { useAppConfig } from "@/lib/app-config"
 import type { GotAuthError } from "@/lib/gotauth-client"
+
+/** Signed out: sign in, or create the account first. Every way back lands here. */
+function SignInFirst({ here }: { here: string }) {
+  const config = useAppConfig()
+  const [creating, setCreating] = useState(false)
+  if (!config) return null
+  return (
+    <div className="grid justify-items-center gap-4">
+      <p>Sign in with the email address the invitation was sent to.</p>
+      {creating ? (
+        // The verification email links back to this page.
+        <SignUpForm callbackURL={here} />
+      ) : (
+        <>
+          {/* Signing in updates the session, and this page then shows the invitation. */}
+          <SignInForm socialProviders={config.social_providers} callbackURL={here} />
+          <div className="w-full max-w-sm">
+            <PasskeyButton />
+          </div>
+        </>
+      )}
+      <Button variant="link" onClick={() => setCreating(!creating)}>
+        {creating ? "I have an account: sign in" : "No account yet? Create one"}
+      </Button>
+    </div>
+  )
+}
 
 /** Where the invitation email links to: ?invitation_id=...&token=... */
 function Accept() {
   const client = useGotAuthClient()
   const router = useRouter()
+  const pathname = usePathname()
   const params = useSearchParams()
   const { data, isPending } = useSession()
   const [error, setError] = useState<GotAuthError | null>(null)
@@ -29,15 +60,7 @@ function Accept() {
     return <p role="alert">This invitation link is incomplete. Open it from the email again.</p>
   }
   if (isPending) return null
-  if (!data) {
-    return (
-      <div className="grid justify-items-center gap-4">
-        <p>Sign in with the email address the invitation was sent to.</p>
-        {/* Signing in updates the session, and this page shows the invitation. */}
-        <SignInForm />
-      </div>
-    )
-  }
+  if (!data) return <SignInFirst here={`${pathname}?${params.toString()}`} />
 
   async function accept() {
     setPending(true)
@@ -63,11 +86,20 @@ function Accept() {
     else setDeclined(true)
   }
 
+  // The server only accepts an invitation for the signed-in email, and says nothing
+  // more, so the page names the likely causes.
+  const wrongAccount =
+    error?.code === "ORG_INVITATION_INVALID"
+      ? `This invitation can't be used by ${data.user.email}. It may be for another email address (sign out and sign in with that one), or it has expired or been used.`
+      : null
+
   return (
     <Card className="w-full max-w-sm" data-testid="invitation">
       <CardHeader>
         <CardTitle>Join an organization</CardTitle>
-        <CardDescription>You were invited as {data.user.email}.</CardDescription>
+        <CardDescription>
+          Signed in as {data.user.email}. The invitation must be for this address.
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {declined ? (
@@ -82,7 +114,7 @@ function Accept() {
             </Button>
           </div>
         )}
-        <FormMessage error={error} />
+        <FormMessage error={wrongAccount ? null : error} message={wrongAccount} />
       </CardContent>
     </Card>
   )

@@ -55,7 +55,18 @@ GotAuth already provides sign-up, sign-in, sessions, email verification, passwor
 3. Check the revision: a NOT NULL column added to an existing table needs a `server_default`, or upgrading a database with rows fails (issue #53).
 4. Apply it: `uv run alembic upgrade head`.
 
-**Organization-scoped data:** the session's active organization is `session.active_organization_id` (set with the switcher), and `auth.fastapi.require(permission={"project": ["read"]})` checks the caller's role in it.
+**Organization-scoped data:** the session's active organization is `session.active_organization_id` (set with the switcher). To check the caller's role in it:
+1. Declare your resources and what each role may do, and pass them to the plugin:
+   ```python
+   from gotauth.plugins.organization import access_control, organization
+
+   access = access_control(
+       statements={"project": ["create", "read", "update", "delete"]},
+       roles={"member": {"project": ["read"]}},
+   )
+   organization(access=access, invitation_url=...)
+   ```
+2. Protect the route with `Depends(auth.fastapi.require(permission={"project": ["read"]}))`. Without step 1, no role has `project:read`, and every request gets 403.
 
 ## Run the checks
 

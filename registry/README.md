@@ -25,7 +25,7 @@ Wrap the app in `<GotAuthProvider baseURL="/api/auth">` and use the components i
 |---|---|
 | `gotauth-client` | `createGotAuthClient({ baseURL, fetch })`: one method per endpoint, `{ data, error }` results |
 | `gotauth-provider` | `GotAuthProvider` and `useGotAuthClient()` |
-| `use-session` | `useSession()`: `{ data: SessionWithUserOut \| null, error, isPending, refetch }`, shared, refetched after sign-in and sign-out |
+| `use-session` | `useSession()`: `{ data: SessionWithUserOut \| null, error, isPending, isRefetching, refetch }`, shared, refetched after sign-in and sign-out. `isPending` is true only until the first answer; refetches keep the last one and set `isRefetching`, so pages that wait for `isPending` keep their forms mounted |
 | `webauthn` | base64url and ArrayBuffer helpers for passkeys |
 | `sign-in-form`, `sign-up-form`, `social-buttons` | Email and password forms with social buttons; the sign-in form shows the two-factor step itself unless you pass `onChallenge` |
 | `user-button` | Avatar with a sign-out menu |
