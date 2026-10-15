@@ -43,6 +43,29 @@ describe("useSession", () => {
     expect(loads).toBe(2)
   })
 
+  it("keeps the last answer while it refetches", async () => {
+    let release: (() => void) | undefined
+    let calls = 0
+    server.use(
+      http.get(`${BASE}/session`, async () => {
+        calls += 1
+        if (calls > 1) await new Promise<void>((resolve) => (release = resolve))
+        return HttpResponse.json({ session: SESSION, user: USER })
+      }),
+    )
+    const client = createGotAuthClient({ baseURL: BASE })
+    const { result } = renderHook(() => useSession(client))
+    await waitFor(() => expect(result.current.data?.user.id).toBe("usr_1"))
+    act(() => client.notify())
+    await waitFor(() => expect(result.current.isRefetching).toBe(true))
+    // Pages that wait for isPending keep their forms (and their state) mounted.
+    expect(result.current.isPending).toBe(false)
+    expect(result.current.data?.user.id).toBe("usr_1")
+    await waitFor(() => expect(release).toBeDefined())
+    act(() => release?.())
+    await waitFor(() => expect(result.current.isRefetching).toBe(false))
+  })
+
   it("works with an explicit client and no provider", async () => {
     server.use(http.get(`${BASE}/session`, () => HttpResponse.json(null)))
     const client = createGotAuthClient({ baseURL: BASE })

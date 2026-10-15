@@ -3,7 +3,14 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+import { OrgSwitcher } from "@/components/gotauth/org-switcher"
 import { UserButton } from "@/components/gotauth/user-button"
+
+const LINKS = [
+  { href: "/keys", label: "API keys" },
+  { href: "/organizations", label: "Organizations" },
+  { href: "/security", label: "Security" },
+]
 
 export function Header() {
   const router = useRouter()
@@ -13,11 +20,17 @@ export function Header() {
         <Link href="/" className="font-semibold">
           Projects
         </Link>
-        <Link href="/keys" className="text-muted-foreground hover:text-foreground">
-          API keys
-        </Link>
+        {LINKS.map((link) => (
+          <Link key={link.href} href={link.href} className="text-muted-foreground hover:text-foreground">
+            {link.label}
+          </Link>
+        ))}
       </nav>
-      <UserButton signInHref="/sign-in" onSignOut={() => router.push("/")} />
+      <div className="flex items-center gap-3">
+        {/* Renders nothing when signed out. */}
+        <OrgSwitcher onCreate={() => router.push("/organizations")} />
+        <UserButton signInHref="/sign-in" onSignOut={() => router.push("/")} />
+      </div>
     </header>
   )
 }

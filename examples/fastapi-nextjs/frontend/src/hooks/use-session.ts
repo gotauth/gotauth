@@ -8,7 +8,10 @@ import type { GotAuthClient, GotAuthError, SessionWithUserOut } from "@/lib/gota
 type Snapshot = {
   data: SessionWithUserOut | null
   error: GotAuthError | null
+  /** Only until the first answer: later refetches keep showing the last one. */
   isPending: boolean
+  /** A refetch after sign-in, sign-out or another change is under way. */
+  isRefetching: boolean
 }
 
 type Store = {
@@ -28,7 +31,7 @@ function storeFor(client: GotAuthClient): Store {
   let store = stores.get(client)
   if (!store) {
     store = {
-      snapshot: { data: null, error: null, isPending: true },
+      snapshot: { data: null, error: null, isPending: true, isRefetching: false },
       listeners: new Set(),
       inFlight: null,
       generation: 0,
@@ -50,12 +53,20 @@ function publish(store: Store, snapshot: Snapshot) {
 
 function load(client: GotAuthClient, store: Store): Promise<void> {
   const generation = ++store.generation
-  if (!store.snapshot.isPending) publish(store, { ...store.snapshot, isPending: true })
+  // Pages keep what they show (and forms keep their state) while this runs.
+  if (store.loaded && !store.snapshot.isRefetching) {
+    publish(store, { ...store.snapshot, isRefetching: true })
+  }
   const request = client.getSession().then((result) => {
     if (generation !== store.generation) return // a newer load is on its way
     store.inFlight = null
     store.loaded = true
-    publish(store, { data: result.data ?? null, error: result.error, isPending: false })
+    publish(store, {
+      data: result.data ?? null,
+      error: result.error,
+      isPending: false,
+      isRefetching: false,
+    })
   })
   store.inFlight = request
   return request
@@ -65,7 +76,7 @@ function ensureLoaded(client: GotAuthClient, store: Store): void {
   if (!store.loaded && !store.inFlight) void load(client, store)
 }
 
-const SERVER_SNAPSHOT: Snapshot = { data: null, error: null, isPending: true }
+const SERVER_SNAPSHOT: Snapshot = { data: null, error: null, isPending: true, isRefetching: false }
 
 /** The current session from GET /session, shared and refetched after sign-in,
  * sign-out and revoke. */

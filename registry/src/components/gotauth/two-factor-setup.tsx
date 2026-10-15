@@ -182,7 +182,7 @@ export function TwoFactorSetup({
         </div>
         {secret ? (
           <p className="text-muted-foreground text-sm">
-            Can't scan it? Enter this key instead:{" "}
+            {"Can't scan it? Enter this key instead: "}
             <code className="break-all" data-testid="totp-secret">
               {secret}
             </code>

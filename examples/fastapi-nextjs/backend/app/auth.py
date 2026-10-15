@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from gotauth import GotAuth
 from gotauth.contracts import Adapter, EmailSender, OAuthProvider
 from gotauth.plugins.api_key import api_key
+from gotauth.plugins.organization import organization
+from gotauth.plugins.passkey import passkey
+from gotauth.plugins.two_factor import two_factor
 from gotauth.social import github
 from gotauth.storage.sqlalchemy import sqlalchemy_adapter
 
@@ -36,16 +39,22 @@ def build_auth(
     if database is None:
         url = env.get("DATABASE_URL", "sqlite+aiosqlite:///app.db")
         database = sqlalchemy_adapter(create_async_engine(url))
+    base_url = env.get("BASE_URL", "http://localhost:3000").rstrip("/")  # Next.js
     return GotAuth(
         database=database,
         secret=env["GOTAUTH_SECRET"],
-        base_url=env.get("BASE_URL", "http://localhost:3000"),  # the Next.js origin
+        base_url=base_url,
         email_password={"require_email_verification": True},
         social_providers=github_from_env()
         if social_providers is None
         else social_providers,
         email_sender=email_sender,  # None: printed to the console on localhost
-        plugins=[api_key(allowed_scopes=SCOPES)],
+        plugins=[
+            api_key(allowed_scopes=SCOPES),
+            two_factor(),
+            passkey(),  # the relying party is the host of base_url: localhost
+            organization(invitation_url=f"{base_url}/invitations/accept"),
+        ],
     )
 
 

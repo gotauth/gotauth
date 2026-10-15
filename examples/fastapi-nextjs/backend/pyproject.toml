@@ -5,7 +5,7 @@ description = "GotAuth example: FastAPI backend for the Next.js frontend"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.142",
-  "gotauth[fastapi,sqlalchemy,sqlite,postgres]",
+  "gotauth[fastapi,sqlalchemy,sqlite,postgres,passkey]",
   "uvicorn>=0.54",
 ]
 
