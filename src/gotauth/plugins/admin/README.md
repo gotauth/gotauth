@@ -19,6 +19,11 @@ others the `admin` role with `set_user_role`.
 - **`impersonation_expires_in`:** `"1h"` by default. An impersonation session never
   slides past it.
 - **`allow_impersonating_admins`:** `False` by default.
+- **`impersonation_blocked`:** endpoint ids an impersonation session may not call.
+  The default, `IMPERSONATION_BLOCKED`, covers everything that creates a credential
+  that would outlive the impersonation (API keys, agents, OAuth clients and grants)
+  and the account's security settings (password, email, two-factor, passkeys, linked
+  accounts, account deletion).
 
 ## Schema
 
@@ -69,7 +74,8 @@ A banned user:
   to 5 seconds in each process; a ban or unban through this process takes effect at
   once.
 
-A ban with `expires_in` ends by itself; it is cleared on the next check after it ends.
+A ban with `expires_in` ends by itself. Requests treat it as over at once; the stored
+flag is cleared at the user's next sign-in, so a GET never writes.
 
 With `sessions.cookie_cache` on, a cached session still reaches the principal check,
 so a banned user is refused there. That check costs one user lookup per request, at
@@ -80,21 +86,28 @@ most every 5 seconds per user.
 `impersonate_user` creates a session of the target with `impersonated_by` set to the
 admin's id, lasting `impersonation_expires_in`. The browser's session cookie now holds
 the new session, and the admin's own session token moves to the signed HttpOnly
-cookie `gotauth.admin_session`. A caller using a bearer session gets the new token in
-the response instead.
+cookie `gotauth.admin_session`, which lasts no longer than the impersonation. A caller
+using a bearer session gets the new token in the response instead.
 
 `stop_impersonating` revokes the impersonation session and, when the admin cookie
 holds a session of the same admin that is still valid, signs the browser back in as
-the admin (`{"restored": true}`). Otherwise the browser is signed out.
+the admin (`{"restored": true}`). Otherwise the browser is signed out. Signing out
+during an impersonation ends the admin's own session too, and emits
+`admin.impersonation_stopped`.
 
 An impersonation session:
 - ends after `impersonation_expires_in`, however often it is used;
 - ends as soon as its admin is no longer an admin, is banned or is deleted;
-- can't call admin endpoints;
-- otherwise acts as the user, including actions that need a fresh session. Every event
-  emitted from it carries its session id as `principal.credential_id`, and
-  `list_user_sessions` shows `impersonated_by`, so audits can tell the admin's actions
-  apart.
+- can't call admin endpoints, or the endpoints in `impersonation_blocked`
+  (`ADMIN_IMPERSONATION_BLOCKED`);
+- otherwise acts as the user. Every event emitted from it carries its session id as
+  `principal.credential_id`, and `list_user_sessions` shows `impersonated_by`, so
+  audits can tell the admin's actions apart.
+
+With `sessions.cookie_cache` on, a revoked session can still be presented until its
+cache cookie expires (C3). The plugin remembers which sessions were impersonations, so
+an ended impersonation stays refused in the process that saw it, and admin endpoints
+refuse any session whose row is gone.
 
 ## Errors
 
@@ -104,3 +117,4 @@ An impersonation session:
 | `ADMIN_CANNOT_TARGET_SELF` | 400 | Banning, removing or impersonating yourself |
 | `ADMIN_CANNOT_IMPERSONATE_ADMIN` | 403 | Impersonating an admin without `allow_impersonating_admins` |
 | `ADMIN_NOT_IMPERSONATING` | 400 | `stop_impersonating` from an ordinary session |
+| `ADMIN_IMPERSONATION_BLOCKED` | 403 | An `impersonation_blocked` endpoint called while impersonating |

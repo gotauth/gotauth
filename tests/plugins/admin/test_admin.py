@@ -223,6 +223,7 @@ async def test_list_users_searches_and_counts() -> None:
     w = world()
     ada = await w.admin("ada")
     for name in ("bob", "bea", "cy"):
+        w.clock.advance("1s")
         await w.user(name)
     await w.db.update("user", [Where("id", w.ids["cy"])], {"name": "Cy Bobson"})
     found = (await ada.get("/admin/users", params={"search": "Bob"})).json()
@@ -754,3 +755,93 @@ async def test_admin_flows_on_every_database(database: str, tmp_path: Any) -> No
             await engine.dispose()
         if databases is not None:
             await databases.aclose()
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def test_an_impersonation_cannot_mint_credentials_or_change_security() -> None:
+    w = world()
+    ada = await w.admin("ada")
+    await w.user("bob")
+    await ada.post(f"/admin/users/{w.ids['bob']}/impersonate")
+    key = await ada.post("/api-keys", json={"name": "backdoor"})
+    assert (key.status_code, _code(key)) == (403, "ADMIN_IMPERSONATION_BLOCKED")
+    password = await ada.post(
+        "/change-password",
+        json={"current_password": PASSWORD, "new_password": PASSWORD + "!"},
+    )
+    assert _code(password) == "ADMIN_IMPERSONATION_BLOCKED"
+    # Reading is fine.
+    assert (await ada.get("/api-keys")).status_code == 200
+
+
+async def test_the_blocked_list_can_be_changed() -> None:
+    w = world(admin={"impersonation_blocked": ()})
+    ada = await w.admin("ada")
+    await w.user("bob")
+    await ada.post(f"/admin/users/{w.ids['bob']}/impersonate")
+    assert (await ada.post("/api-keys", json={"name": "ok"})).status_code == 200
+
+
+async def test_signing_out_of_an_impersonation_ends_the_admin_session_too() -> None:
+    w = world()
+    ada = await w.admin("ada")
+    await w.user("bob")
+    await ada.post(f"/admin/users/{w.ids['bob']}/impersonate")
+    out = await ada.post("/sign-out")
+    assert out.status_code == 200, out.text
+    assert "gotauth.admin_session" not in ada.cookies
+    assert await w.db.find_many("session", [Where("user_id", w.ids["ada"])]) == []
+    await w.auth.drain()
+    assert "admin.impersonation_stopped" in w.types()
+
+
+async def test_the_admin_cookie_lasts_no_longer_than_the_impersonation() -> None:
+    w = world()
+    ada = await w.admin("ada")
+    await w.user("bob")
+    started = await ada.post(f"/admin/users/{w.ids['bob']}/impersonate")
+    header = next(
+        value
+        for value in started.headers.get_list("set-cookie")
+        if value.startswith("gotauth.admin_session=")
+    )
+    assert "Max-Age=3600" in header
+    assert "HttpOnly" in header
+
+
+async def test_a_revoked_impersonation_stays_refused_with_the_cookie_cache() -> None:
+    w = world(sessions={"cookie_cache": {"enabled": True}})
+    ada = await w.admin("ada")
+    cy = await w.admin("cy")
+    await w.user("bob")
+    await cy.post(f"/admin/users/{w.ids['bob']}/impersonate")
+    assert (await cy.get("/whoami")).status_code == 200
+    await ada.post(f"/admin/users/{w.ids['cy']}/role", json={"role": "user"})
+    # The row is gone; the cache cookie still names the session.
+    for _attempt in range(2):
+        assert (await cy.get("/whoami")).status_code == 401
+
+
+async def test_an_unknown_cached_session_cannot_call_admin_endpoints() -> None:
+    w = world(sessions={"cookie_cache": {"enabled": True}})
+    ada = await w.admin("ada")
+    await w.db.delete("session", [Where("user_id", w.ids["ada"])])
+    refused = await ada.get("/admin/users")
+    assert (refused.status_code, _code(refused)) == (403, "FORBIDDEN")
+
+
+async def test_an_expired_ban_is_not_written_on_requests() -> None:
+    w = world()
+    ada = await w.admin("ada")
+    await w.user("bob")
+    w.tokens.user_id = w.ids["bob"]
+    await ada.post(f"/admin/users/{w.ids['bob']}/ban", json={"expires_in": "1h"})
+    w.clock.advance("61m")
+    client = make_client(w.auth)
+    headers = {"authorization": "Bearer eyJ.token"}
+    assert (await client.get("/whoami", headers=headers)).status_code == 200
+    assert (await w.row("bob"))["banned"] is True
+    assert (await w.sign_in("bob")).status_code == 200
+    assert (await w.row("bob"))["banned"] is False

@@ -4,16 +4,23 @@ bans checked on every sign-in and request, and audited impersonation."""
 from __future__ import annotations
 
 import weakref
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Generic, Literal, TypeVar
 
 from gotauth.contracts.adapter import SortBy, Where
 from gotauth.contracts.config import DatabaseHooks, ModelHooks
 from gotauth.contracts.core_schema import User
-from gotauth.contracts.endpoints import Endpoint, EndpointContext, Plugin
+from gotauth.contracts.endpoints import (
+    Endpoint,
+    EndpointContext,
+    Hook,
+    HookPayload,
+    Plugin,
+)
 from gotauth.contracts.errors import AuthError, ConfigError, UniqueViolation
 from gotauth.contracts.http import SetCookie
 from gotauth.contracts.http_models import StatusOut
@@ -38,7 +45,7 @@ from ._models import (
     UserListOut,
 )
 
-__all__ = ["admin"]
+__all__ = ["IMPERSONATION_BLOCKED", "admin"]
 
 USER_FIELDS = ModelSchema(
     name="user",
@@ -78,11 +85,45 @@ ERROR_CODES: dict[str, tuple[int, str]] = {
     "ADMIN_CANNOT_TARGET_SELF": (400, "Admins cannot do this to their own account"),
     "ADMIN_CANNOT_IMPERSONATE_ADMIN": (403, "Admins cannot impersonate other admins"),
     "ADMIN_NOT_IMPERSONATING": (400, "This session is not an impersonation"),
+    "ADMIN_IMPERSONATION_BLOCKED": (403, "Not allowed while impersonating a user"),
 }
+
+IMPERSONATION_BLOCKED: tuple[str, ...] = (
+    # Credentials that would outlive the impersonation.
+    "create_api_key",
+    "update_api_key",
+    "create_agent",
+    "create_agent_api_key",
+    "update_agent",
+    "link_oauth_client",
+    "create_oauth_client",
+    "rotate_oauth_client_secret",
+    "oauth_authorize",
+    "oauth_consent",
+    # The account's own security settings.
+    "change_password",
+    "change_email",
+    "delete_user",
+    "enable_two_factor",
+    "disable_two_factor",
+    "regenerate_backup_codes",
+    "get_passkey_registration_options",
+    "verify_passkey_registration",
+    "delete_passkey",
+    "link_social",
+    "unlink_account",
+)
+"""Endpoint ids an impersonation session may not call by default."""
 
 CREDENTIAL_PROVIDER = "credential"
 BAN_CACHE_TTL = timedelta(seconds=5)
 _CACHE_LIMIT = 10_000
+
+Gone = Literal["gone"]
+"""An uncached session whose row no longer exists (served by the cookie cache)."""
+
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def _error(code: str) -> AuthError:
@@ -90,17 +131,43 @@ def _error(code: str) -> AuthError:
     return AuthError(code, status, message)
 
 
+class _Lru(Generic[K, V]):
+    """A small least-recently-used map."""
+
+    def __init__(self, limit: int = _CACHE_LIMIT) -> None:
+        self._items: OrderedDict[K, V] = OrderedDict()
+        self._limit = limit
+
+    def __contains__(self, key: K) -> bool:
+        return key in self._items
+
+    def get(self, key: K) -> V | None:
+        if key not in self._items:
+            return None
+        self._items.move_to_end(key)
+        return self._items[key]
+
+    def put(self, key: K, value: V) -> None:
+        self._items[key] = value
+        self._items.move_to_end(key)
+        if len(self._items) > self._limit:
+            self._items.popitem(last=False)
+
+    def pop(self, key: K) -> None:
+        self._items.pop(key, None)
+
+
 @dataclass
 class _State:
-    """Per-``GotAuth`` caches. Bans are cached for ``BAN_CACHE_TTL``; whether a session
-    is an impersonation never changes after it is created, so that is kept until the
-    cache is full."""
+    """Per-``GotAuth`` caches. Bans are cached for ``BAN_CACHE_TTL``. Whether a session
+    is an impersonation never changes, so that is kept, revoked sessions included: a
+    session the cookie cache still serves stays marked."""
 
-    bans: dict[str, tuple[bool, datetime | None, datetime]] = field(
-        default_factory=dict[str, tuple[bool, datetime | None, datetime]]
+    bans: _Lru[str, tuple[bool, datetime | None, datetime]] = field(
+        default_factory=_Lru[str, tuple[bool, datetime | None, datetime]]
     )
-    impersonations: dict[str, tuple[str, datetime] | None] = field(
-        default_factory=dict[str, tuple[str, datetime] | None]
+    impersonations: _Lru[str, tuple[str, datetime] | None] = field(
+        default_factory=_Lru[str, tuple[str, datetime] | None]
     )
 
 
@@ -133,11 +200,15 @@ def _session_out(row: Mapping[str, Any]) -> AdminSessionOut:
     )
 
 
-def _banned_now(row: Mapping[str, Any], now: datetime) -> bool:
-    if not row.get("banned"):
-        return False
-    expires_at = row.get("ban_expires_at")
-    return expires_at is None or now < expires_at
+def _banned_now(
+    banned: Any, expires_at: datetime | None, now: datetime
+) -> bool:  # Any: a stored flag, possibly NULL
+    """A ban counts until ``ban_expires_at``; an expired one is no ban."""
+    return bool(banned) and (expires_at is None or now < expires_at)
+
+
+def _row_banned(row: Mapping[str, Any], now: datetime) -> bool:
+    return _banned_now(row.get("banned"), row.get("ban_expires_at"), now)
 
 
 def admin(
@@ -146,6 +217,7 @@ def admin(
     admin_user_ids: tuple[str, ...] = (),
     impersonation_expires_in: Duration = "1h",
     allow_impersonating_admins: bool = False,
+    impersonation_blocked: tuple[str, ...] = IMPERSONATION_BLOCKED,
 ) -> Plugin:
     """Return the ``admin`` plugin: find, create, ban and remove users, set their roles
     and passwords, manage their sessions and impersonate them.
@@ -160,6 +232,9 @@ def admin(
         impersonation_expires_in: How long an impersonation session lasts. It never
             slides past this.
         allow_impersonating_admins: Let admins impersonate other admins.
+        impersonation_blocked: Endpoint ids an impersonation session may not call:
+            by default those that create credentials outliving it (API keys, agents,
+            OAuth grants) and the account's security settings.
 
     Returns:
         The plugin.
@@ -207,61 +282,53 @@ def admin(
                 "updated_at": ctx.clock.now(),
             },
         )
-        state(ctx).bans.pop(user_id, None)
+        state(ctx).bans.pop(user_id)
 
     async def check_ban(ctx: EndpointContext, row: Mapping[str, Any]) -> None:
         """Raise ADMIN_USER_BANNED for a banned row; clear a ban that has expired."""
-        if not row.get("banned"):
-            return
-        expires_at = row.get("ban_expires_at")
-        if expires_at is not None and ctx.clock.now() >= expires_at:
-            await clear_expired_ban(ctx, row["id"], expires_at)
-            return
-        raise _error("ADMIN_USER_BANNED")
+        now = ctx.clock.now()
+        if _row_banned(row, now):
+            raise _error("ADMIN_USER_BANNED")
+        if row.get("banned"):
+            await clear_expired_ban(ctx, row["id"], row["ban_expires_at"])
 
     async def check_ban_cached(ctx: EndpointContext, user_id: str) -> None:
+        """Raise ADMIN_USER_BANNED for a banned user. Reads only: an expired ban
+        counts as none here, and is cleared at the next sign-in."""
         bans = state(ctx).bans
         now = ctx.clock.now()
         entry = bans.get(user_id)
-        if entry is None or now - entry[2] >= BAN_CACHE_TTL or now < entry[2]:
+        if entry is None or not entry[2] <= now < entry[2] + BAN_CACHE_TTL:
             row = await ctx.adapter.find_one("user", [Where("id", user_id)])
             if row is None:
                 return  # the credential's own lookup fails for a deleted user
-            if len(bans) >= _CACHE_LIMIT:
-                bans.clear()
             entry = (bool(row.get("banned")), row.get("ban_expires_at"), now)
-            bans[user_id] = entry
-        banned, expires_at, _cached_at = entry
-        if not banned:
-            return
-        if expires_at is not None and now >= expires_at:
-            await clear_expired_ban(ctx, user_id, expires_at)
-            return
-        raise _error("ADMIN_USER_BANNED")
+            bans.put(user_id, entry)
+        if _banned_now(entry[0], entry[1], now):
+            raise _error("ADMIN_USER_BANNED")
 
     # ------------------------------------------------------------ impersonation
 
     async def impersonation(
         ctx: EndpointContext, session_id: str
-    ) -> tuple[str, datetime] | None:
-        """``(admin id, created_at)`` of an impersonation session, else None."""
+    ) -> tuple[str, datetime] | Gone | None:
+        """``(admin id, created_at)`` of an impersonation session, None for another
+        session, ``"gone"`` for an unknown session whose row no longer exists."""
         cache = state(ctx).impersonations
         if session_id in cache:
-            return cache[session_id]
+            return cache.get(session_id)
         row = await ctx.adapter.find_one("session", [Where("id", session_id)])
         if row is None:
-            return None
+            return "gone"
         admin_id = row.get("impersonated_by")
         info = (admin_id, row["created_at"]) if admin_id else None
-        if len(cache) >= _CACHE_LIMIT:
-            cache.clear()
-        cache[session_id] = info
+        cache.put(session_id, info)
         return info
 
     async def still_admin(ctx: EndpointContext, admin_id: str) -> bool:
         row = await ctx.adapter.find_one("user", [Where("id", admin_id)])
         return (
-            row is not None and is_admin(row) and not _banned_now(row, ctx.clock.now())
+            row is not None and is_admin(row) and not _row_banned(row, ctx.clock.now())
         )
 
     async def end_impersonations_by(ctx: EndpointContext, admin_id: str) -> None:
@@ -270,28 +337,19 @@ def admin(
         )
         for row in rows:
             await ctx.sessions.revoke(ctx, row["id"])
-            state(ctx).impersonations.pop(row["id"], None)
 
-    def admin_cookie(ctx: EndpointContext) -> str:
-        config = ctx.auth.config
-        return cookie_name(
-            "admin_session",
-            base_url=config.base_url,
-            prefix=config.advanced.cookie_prefix,
-        )
-
-    def session_cookie(ctx: EndpointContext, base: str = "session_token") -> str:
+    def cookie_named(ctx: EndpointContext, base: str) -> str:
         config = ctx.auth.config
         return cookie_name(
             base, base_url=config.base_url, prefix=config.advanced.cookie_prefix
         )
 
     def cookie(
-        ctx: EndpointContext, name: str, value: str, max_age: int | None
+        ctx: EndpointContext, base: str, value: str, max_age: int | None
     ) -> None:
         ctx.set_cookie(
             SetCookie(
-                name=name,
+                name=cookie_named(ctx, base),
                 value=value,
                 max_age=max_age,
                 secure=secure_cookies(ctx.auth.config.base_url),
@@ -304,17 +362,41 @@ def admin(
         left = row["expires_at"] - ctx.clock.now()
         return max(0, int(left / timedelta(seconds=1)))
 
+    async def admin_session(
+        ctx: EndpointContext, admin_id: str | None = None
+    ) -> tuple[str, dict[str, Any]] | None:
+        """The live session the admin cookie holds: (token, row). With ``admin_id``,
+        only a session of that admin who is still an admin counts."""
+        raw = ctx.request.cookies.get(cookie_named(ctx, "admin_session"))
+        token = ctx.crypto.unsign(raw, purpose="admin_session") if raw else None
+        if token is None:
+            return None
+        token_hash = ctx.crypto.hash_token(token)
+        row = await ctx.adapter.find_one("session", [Where("token_hash", token_hash)])
+        if (
+            row is None
+            or not ctx.crypto.equal(row["token_hash"], token_hash)
+            or row.get("impersonated_by")
+            or ctx.clock.now() >= row["expires_at"]
+        ):
+            return None
+        if admin_id is not None and (
+            row["user_id"] != admin_id or not await still_admin(ctx, admin_id)
+        ):
+            return None
+        return token, row
+
     # ------------------------------------------------------------ checks
 
     async def principal_check(ctx: EndpointContext, principal: Principal) -> None:
         if principal.via == "session":
             info = await impersonation(ctx, principal.credential_id)
-            if info is not None:
+            if isinstance(info, tuple):
                 admin_id, created_at = info
                 over = ctx.clock.now() >= created_at + impersonation_ttl
                 if over or not await still_admin(ctx, admin_id):
+                    # Like an expired session: deleted when it is next presented.
                     await ctx.sessions.revoke(ctx, principal.credential_id)
-                    state(ctx).impersonations.pop(principal.credential_id, None)
                     raise AuthError("UNAUTHENTICATED", 401)
         if principal.user_id is not None:
             await check_ban_cached(ctx, principal.user_id)
@@ -335,11 +417,46 @@ def admin(
         if ctx is not None:
             await end_impersonations_by(ctx, row["id"])
 
+    async def block_while_impersonating(
+        ctx: EndpointContext, payload: HookPayload
+    ) -> None:
+        del payload
+        principal = ctx.principal
+        if principal is None or principal.via != "session":
+            return
+        info = await impersonation(ctx, principal.credential_id)
+        if info == "gone":
+            raise AuthError("UNAUTHENTICATED", 401)
+        if info is not None:
+            raise _error("ADMIN_IMPERSONATION_BLOCKED")
+
+    async def before_sign_out(ctx: EndpointContext, payload: HookPayload) -> None:
+        """Signing out of an impersonation signs the browser out completely: the
+        session of the admin in the admin cookie ends too."""
+        del payload
+        if cookie_named(ctx, "admin_session") not in ctx.request.cookies:
+            return
+        own = await admin_session(ctx)
+        if own is not None:
+            await ctx.sessions.revoke(ctx, own[1]["id"])
+        cookie(ctx, "admin_session", "", 0)
+        principal = ctx.principal
+        if principal is not None and principal.via == "session":
+            info = await impersonation(ctx, principal.credential_id)
+            if isinstance(info, tuple):
+                await ctx.emit(
+                    "admin.impersonation_stopped",
+                    admin_id=info[0],
+                    target_id=principal.user_id,
+                    session_id=principal.credential_id,
+                )
+
     async def require_admin(ctx: EndpointContext) -> str:
         """The calling admin's id; FORBIDDEN for anyone else."""
         principal = ctx.principal
         if principal is None or principal.via != "session" or principal.user_id is None:
             raise AuthError("FORBIDDEN", 403)
+        # Impersonations, and sessions only the cookie cache still knows, are refused.
         if await impersonation(ctx, principal.credential_id) is not None:
             raise AuthError("FORBIDDEN", 403)
         row = await ctx.adapter.find_one("user", [Where("id", principal.user_id)])
@@ -405,14 +522,13 @@ def admin(
                 Where("name", term, op="contains", connector="or"),
             ]
         total = await ctx.adapter.count("user", where)
-        # Ids sort by creation time and are unique, so pages never overlap.
-        sort_field = "id" if body.sort_by == "created_at" else "email"
+        # Ties break by id (CCR 013), so pages never overlap.
         rows = await ctx.adapter.find_many(
             "user",
             where,
             limit=body.limit,
             offset=body.offset,
-            sort_by=SortBy(sort_field, body.sort_direction),
+            sort_by=SortBy(body.sort_by, body.sort_direction),
         )
         return UserListOut(users=[_user_out(row) for row in rows], total=total)
 
@@ -422,12 +538,12 @@ def admin(
 
     async def create_user(ctx: EndpointContext, body: CreateUserIn) -> AdminUserOut:
         await require_admin(ctx)
+        if await ctx.adapter.find_one("user", [Where("email", body.email)]):
+            raise AuthError("USER_ALREADY_EXISTS", 409)
         password_hash: str | None = None
         if body.password is not None:
             await check_password(ctx, body.password, body.email)
             password_hash = await ctx.crypto.hash_password(body.password)
-        if await ctx.adapter.find_one("user", [Where("email", body.email)]):
-            raise AuthError("USER_ALREADY_EXISTS", 409)
         try:
             user = await ctx.auth.create_user_record(
                 ctx,
@@ -443,10 +559,7 @@ def admin(
             raise AuthError("USER_ALREADY_EXISTS", 409) from exc
         if password_hash is not None:
             await set_password(ctx, user.id, password_hash)
-        row = await ctx.adapter.find_one("user", [Where("id", user.id)])
-        if row is None:  # created in this transaction
-            raise AuthError("INTERNAL_ERROR", 500)
-        return _user_out(row)
+        return _user_out({**user.model_dump(), "role": body.role, "banned": False})
 
     async def remove_user(ctx: EndpointContext, _: None) -> StatusOut:
         admin_id = await require_admin(ctx)
@@ -456,7 +569,7 @@ def admin(
         # The only way to delete a user: config and plugin user hooks run, and
         # user.deleted is emitted (CONTRACTS 13).
         await ctx.auth.delete_user(ctx, user_id)
-        state(ctx).bans.pop(user_id, None)
+        state(ctx).bans.pop(user_id)
         return StatusOut(status="ok")
 
     async def set_user_role(ctx: EndpointContext, body: SetUserRoleIn) -> AdminUserOut:
@@ -524,7 +637,7 @@ def admin(
         )
         if updated is None:
             raise AuthError("NOT_FOUND", 404)
-        state(ctx).bans.pop(row["id"], None)
+        state(ctx).bans.pop(row["id"])
         await ctx.sessions.revoke_all(ctx, row["id"])
         await end_impersonations_by(ctx, row["id"])
         await ctx.emit(
@@ -552,7 +665,7 @@ def admin(
         )
         if updated is None:
             raise AuthError("NOT_FOUND", 404)
-        state(ctx).bans.pop(row["id"], None)
+        state(ctx).bans.pop(row["id"])
         await ctx.emit("user.unbanned", user_id=row["id"])
         return _user_out(updated)
 
@@ -594,7 +707,7 @@ def admin(
         row = await target(ctx)
         if is_admin(row) and not allow_impersonating_admins:
             raise _error("ADMIN_CANNOT_IMPERSONATE_ADMIN")
-        if _banned_now(row, ctx.clock.now()):
+        if _row_banned(row, ctx.clock.now()):
             raise _error("ADMIN_USER_BANNED")
         # The admin's own session, kept in a signed cookie when the browser sent it.
         principal = ctx.principal
@@ -605,7 +718,7 @@ def admin(
             if principal is not None
             else None
         )
-        token = ctx.request.cookies.get(session_cookie(ctx))
+        token = ctx.request.cookies.get(cookie_named(ctx, "session_token"))
         from_cookie = (
             own is not None
             and token is not None
@@ -619,11 +732,15 @@ def admin(
             extra={"impersonated_by": admin_id},
         )
         if from_cookie and own is not None and token is not None:
+            # Gone when the impersonation is: an admin who never stops it does not
+            # leave a live session token in the browser for days.
+            left = remaining(ctx, own)
+            ttl = int(impersonation_ttl / timedelta(seconds=1))
             cookie(
                 ctx,
-                admin_cookie(ctx),
+                "admin_session",
                 ctx.crypto.sign(token, purpose="admin_session"),
-                remaining(ctx, own),
+                ttl if left is None else min(left, ttl),
             )
         await ctx.emit(
             "admin.impersonation_started",
@@ -648,41 +765,27 @@ def admin(
         if principal is None or principal.via != "session":
             raise AuthError("UNAUTHENTICATED", 401)
         info = await impersonation(ctx, principal.credential_id)
+        if info == "gone":
+            raise AuthError("UNAUTHENTICATED", 401)
         if info is None:
             raise _error("ADMIN_NOT_IMPERSONATING")
         admin_id = info[0]
         await ctx.sessions.revoke(ctx, principal.credential_id)
-        state(ctx).impersonations.pop(principal.credential_id, None)
-        restored = False
-        raw = ctx.request.cookies.get(admin_cookie(ctx))
-        token = ctx.crypto.unsign(raw, purpose="admin_session") if raw else None
-        if token is not None:
-            token_hash = ctx.crypto.hash_token(token)
-            own = await ctx.adapter.find_one(
-                "session", [Where("token_hash", token_hash)]
-            )
-            if (
-                own is not None
-                and ctx.crypto.equal(own["token_hash"], token_hash)
-                and own["user_id"] == admin_id
-                and not own.get("impersonated_by")
-                and ctx.clock.now() < own["expires_at"]
-                and await still_admin(ctx, admin_id)
-            ):
-                cookie(ctx, session_cookie(ctx), token, remaining(ctx, own))
-                # The cookie cache was bound to the impersonation token.
-                cookie(ctx, session_cookie(ctx, "session_data"), "", 0)
-                restored = True
-        if not restored:
+        own = await admin_session(ctx, admin_id)
+        if own is not None:
+            cookie(ctx, "session_token", own[0], remaining(ctx, own[1]))
+            # The cookie cache was bound to the impersonation token.
+            cookie(ctx, "session_data", "", 0)
+        else:
             ctx.sessions.clear_cookies(ctx)
-        cookie(ctx, admin_cookie(ctx), "", 0)
+        cookie(ctx, "admin_session", "", 0)
         await ctx.emit(
             "admin.impersonation_stopped",
             admin_id=admin_id,
             target_id=principal.user_id,
             session_id=principal.credential_id,
         )
-        return StopImpersonatingOut(restored=restored)
+        return StopImpersonatingOut(restored=own is not None)
 
     # ------------------------------------------------------------ endpoints
 
@@ -812,6 +915,10 @@ def admin(
         endpoints=endpoints,
         database_hooks=DatabaseHooks(
             hooks={"user": ModelHooks(before_delete=before_user_delete)}
+        ),
+        hooks=(
+            Hook("before", tuple(impersonation_blocked), block_while_impersonating),
+            Hook("before", ("sign_out",), before_sign_out),
         ),
         sign_in_interceptors=(sign_in_interceptor,),
         principal_checks=(principal_check,),

@@ -8,6 +8,6 @@ audited impersonation::
 
 from __future__ import annotations
 
-from gotauth.plugins.admin._plugin import admin
+from gotauth.plugins.admin._plugin import IMPERSONATION_BLOCKED, admin
 
-__all__ = ["admin"]
+__all__ = ["IMPERSONATION_BLOCKED", "admin"]
