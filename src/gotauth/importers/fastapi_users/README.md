@@ -52,6 +52,9 @@ Built against fastapi-users 15.0.5 and fastapi-users-db-sqlalchemy 7.0.0 (pwdlib
 | `--dry-run` | off | Count and check; write nothing |
 | `--report PATH` | | Write the JSON report |
 
+A source URL with a password ends up in your shell history; pass it from an
+environment variable instead: `--source-url "$OLD_DATABASE_URL"`.
+
 From Python: `await import_fastapi_users(auth, dry_run=True)` returns the same
 report. Exit codes: 0 done (problems are reported, not fatal), 1 a batch failed
 (earlier batches are committed; run again) or the report could not be written, 2
@@ -77,6 +80,11 @@ GotAuth adapter without database hooks or events.
 
 On the first sign-in, GotAuth checks the old hash and stores a new one with its own
 algorithm (scrypt by default).
+
+**Unverified users** (`is_verified=False`) stay unverified. With
+`email_password={"require_email_verification": True}` they must verify their email
+before they can sign in with a password, as a new user would. Many fastapi-users apps
+never verified emails: check the report's counts before turning verification on.
 
 **Users created by fastapi-users OAuth sign-in** have a hash of a random password
 nobody knows. They are imported as they are and counted in the report ("OAuth users
