@@ -16,7 +16,7 @@ from hypothesis import strategies as st
 from gotauth.contracts.adapter import Where
 from gotauth.contracts.config import DatabaseHooks, ModelHooks
 from gotauth.contracts.endpoints import Endpoint, EndpointContext, Plugin
-from gotauth.contracts.errors import ConfigError
+from gotauth.contracts.errors import AuthError, ConfigError
 from gotauth.contracts.http_models import StatusOut
 from gotauth.contracts.principal import Principal
 from gotauth.plugins.admin import admin
@@ -845,3 +845,51 @@ async def test_an_expired_ban_is_not_written_on_requests() -> None:
     assert (await w.row("bob"))["banned"] is True
     assert (await w.sign_in("bob")).status_code == 200
     assert (await w.row("bob"))["banned"] is False
+
+
+def test_every_blocked_endpoint_id_exists() -> None:
+    from gotauth.email_password import email_password_plugin
+    from gotauth.plugins.admin import IMPERSONATION_BLOCKED
+    from gotauth.plugins.agent import agent
+    from gotauth.plugins.oauth_provider import oauth_provider
+    from gotauth.plugins.passkey import passkey
+    from gotauth.plugins.two_factor import two_factor
+    from gotauth.social import social_plugin
+
+    plugins = (
+        email_password_plugin(),
+        social_plugin(),
+        api_key(),
+        agent(),
+        oauth_provider(),
+        two_factor(),
+        passkey(),
+    )
+    ids = {endpoint.id for plugin in plugins for endpoint in plugin.endpoints}
+    assert set(IMPERSONATION_BLOCKED) <= ids, set(IMPERSONATION_BLOCKED) - ids
+
+
+async def test_get_principal_runs_the_ban_and_impersonation_checks() -> None:
+    w = world()
+    ada = await w.admin("ada")
+    bob = await w.user("bob")
+    key = (await bob.post("/api-keys", json={"name": "cli"})).json()["key"]
+    await ada.post(f"/admin/users/{w.ids['bob']}/ban", json={})
+    with pytest.raises(AuthError) as banned:
+        await w.auth.get_principal({"x-api-key": key}, {})
+    assert banned.value.code == "ADMIN_USER_BANNED"
+    await ada.post(f"/admin/users/{w.ids['bob']}/unban")
+    started = await ada.post(f"/admin/users/{w.ids['bob']}/impersonate")
+    assert started.status_code == 200
+    cookies = dict(ada.cookies.items())
+    principal = await w.auth.get_principal({}, cookies)
+    assert principal is not None and principal.user_id == w.ids["bob"]
+    w.clock.advance("61m")
+    assert await w.auth.get_principal({}, cookies) is None
+
+
+async def test_a_huge_offset_is_refused() -> None:
+    w = world()
+    ada = await w.admin("ada")
+    response = await ada.get("/admin/users", params={"offset": 10**20})
+    assert response.status_code == 400

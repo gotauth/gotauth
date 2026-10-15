@@ -28,6 +28,7 @@ from gotauth.contracts.primitives import Duration, to_timedelta
 from gotauth.contracts.principal import Principal
 from gotauth.contracts.schema import Field, ModelSchema, Reference
 from gotauth.contracts.sessions import cookie_name, secure_cookies
+from gotauth.email_password import CREDENTIAL_PROVIDER
 
 from ._models import (
     AdminSessionListOut,
@@ -115,7 +116,6 @@ IMPERSONATION_BLOCKED: tuple[str, ...] = (
 )
 """Endpoint ids an impersonation session may not call by default."""
 
-CREDENTIAL_PROVIDER = "credential"
 BAN_CACHE_TTL = timedelta(seconds=5)
 _CACHE_LIMIT = 10_000
 

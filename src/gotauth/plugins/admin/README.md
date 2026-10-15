@@ -70,7 +70,8 @@ A banned user:
   `ADMIN_USER_BANNED`.
 - **loses every session** when the ban is set.
 - **can't use API keys or OAuth tokens:** a principal check rejects any credential
-  whose user is banned with `ADMIN_USER_BANNED`. The flag is cached per user for up
+  whose user is banned with `ADMIN_USER_BANNED`. Keys and agents owned by an
+  organization have no user and are not affected. The flag is cached per user for up
   to 5 seconds in each process; a ban or unban through this process takes effect at
   once.
 
