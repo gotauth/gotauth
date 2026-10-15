@@ -428,6 +428,23 @@ def adapter_conformance(factory: AdapterFactory) -> type:
             assert [row["id"] for row in up] == ["o2", "o3", "o1"]
             assert [row["id"] for row in down] == ["o1", "o3", "o2"]
 
+        async def test_sort_ties_break_by_id(self, adapter: Adapter) -> None:
+            # CONTRACTS 3 (CCR 013): a total order, so paging is stable.
+            for row_id, name in (("o3", "cy"), ("o1", "ada"), ("o4", "dee")):
+                await adapter.create("owner", _owner(row_id, name, age=30))
+            await adapter.create("owner", _owner("o2", "bob"))
+            up = await adapter.find_many("owner", sort_by=SortBy("age"))
+            down = await adapter.find_many("owner", sort_by=SortBy("age", "desc"))
+            assert [row["id"] for row in up] == ["o2", "o1", "o3", "o4"]
+            assert [row["id"] for row in down] == ["o4", "o3", "o1", "o2"]
+            pages = [
+                await adapter.find_many(
+                    "owner", sort_by=SortBy("age"), limit=1, offset=offset
+                )
+                for offset in range(4)
+            ]
+            assert [page[0]["id"] for page in pages] == ["o2", "o1", "o3", "o4"]
+
         async def test_unique_violation_keeps_the_transaction_usable(
             self, adapter: Adapter
         ) -> None:

@@ -558,11 +558,11 @@ def _sorted(
         msg = f"invalid sort direction {sort_by.direction!r}"
         raise ValueError(msg)
 
-    def key(row: Row) -> tuple[bool, Any]:
+    def key(row: Row) -> tuple[bool, Any, str]:
         value = row.get(name)
-        return (value is not None, value if value is not None else 0)
+        return (value is not None, value if value is not None else 0, row["id"])
 
-    # NULLs sort first ascending and last descending.
+    # NULLs sort first ascending and last descending; ties break by id (CCR 013).
     return sorted(rows, key=key, reverse=sort_by.direction == "desc")
 
 

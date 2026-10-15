@@ -21,6 +21,7 @@ CRYPTO_PURPOSES: Mapping[str, str] = MappingProxyType(
         "passkey_challenge": "P3",
         "jwk_private": "O1",
         "oauth_consent": "O1",
+        "admin_session": "P6",
     }
 )
 """Purpose strings in use -> owning work package (section 8). ``account_token`` is also

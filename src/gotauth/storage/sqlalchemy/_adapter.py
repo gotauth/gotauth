@@ -228,12 +228,12 @@ class SqlAlchemyAdapter:
         )
         if sort_by is not None:
             column = table.c[sort_by.field]
-            # NULLs first ascending and last descending, on every backend.
-            query = query.order_by(
-                column.desc().nulls_last()
-                if sort_by.direction == "desc"
-                else column.asc().nulls_first()
-            )
+            # NULLs first ascending and last descending, on every backend; ties
+            # break by id in the same direction (CCR 013).
+            if sort_by.direction == "desc":
+                query = query.order_by(column.desc().nulls_last(), table.c.id.desc())
+            else:
+                query = query.order_by(column.asc().nulls_first(), table.c.id.asc())
         if limit is not None:
             query = query.limit(limit)
         if offset:

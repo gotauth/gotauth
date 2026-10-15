@@ -14,6 +14,7 @@ Rules every adapter follows (``gotauth.testing.adapter_conformance`` checks them
 - Unique violations raise ``UniqueViolation``; broken references raise
   ``ReferenceViolation``.
 - ``Field.default`` fills missing fields on create.
+- ``sort_by`` ties break by ``id`` in the same direction (CCR 013).
 
 ``Where`` semantics: clauses are grouped by ``connector`` with ``and`` binding
 tighter than ``or``; ``eq None`` is IS NULL and ``ne None`` is IS NOT NULL; ``ne``
