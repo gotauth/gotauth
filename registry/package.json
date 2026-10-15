@@ -10,12 +10,13 @@
     "node": ">=24"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm run openapi && tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "build": "shadcn build",
     "build:npm": "node scripts/build-npm.mjs",
     "fixtures": "node scripts/install-fixtures.mjs && tsc --noEmit -p fixtures/next-app && tsc --noEmit -p fixtures/vite-react && next build fixtures/next-app && vite build fixtures/vite-react",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:npm && pnpm run fixtures"
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:npm && pnpm run fixtures",
+    "openapi": "node scripts/openapi-types.mjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -44,6 +45,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.52.0",
     "radix-ui": "^1.7.0",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "uqr": "0.1.3"
   }
 }

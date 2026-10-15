@@ -42,6 +42,41 @@ const CASES: [string, (c: ReturnType<typeof createGotAuthClient>) => Promise<unk
   ["listApiKeys", (c) => c.apiKeys.listApiKeys({ organization_id: "org_1" }), "GET", "/api-keys?organization_id=org_1"],
   ["updateApiKey", (c) => c.apiKeys.updateApiKey("key_1", { name: "x" }), "PATCH", "/api-keys/key_1"],
   ["deleteApiKey", (c) => c.apiKeys.deleteApiKey("key_1"), "DELETE", "/api-keys/key_1"],
+  ["enableTwoFactor", (c) => c.twoFactor.enableTwoFactor({ password: "p" }), "POST", "/two-factor/enable"],
+  ["verifyTotp", (c) => c.twoFactor.verifyTotp({ code: "123456" }), "POST", "/two-factor/verify-totp"],
+  ["verifyBackupCode", (c) => c.twoFactor.verifyBackupCode({ code: "abcd-efgh" }), "POST", "/two-factor/verify-backup-code"],
+  ["sendTwoFactorOtp", (c) => c.twoFactor.sendTwoFactorOtp(), "POST", "/two-factor/send-otp"],
+  ["verifyTwoFactorOtp", (c) => c.twoFactor.verifyTwoFactorOtp({ code: "123456" }), "POST", "/two-factor/verify-otp"],
+  ["disableTwoFactor", (c) => c.twoFactor.disableTwoFactor({ password: "p" }), "POST", "/two-factor/disable"],
+  ["regenerateBackupCodes", (c) => c.twoFactor.regenerateBackupCodes(), "POST", "/two-factor/regenerate-backup-codes"],
+  ["getPasskeyRegistrationOptions", (c) => c.passkey.getPasskeyRegistrationOptions(), "POST", "/passkey/register/options"],
+  ["verifyPasskeyRegistration", (c) => c.passkey.verifyPasskeyRegistration({ response: {} }), "POST", "/passkey/register/verify"],
+  ["getPasskeySignInOptions", (c) => c.passkey.getPasskeySignInOptions(), "POST", "/passkey/sign-in/options"],
+  ["signInPasskey", (c) => c.passkey.signInPasskey({ response: {} }), "POST", "/passkey/sign-in/verify"],
+  ["listPasskeys", (c) => c.passkey.listPasskeys(), "GET", "/passkeys"],
+  ["renamePasskey", (c) => c.passkey.renamePasskey("pk_1", { name: "Laptop" }), "PATCH", "/passkeys/pk_1"],
+  ["deletePasskey", (c) => c.passkey.deletePasskey("pk_1"), "DELETE", "/passkeys/pk_1"],
+  ["sendMagicLink", (c) => c.magicLink.sendMagicLink({ email: "a@b.test" }), "POST", "/magic-link/send"],
+  ["sendEmailOtp", (c) => c.emailOtp.sendEmailOtp({ email: "a@b.test", type: "sign_in" }), "POST", "/email-otp/send"],
+  ["verifyEmailOtp", (c) => c.emailOtp.verifyEmailOtp({ email: "a@b.test", otp: "123456", type: "sign_in" }), "POST", "/email-otp/verify"],
+  ["createOrganization", (c) => c.organization.createOrganization({ name: "Acme", slug: "acme" }), "POST", "/organization/create"],
+  ["listOrganizations", (c) => c.organization.listOrganizations(), "GET", "/organization/list"],
+  ["getOrganization", (c) => c.organization.getOrganization({ organization_id: "org_1" }), "GET", "/organization/get?organization_id=org_1"],
+  ["updateOrganization", (c) => c.organization.updateOrganization({ name: "Acme 2" }), "POST", "/organization/update"],
+  ["deleteOrganization", (c) => c.organization.deleteOrganization({ organization_id: "org_1" }), "POST", "/organization/delete"],
+  ["setActiveOrganization", (c) => c.organization.setActiveOrganization({ organization_id: null }), "POST", "/organization/set-active"],
+  ["inviteMember", (c) => c.organization.inviteMember({ email: "b@b.test" }), "POST", "/organization/invite-member"],
+  ["acceptInvitation", (c) => c.organization.acceptInvitation({ invitation_id: "inv_1", token: "gav_x" }), "POST", "/organization/accept-invitation"],
+  ["rejectInvitation", (c) => c.organization.rejectInvitation({ invitation_id: "inv_1", token: "gav_x" }), "POST", "/organization/reject-invitation"],
+  ["cancelInvitation", (c) => c.organization.cancelInvitation({ invitation_id: "inv_1" }), "POST", "/organization/cancel-invitation"],
+  ["listInvitations", (c) => c.organization.listInvitations(), "GET", "/organization/list-invitations"],
+  ["removeMember", (c) => c.organization.removeMember({ user_id: "usr_2" }), "POST", "/organization/remove-member"],
+  ["updateMemberRole", (c) => c.organization.updateMemberRole({ user_id: "usr_2", role: "admin" }), "POST", "/organization/update-member-role"],
+  ["leaveOrganization", (c) => c.organization.leaveOrganization(), "POST", "/organization/leave"],
+  ["hasPermission", (c) => c.organization.hasPermission({ permissions: { project: ["read"] } }), "POST", "/organization/has-permission"],
+  ["getOauthConsent", (c) => c.oauth2.getOauthConsent({ consent_id: "c1" }), "GET", "/oauth2/consent?consent_id=c1"],
+  ["listOauthGrants", (c) => c.oauth2.listOauthGrants(), "GET", "/oauth2/grants"],
+  ["revokeOauthGrant", (c) => c.oauth2.revokeOauthGrant({ client_id: "cli_1" }), "POST", "/oauth2/grants/revoke"],
 ]
 
 describe("createGotAuthClient", () => {
@@ -125,6 +160,11 @@ describe("createGotAuthClient", () => {
     await client.getSession()
     expect(local).not.toHaveBeenCalled()
     local.mockRestore()
+  })
+
+  it("names the consent form target", () => {
+    const { client } = recorder()
+    expect(client.oauth2.consentURL).toBe("https://api.test/api/auth/oauth2/consent")
   })
 
   it("tells challenges apart from sign-ins", () => {

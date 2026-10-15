@@ -77,15 +77,34 @@ describe("SignInForm", () => {
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
-  it("explains a challenge without onChallenge", async () => {
+  it("shows the two-factor step itself without onChallenge", async () => {
+    server.use(
+      http.post(`${BASE}/sign-in/email`, () =>
+        HttpResponse.json({ challenge: { type: "two_factor", methods: ["totp"] } }),
+      ),
+      http.post(`${BASE}/two-factor/verify-totp`, () =>
+        HttpResponse.json({ user: USER, session: SESSION }),
+      ),
+      http.get(`${BASE}/session`, () => HttpResponse.json({ user: USER, session: SESSION })),
+    )
+    const onSuccess = vi.fn()
+    renderWith(<SignInForm onSuccess={onSuccess} />)
+    const user = await fillSignIn()
+    await user.type(await screen.findByLabelText(/authenticator app/), "123456")
+    await user.click(screen.getByRole("button", { name: "Continue" }))
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
+  })
+
+  it("goes back from the two-factor step to the form", async () => {
     server.use(
       http.post(`${BASE}/sign-in/email`, () =>
         HttpResponse.json({ challenge: { type: "two_factor", methods: ["totp"] } }),
       ),
     )
     renderWith(<SignInForm />)
-    await fillSignIn()
-    expect(await screen.findByText(/second factor/)).toBeTruthy()
+    const user = await fillSignIn()
+    await user.click(await screen.findByRole("button", { name: "Sign in again" }))
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy()
   })
 })
 

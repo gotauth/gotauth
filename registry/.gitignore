@@ -3,3 +3,4 @@ public/r/
 # Built by `pnpm build:npm` (the npm package "@gotauth/client"; LICENSE is copied from the root).
 npm/dist/
 npm/LICENSE
+tests/generated/

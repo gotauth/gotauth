@@ -1,0 +1,7188 @@
+{
+  "components": {
+    "schemas": {
+      "AcceptInvitationIn": {
+        "additionalProperties": false,
+        "description": "``accept_invitation`` and ``reject_invitation`` input, from the email link.",
+        "properties": {
+          "invitation_id": {
+            "title": "Invitation Id",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invitation_id",
+          "token"
+        ],
+        "title": "AcceptInvitationIn",
+        "type": "object"
+      },
+      "AccountListOut": {
+        "description": "``list_accounts`` output.",
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountOut"
+            },
+            "title": "Accounts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "title": "AccountListOut",
+        "type": "object"
+      },
+      "AccountOut": {
+        "description": "A linked account in ``list_accounts`` output.",
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "required": [
+          "id",
+          "provider_id",
+          "account_id",
+          "scope",
+          "created_at"
+        ],
+        "title": "AccountOut",
+        "type": "object"
+      },
+      "AdminSessionListOut": {
+        "description": "A user's sessions, newest first.",
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/AdminSessionOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions"
+        ],
+        "title": "AdminSessionListOut",
+        "type": "object"
+      },
+      "AdminSessionOut": {
+        "description": "A session as admins see it. ``impersonated_by`` names the admin, if any.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "impersonated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impersonated By"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "expires_at",
+          "created_at",
+          "updated_at",
+          "ip_address",
+          "user_agent",
+          "impersonated_by"
+        ],
+        "title": "AdminSessionOut",
+        "type": "object"
+      },
+      "AdminUserOut": {
+        "description": "A user as admins see it, ban fields included.",
+        "properties": {
+          "ban_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ban Expires At"
+          },
+          "ban_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ban Reason"
+          },
+          "banned": {
+            "title": "Banned",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "email_verified",
+          "name",
+          "image",
+          "role",
+          "banned",
+          "ban_reason",
+          "ban_expires_at",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AdminUserOut",
+        "type": "object"
+      },
+      "AgentApiKeyListOut": {
+        "description": "``list_agent_api_keys`` output.",
+        "properties": {
+          "api_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyOut"
+            },
+            "title": "Api Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "api_keys"
+        ],
+        "title": "AgentApiKeyListOut",
+        "type": "object"
+      },
+      "AgentListOut": {
+        "description": "``list_agents`` output.",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentOut"
+            },
+            "title": "Agents",
+            "type": "array"
+          }
+        },
+        "required": [
+          "agents"
+        ],
+        "title": "AgentListOut",
+        "type": "object"
+      },
+      "AgentOut": {
+        "description": "An agent (the 12.2 ``agent`` model).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "disabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "owner_type": {
+            "enum": [
+              "user",
+              "organization"
+            ],
+            "title": "Owner Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "owner_type",
+          "owner_id",
+          "created_by",
+          "disabled_at",
+          "created_at",
+          "metadata"
+        ],
+        "title": "AgentOut",
+        "type": "object"
+      },
+      "ApiKeyListOut": {
+        "description": "``list_api_keys`` output.",
+        "properties": {
+          "api_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyOut"
+            },
+            "title": "Api Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "api_keys"
+        ],
+        "title": "ApiKeyListOut",
+        "type": "object"
+      },
+      "ApiKeyOut": {
+        "additionalProperties": true,
+        "description": "An API key without its hash (P1 model, ``returned=True`` fields).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "owner_type": {
+            "enum": [
+              "user",
+              "organization",
+              "agent"
+            ],
+            "title": "Owner Type",
+            "type": "string"
+          },
+          "rate_limit_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit Max"
+          },
+          "rate_limit_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit Window"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "start",
+          "owner_type",
+          "owner_id",
+          "user_id",
+          "scopes",
+          "expires_at",
+          "last_used_at",
+          "rate_limit_max",
+          "rate_limit_window",
+          "enabled",
+          "created_by",
+          "created_at",
+          "metadata"
+        ],
+        "title": "ApiKeyOut",
+        "type": "object"
+      },
+      "BackupCodesOut": {
+        "description": "``regenerate_backup_codes`` output, shown once.",
+        "properties": {
+          "backup_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backup Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "backup_codes"
+        ],
+        "title": "BackupCodesOut",
+        "type": "object"
+      },
+      "BanUserIn": {
+        "additionalProperties": false,
+        "description": "``ban_user`` input. Without ``expires_in`` the ban lasts until an unban.",
+        "properties": {
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "BanUserIn",
+        "type": "object"
+      },
+      "CallbackIn": {
+        "description": "Callback parameters; providers may add others, which are ignored.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          }
+        },
+        "title": "CallbackIn",
+        "type": "object"
+      },
+      "ChangeEmailIn": {
+        "additionalProperties": false,
+        "description": "``change_email`` input.",
+        "properties": {
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "new_email": {
+            "title": "New Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_email"
+        ],
+        "title": "ChangeEmailIn",
+        "type": "object"
+      },
+      "ChangePasswordIn": {
+        "additionalProperties": false,
+        "description": "``change_password`` input.",
+        "properties": {
+          "current_password": {
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "title": "New Password",
+            "type": "string"
+          },
+          "revoke_other_sessions": {
+            "default": false,
+            "title": "Revoke Other Sessions",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordIn",
+        "type": "object"
+      },
+      "ClientIdIn": {
+        "additionalProperties": false,
+        "description": "Input of the server-only calls that name one client.",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "ClientIdIn",
+        "type": "object"
+      },
+      "CodeIn": {
+        "additionalProperties": false,
+        "description": "A code, and whether to trust this device for 30 days.",
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "trust_device": {
+            "default": false,
+            "title": "Trust Device",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "CodeIn",
+        "type": "object"
+      },
+      "ConsentClientOut": {
+        "description": "The app asking for access. ``host`` is set for a CIMD client (its URL's host).",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "name",
+          "host"
+        ],
+        "title": "ConsentClientOut",
+        "type": "object"
+      },
+      "ConsentIn": {
+        "description": "``oauth_consent`` form.",
+        "properties": {
+          "accept": {
+            "default": "false",
+            "title": "Accept",
+            "type": "string"
+          },
+          "consent_id": {
+            "title": "Consent Id",
+            "type": "string"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "consent_id"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
+      "CreateAgentApiKeyIn": {
+        "additionalProperties": false,
+        "description": "``create_agent_api_key`` input.",
+        "properties": {
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "format": "duration",
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateAgentApiKeyIn",
+        "type": "object"
+      },
+      "CreateAgentIn": {
+        "additionalProperties": false,
+        "description": "``create_agent`` input: owned by the session user, or by ``organization_id``.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateAgentIn",
+        "type": "object"
+      },
+      "CreateApiKeyIn": {
+        "additionalProperties": false,
+        "description": "``create_api_key`` input.",
+        "properties": {
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "format": "duration",
+                "type": "string"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "rate_limit_max": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit Max"
+          },
+          "rate_limit_window": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit Window"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateApiKeyIn",
+        "type": "object"
+      },
+      "CreateOrganizationIn": {
+        "additionalProperties": false,
+        "description": "``create_organization`` input.",
+        "properties": {
+          "logo": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{1,46})[a-z0-9]$",
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "slug"
+        ],
+        "title": "CreateOrganizationIn",
+        "type": "object"
+      },
+      "CreateUserIn": {
+        "additionalProperties": false,
+        "description": "``create_user`` input. Without a password the user signs in another way.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "default": false,
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "role": {
+            "default": "user",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "CreateUserIn",
+        "type": "object"
+      },
+      "CreationOptionsOut": {
+        "additionalProperties": true,
+        "description": "``PublicKeyCredentialCreationOptions`` as WebAuthn JSON (base64url values),\nfor ``navigator.credentials.create()``.",
+        "properties": {
+          "challenge": {
+            "title": "Challenge",
+            "type": "string"
+          },
+          "excludeCredentials": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Excludecredentials",
+            "type": "array"
+          },
+          "pubKeyCredParams": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Pubkeycredparams",
+            "type": "array"
+          },
+          "rp": {
+            "additionalProperties": true,
+            "title": "Rp",
+            "type": "object"
+          },
+          "user": {
+            "additionalProperties": true,
+            "title": "User",
+            "type": "object"
+          }
+        },
+        "required": [
+          "challenge",
+          "rp",
+          "user",
+          "pubKeyCredParams"
+        ],
+        "title": "CreationOptionsOut",
+        "type": "object"
+      },
+      "DeleteUserIn": {
+        "additionalProperties": false,
+        "description": "``delete_user`` input; ``password`` is required for credential accounts.",
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "DeleteUserIn",
+        "type": "object"
+      },
+      "EnableOut": {
+        "description": "``enable_two_factor`` output, shown once.",
+        "properties": {
+          "backup_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backup Codes",
+            "type": "array"
+          },
+          "totp_uri": {
+            "title": "Totp Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "totp_uri",
+          "backup_codes"
+        ],
+        "title": "EnableOut",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "description": "The ``error`` object of :class:`ErrorOut`.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorOut": {
+        "description": "Error response body: ``{\"error\": {\"code\", \"message\", \"details\"?}}``.\n\nSerialize with ``exclude_none=True`` so ``details`` is omitted when empty.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorOut",
+        "type": "object"
+      },
+      "FullOrganizationOut": {
+        "description": "``get_organization`` output: the organization, its members, the caller's role.",
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberOut"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationOut"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization",
+          "members",
+          "role"
+        ],
+        "title": "FullOrganizationOut",
+        "type": "object"
+      },
+      "HasPermissionIn": {
+        "additionalProperties": false,
+        "description": "``has_permission`` (P5) input: ``{organization_id?, permissions: {resource:\n[action]}}``.",
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "permissions": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Permissions",
+            "type": "object"
+          }
+        },
+        "required": [
+          "permissions"
+        ],
+        "title": "HasPermissionIn",
+        "type": "object"
+      },
+      "HasPermissionOut": {
+        "description": "``has_permission`` output; a denial is ``success=false``, not an error.",
+        "properties": {
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "title": "HasPermissionOut",
+        "type": "object"
+      },
+      "ImpersonateOut": {
+        "description": "The impersonation session. ``token`` is set for bearer callers, or when\n``sessions.expose_token`` is on; browsers get the session cookie.",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/AdminSessionOut"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AdminUserOut"
+          }
+        },
+        "required": [
+          "user",
+          "session"
+        ],
+        "title": "ImpersonateOut",
+        "type": "object"
+      },
+      "InvitationIdIn": {
+        "additionalProperties": false,
+        "description": "``cancel_invitation`` input.",
+        "properties": {
+          "invitation_id": {
+            "title": "Invitation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invitation_id"
+        ],
+        "title": "InvitationIdIn",
+        "type": "object"
+      },
+      "InvitationListOut": {
+        "description": "``list_invitations`` output.",
+        "properties": {
+          "invitations": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationOut"
+            },
+            "title": "Invitations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "invitations"
+        ],
+        "title": "InvitationListOut",
+        "type": "object"
+      },
+      "InvitationOut": {
+        "description": "An invitation, never its token.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inviter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inviter Id"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected",
+              "canceled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "email",
+          "role",
+          "status",
+          "inviter_id",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "InvitationOut",
+        "type": "object"
+      },
+      "InviteMemberIn": {
+        "additionalProperties": false,
+        "description": "``invite_member`` input.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "role": {
+            "default": "member",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "InviteMemberIn",
+        "type": "object"
+      },
+      "IssueApiKeyOut": {
+        "description": "``issue_api_key`` output: the key row and the raw key, shown once.",
+        "properties": {
+          "api_key": {
+            "$ref": "#/components/schemas/ApiKeyOut"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_key",
+          "key"
+        ],
+        "title": "IssueApiKeyOut",
+        "type": "object"
+      },
+      "LinkOAuthClientIn": {
+        "additionalProperties": false,
+        "description": "``link_oauth_client`` input.",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "LinkOAuthClientIn",
+        "type": "object"
+      },
+      "LinkSocialIn": {
+        "additionalProperties": false,
+        "description": "``link_social`` input.",
+        "properties": {
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "LinkSocialIn",
+        "type": "object"
+      },
+      "MemberOut": {
+        "description": "A member, with the user's email and name.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "organization_id": {
+            "title": "Organization Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organization_id",
+          "user_id",
+          "role",
+          "created_at"
+        ],
+        "title": "MemberOut",
+        "type": "object"
+      },
+      "OAuthConsentOut": {
+        "description": "What a consent screen shows (``get_oauth_consent``, and ``oauth_authorize`` in\nJSON mode). ``redirect_host`` must be on screen (MCP authorization 2026-07-28);\n``loopback_only`` means every redirect URI of the client is a loopback address.",
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/ConsentClientOut"
+          },
+          "consent_id": {
+            "title": "Consent Id",
+            "type": "string"
+          },
+          "loopback_only": {
+            "title": "Loopback Only",
+            "type": "boolean"
+          },
+          "redirect_host": {
+            "title": "Redirect Host",
+            "type": "string"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "consent_id",
+          "client",
+          "scopes",
+          "resource",
+          "redirect_host",
+          "loopback_only"
+        ],
+        "title": "OAuthConsentOut",
+        "type": "object"
+      },
+      "OAuthErrorOut": {
+        "description": "RFC 6749 error body, used by endpoints with ``error_format=\"oauth\"``.",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "error_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Description"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "OAuthErrorOut",
+        "type": "object"
+      },
+      "OAuthGrantListOut": {
+        "description": "``list_oauth_grants`` output.",
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/OAuthGrantOut"
+            },
+            "title": "Grants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "grants"
+        ],
+        "title": "OAuthGrantListOut",
+        "type": "object"
+      },
+      "OAuthGrantOut": {
+        "description": "An app the signed-in user authorized: a client with a stored consent or live\ntokens for the user.",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_name": {
+            "title": "Client Name",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "resources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Resources",
+            "type": "array"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "client_id",
+          "client_name",
+          "scopes",
+          "resources",
+          "created_at",
+          "last_used_at"
+        ],
+        "title": "OAuthGrantOut",
+        "type": "object"
+      },
+      "OrganizationIdIn": {
+        "additionalProperties": false,
+        "description": "An organization; the active one when omitted.",
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          }
+        },
+        "title": "OrganizationIdIn",
+        "type": "object"
+      },
+      "OrganizationListOut": {
+        "description": "``list_organizations`` output.",
+        "properties": {
+          "organizations": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationWithRoleOut"
+            },
+            "title": "Organizations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "organizations"
+        ],
+        "title": "OrganizationListOut",
+        "type": "object"
+      },
+      "OrganizationOut": {
+        "description": "An organization.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "logo",
+          "metadata",
+          "created_at"
+        ],
+        "title": "OrganizationOut",
+        "type": "object"
+      },
+      "OrganizationWithRoleOut": {
+        "description": "An organization and the caller's role in it.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "logo",
+          "metadata",
+          "created_at",
+          "role"
+        ],
+        "title": "OrganizationWithRoleOut",
+        "type": "object"
+      },
+      "PasskeyListOut": {
+        "description": "``list_passkeys`` output.",
+        "properties": {
+          "passkeys": {
+            "items": {
+              "$ref": "#/components/schemas/PasskeyOut"
+            },
+            "title": "Passkeys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "passkeys"
+        ],
+        "title": "PasskeyListOut",
+        "type": "object"
+      },
+      "PasskeyOut": {
+        "description": "A passkey without its public key.",
+        "properties": {
+          "backed_up": {
+            "title": "Backed Up",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "device_type": {
+            "enum": [
+              "single_device",
+              "multi_device"
+            ],
+            "title": "Device Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "transports": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Transports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "credential_id",
+          "transports",
+          "device_type",
+          "backed_up",
+          "created_at",
+          "last_used_at"
+        ],
+        "title": "PasskeyOut",
+        "type": "object"
+      },
+      "PasswordIn": {
+        "additionalProperties": false,
+        "description": "``{password?}``: needed for users who sign in with a password.",
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "PasswordIn",
+        "type": "object"
+      },
+      "RedirectOut": {
+        "description": "``{url}`` the client should navigate to.",
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "RedirectOut",
+        "type": "object"
+      },
+      "RegisterIn": {
+        "additionalProperties": false,
+        "description": "``verify_passkey_registration`` input: the credential from\n``navigator.credentials.create()`` as JSON, and a name for it.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "response": {
+            "additionalProperties": true,
+            "title": "Response",
+            "type": "object"
+          }
+        },
+        "required": [
+          "response"
+        ],
+        "title": "RegisterIn",
+        "type": "object"
+      },
+      "RemoveMemberIn": {
+        "additionalProperties": false,
+        "description": "``remove_member`` input.",
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "title": "RemoveMemberIn",
+        "type": "object"
+      },
+      "RenameIn": {
+        "additionalProperties": false,
+        "description": "``rename_passkey`` input.",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RenameIn",
+        "type": "object"
+      },
+      "RequestOptionsOut": {
+        "additionalProperties": true,
+        "description": "``PublicKeyCredentialRequestOptions`` as WebAuthn JSON, for\n``navigator.credentials.get()``.",
+        "properties": {
+          "allowCredentials": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Allowcredentials",
+            "type": "array"
+          },
+          "challenge": {
+            "title": "Challenge",
+            "type": "string"
+          },
+          "rpId": {
+            "title": "Rpid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge",
+          "rpId"
+        ],
+        "title": "RequestOptionsOut",
+        "type": "object"
+      },
+      "RequestPasswordResetIn": {
+        "additionalProperties": false,
+        "description": "``request_password_reset`` input.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "redirect_to": {
+            "title": "Redirect To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "redirect_to"
+        ],
+        "title": "RequestPasswordResetIn",
+        "type": "object"
+      },
+      "ResetPasswordIn": {
+        "additionalProperties": false,
+        "description": "``reset_password`` input.",
+        "properties": {
+          "new_password": {
+            "title": "New Password",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "ResetPasswordIn",
+        "type": "object"
+      },
+      "RevokeAgentOut": {
+        "description": "``revoke_agent`` output: the agent and what was revoked.",
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentOut"
+          },
+          "api_keys": {
+            "title": "Api Keys",
+            "type": "integer"
+          },
+          "oauth_clients": {
+            "title": "Oauth Clients",
+            "type": "integer"
+          },
+          "oauth_tokens": {
+            "title": "Oauth Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent",
+          "api_keys",
+          "oauth_clients",
+          "oauth_tokens"
+        ],
+        "title": "RevokeAgentOut",
+        "type": "object"
+      },
+      "RevokeSessionIn": {
+        "additionalProperties": false,
+        "description": "``revoke_session`` input.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "RevokeSessionIn",
+        "type": "object"
+      },
+      "RevokeUserSessionsIn": {
+        "additionalProperties": false,
+        "description": "``revoke_user_sessions`` input: one session, or all of them when omitted.",
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "title": "RevokeUserSessionsIn",
+        "type": "object"
+      },
+      "SendEmailOtpIn": {
+        "additionalProperties": false,
+        "description": "``send_email_otp`` input.",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "sign_in",
+              "verify_email",
+              "reset_password"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "type"
+        ],
+        "title": "SendEmailOtpIn",
+        "type": "object"
+      },
+      "SendMagicLinkIn": {
+        "additionalProperties": false,
+        "description": "``send_magic_link`` input.",
+        "properties": {
+          "callback_url": {
+            "default": "/",
+            "title": "Callback Url",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "error_callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Callback Url"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "SendMagicLinkIn",
+        "type": "object"
+      },
+      "SendVerificationEmailIn": {
+        "additionalProperties": false,
+        "description": "``send_verification_email`` input.",
+        "properties": {
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "SendVerificationEmailIn",
+        "type": "object"
+      },
+      "Session": {
+        "additionalProperties": true,
+        "description": "A session record. The token hash is never part of it.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "remember_me": {
+            "title": "Remember Me",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "expires_at",
+          "remember_me",
+          "created_at",
+          "updated_at",
+          "ip_address",
+          "user_agent"
+        ],
+        "title": "Session",
+        "type": "object"
+      },
+      "SessionListOut": {
+        "description": "``list_sessions`` output.",
+        "properties": {
+          "current_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Session Id"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/Session"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions",
+          "current_session_id"
+        ],
+        "title": "SessionListOut",
+        "type": "object"
+      },
+      "SessionWithUserOut": {
+        "description": "``get_session`` output: ``{session, user}``.",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "session",
+          "user"
+        ],
+        "title": "SessionWithUserOut",
+        "type": "object"
+      },
+      "SetActiveIn": {
+        "additionalProperties": false,
+        "description": "``set_active_organization`` input; ``null`` clears it.",
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          }
+        },
+        "required": [
+          "organization_id"
+        ],
+        "title": "SetActiveIn",
+        "type": "object"
+      },
+      "SetActiveOut": {
+        "description": "``set_active_organization`` output.",
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          }
+        },
+        "required": [
+          "organization_id"
+        ],
+        "title": "SetActiveOut",
+        "type": "object"
+      },
+      "SetUserPasswordIn": {
+        "additionalProperties": false,
+        "description": "``set_user_password`` input.",
+        "properties": {
+          "new_password": {
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_password"
+        ],
+        "title": "SetUserPasswordIn",
+        "type": "object"
+      },
+      "SetUserRoleIn": {
+        "additionalProperties": false,
+        "description": "``set_user_role`` input.",
+        "properties": {
+          "role": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "SetUserRoleIn",
+        "type": "object"
+      },
+      "SignInEmailIn": {
+        "additionalProperties": false,
+        "description": "``sign_in_email`` input.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "remember_me": {
+            "default": true,
+            "title": "Remember Me",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "SignInEmailIn",
+        "type": "object"
+      },
+      "SignInIn": {
+        "additionalProperties": false,
+        "description": "``sign_in_passkey`` input: the ``navigator.credentials.get()`` credential.",
+        "properties": {
+          "remember_me": {
+            "default": true,
+            "title": "Remember Me",
+            "type": "boolean"
+          },
+          "response": {
+            "additionalProperties": true,
+            "title": "Response",
+            "type": "object"
+          }
+        },
+        "required": [
+          "response"
+        ],
+        "title": "SignInIn",
+        "type": "object"
+      },
+      "SignInOut": {
+        "description": "A completed sign-in. ``token`` is set only with ``sessions.expose_token``.",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user",
+          "session"
+        ],
+        "title": "SignInOut",
+        "type": "object"
+      },
+      "SignInSocialIn": {
+        "additionalProperties": false,
+        "description": "``sign_in_social`` input.",
+        "properties": {
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "error_callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Callback Url"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "remember_me": {
+            "default": true,
+            "title": "Remember Me",
+            "type": "boolean"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "SignInSocialIn",
+        "type": "object"
+      },
+      "SignUpEmailIn": {
+        "additionalProperties": false,
+        "description": "``sign_up_email`` input.",
+        "properties": {
+          "callback_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "remember_me": {
+            "default": true,
+            "title": "Remember Me",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "SignUpEmailIn",
+        "type": "object"
+      },
+      "StatusOut": {
+        "description": "``{status}``, e.g. ``\"ok\"`` or ``\"verification_sent\"``.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "StatusOut",
+        "type": "object"
+      },
+      "StopImpersonatingOut": {
+        "description": "Whether the admin's own session was restored.",
+        "properties": {
+          "restored": {
+            "title": "Restored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "restored"
+        ],
+        "title": "StopImpersonatingOut",
+        "type": "object"
+      },
+      "TokenIn": {
+        "description": "``oauth_token`` form.",
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "code_verifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Verifier"
+          },
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "redirect_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Uri"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "title": "TokenIn",
+        "type": "object"
+      },
+      "TokenRequestIn": {
+        "description": "``oauth_introspect`` and ``oauth_revoke`` form.",
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "token_type_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Type Hint"
+          }
+        },
+        "title": "TokenRequestIn",
+        "type": "object"
+      },
+      "UnlinkAccountIn": {
+        "additionalProperties": false,
+        "description": "``unlink_account`` input.",
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_id"
+        ],
+        "title": "UnlinkAccountIn",
+        "type": "object"
+      },
+      "UpdateAgentIn": {
+        "additionalProperties": false,
+        "description": "``update_agent`` input; only the fields given change. ``enabled=True``\nre-enables a revoked agent, and what was revoked stays revoked. ``enabled=False``\nis refused: disable an agent with ``revoke_agent``, which needs a fresh session.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "UpdateAgentIn",
+        "type": "object"
+      },
+      "UpdateApiKeyIn": {
+        "additionalProperties": false,
+        "description": "``update_api_key`` input; only the fields given change.",
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "title": "UpdateApiKeyIn",
+        "type": "object"
+      },
+      "UpdateMemberRoleIn": {
+        "additionalProperties": false,
+        "description": "``update_member_role`` input.",
+        "properties": {
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "role": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "role"
+        ],
+        "title": "UpdateMemberRoleIn",
+        "type": "object"
+      },
+      "UpdateOrganizationIn": {
+        "additionalProperties": false,
+        "description": "``update_organization`` input; only the fields given change.",
+        "properties": {
+          "logo": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9](?:[a-z0-9-]{1,46})[a-z0-9]$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          }
+        },
+        "title": "UpdateOrganizationIn",
+        "type": "object"
+      },
+      "UpdateUserIn": {
+        "additionalProperties": false,
+        "description": "``update_user`` input. The email changes only through ``change_email``.",
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "UpdateUserIn",
+        "type": "object"
+      },
+      "User": {
+        "additionalProperties": true,
+        "description": "A user record. Plugin fields with ``returned=True`` are kept as extras.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "email_verified",
+          "name",
+          "image",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "User",
+        "type": "object"
+      },
+      "UserListOut": {
+        "description": "One page of users and the number of users that match.",
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserOut"
+            },
+            "title": "Users",
+            "type": "array"
+          }
+        },
+        "required": [
+          "users",
+          "total"
+        ],
+        "title": "UserListOut",
+        "type": "object"
+      },
+      "VerifyEmailOtpIn": {
+        "additionalProperties": false,
+        "description": "``verify_email_otp`` input.",
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "new_password": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Password"
+          },
+          "otp": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Otp",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "sign_in",
+              "verify_email",
+              "reset_password"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "otp",
+          "type"
+        ],
+        "title": "VerifyEmailOtpIn",
+        "type": "object"
+      },
+      "gotauth__contracts__http_models__RevokedOut": {
+        "description": "``{revoked: int}``, the number of revoked items.",
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "title": "RevokedOut",
+        "type": "object"
+      },
+      "gotauth__plugins__admin___models__RevokedOut": {
+        "description": "How many sessions were revoked.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "RevokedOut",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "GotAuth",
+    "version": "0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/auth/.well-known/openid-configuration": {
+      "get": {
+        "operationId": "oauth_openid_configuration",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "OpenID provider metadata",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/accounts": {
+      "get": {
+        "operationId": "list_accounts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List your linked accounts",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/auth/admin/stop-impersonating": {
+      "post": {
+        "operationId": "stop_impersonating",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopImpersonatingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "End an impersonation and return to the admin's session",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users": {
+      "get": {
+        "operationId": "list_users",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 254,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "default": "created_at",
+              "enum": [
+                "created_at",
+                "email"
+              ],
+              "title": "Sort By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort_direction",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Sort Direction",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 2147483647,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Find users",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "create_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a user",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}": {
+      "delete": {
+        "operationId": "remove_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete a user and everything they own",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "operationId": "get_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a user",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/ban": {
+      "post": {
+        "operationId": "ban_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BanUserIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Ban a user and sign them out",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/impersonate": {
+      "post": {
+        "operationId": "impersonate_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign in as a user for a while",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/password": {
+      "post": {
+        "operationId": "set_user_password",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserPasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set a user's password and sign them out",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/role": {
+      "post": {
+        "operationId": "set_user_role",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserRoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set a user's role",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/sessions": {
+      "get": {
+        "operationId": "list_user_sessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSessionListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "A user's sessions",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/sessions/revoke": {
+      "post": {
+        "operationId": "revoke_user_sessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeUserSessionsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/gotauth__plugins__admin___models__RevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke one or all of a user's sessions",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/admin/users/{user_id}/unban": {
+      "post": {
+        "operationId": "unban_user",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Lift a user's ban",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/agents": {
+      "get": {
+        "operationId": "list_agents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "organization_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List your agents, or an organization's",
+        "tags": [
+          "agents"
+        ]
+      },
+      "post": {
+        "operationId": "create_agent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/auth/agents/{id}": {
+      "get": {
+        "operationId": "get_agent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get an agent",
+        "tags": [
+          "agents"
+        ]
+      },
+      "patch": {
+        "operationId": "update_agent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rename, describe, disable or re-enable an agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/auth/agents/{id}/api-keys": {
+      "get": {
+        "operationId": "list_agent_api_keys",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentApiKeyListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List an agent's API keys",
+        "tags": [
+          "agents"
+        ]
+      },
+      "post": {
+        "operationId": "create_agent_api_key",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentApiKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueApiKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an API key for an agent (shown once)",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/auth/agents/{id}/clients": {
+      "post": {
+        "operationId": "link_oauth_client",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkOAuthClientIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Link one of your OAuth clients to an agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/auth/agents/{id}/revoke": {
+      "post": {
+        "operationId": "revoke_agent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeAgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Disable an agent and revoke its keys, clients and tokens",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/auth/api-keys": {
+      "get": {
+        "operationId": "list_api_keys",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "organization_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List your API keys",
+        "tags": [
+          "api-keys"
+        ]
+      },
+      "post": {
+        "operationId": "create_api_key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueApiKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an API key (the key is shown once)",
+        "tags": [
+          "api-keys"
+        ]
+      }
+    },
+    "/api/auth/api-keys/{id}": {
+      "delete": {
+        "operationId": "delete_api_key",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete an API key",
+        "tags": [
+          "api-keys"
+        ]
+      },
+      "patch": {
+        "operationId": "update_api_key",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateApiKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update an API key",
+        "tags": [
+          "api-keys"
+        ]
+      }
+    },
+    "/api/auth/callback/{provider}": {
+      "get": {
+        "operationId": "social_callback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Social sign-in callback",
+        "tags": [
+          "social"
+        ]
+      },
+      "post": {
+        "operationId": "social_callback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/CallbackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Social sign-in callback (form_post providers)",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/auth/change-email": {
+      "post": {
+        "operationId": "change_email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEmailIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Change your email address",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Change your password",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/email-otp/send": {
+      "post": {
+        "operationId": "send_email_otp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendEmailOtpIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Email a 6-digit code (the same answer for every email)",
+        "tags": [
+          "email-otp"
+        ]
+      }
+    },
+    "/api/auth/email-otp/verify": {
+      "post": {
+        "operationId": "verify_email_otp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailOtpIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign in, verify an email or reset a password with a code",
+        "tags": [
+          "email-otp"
+        ]
+      }
+    },
+    "/api/auth/link-social": {
+      "post": {
+        "operationId": "link_social",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkSocialIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Link a social account",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/auth/magic-link/send": {
+      "post": {
+        "operationId": "send_magic_link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMagicLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Email a sign-in link (the same answer for every email)",
+        "tags": [
+          "magic-link"
+        ]
+      }
+    },
+    "/api/auth/magic-link/verify": {
+      "get": {
+        "operationId": "verify_magic_link",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign in from an emailed link, then redirect",
+        "tags": [
+          "magic-link"
+        ]
+      }
+    },
+    "/api/auth/oauth2/authorize": {
+      "get": {
+        "operationId": "oauth_authorize",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "response_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Response Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "client_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Client Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Redirect Uri"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Challenge"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_challenge_method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Challenge Method"
+            }
+          },
+          {
+            "in": "query",
+            "name": "nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nonce"
+            }
+          },
+          {
+            "in": "query",
+            "name": "prompt",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Prompt"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resource",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resource"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "OAuth 2.1 authorization endpoint",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/consent": {
+      "get": {
+        "operationId": "get_oauth_consent",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "consent_id",
+            "required": true,
+            "schema": {
+              "title": "Consent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "What a consent request asks for (for your own consent page)",
+        "tags": [
+          "oauth"
+        ]
+      },
+      "post": {
+        "operationId": "oauth_consent",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Approve or deny a consent request",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/grants": {
+      "get": {
+        "operationId": "list_oauth_grants",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthGrantListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Apps the signed-in user has authorized",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/grants/revoke": {
+      "post": {
+        "operationId": "revoke_oauth_grant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/gotauth__contracts__http_models__RevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke an app's access: its consent and tokens",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/introspect": {
+      "post": {
+        "operationId": "oauth_introspect",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Token introspection (RFC 7662)",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/jwks": {
+      "get": {
+        "operationId": "oauth_jwks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Signing keys (JWKS)",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/revoke": {
+      "post": {
+        "operationId": "oauth_revoke",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Token revocation (RFC 7009)",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/token": {
+      "post": {
+        "operationId": "oauth_token",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "OAuth 2.1 token endpoint",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/oauth2/userinfo": {
+      "get": {
+        "operationId": "oauth_userinfo",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "OpenID Connect userinfo",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/auth/organization/accept-invitation": {
+      "post": {
+        "operationId": "accept_invitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Accept an invitation sent to your email",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/cancel-invitation": {
+      "post": {
+        "operationId": "cancel_invitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Cancel a pending invitation",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/create": {
+      "post": {
+        "operationId": "create_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create an organization (you become its owner)",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/delete": {
+      "post": {
+        "operationId": "delete_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete an organization and revoke its keys and agents",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/get": {
+      "get": {
+        "operationId": "get_organization",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "organization_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullOrganizationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "An organization, its members and your role",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/has-permission": {
+      "post": {
+        "operationId": "has_permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HasPermissionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasPermissionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Whether the caller has these organization permissions",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/invite-member": {
+      "post": {
+        "operationId": "invite_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMemberIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Invite someone by email",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/leave": {
+      "post": {
+        "operationId": "leave_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Leave an organization",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/list": {
+      "get": {
+        "operationId": "list_organizations",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Your organizations and your role in each",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/list-invitations": {
+      "get": {
+        "operationId": "list_invitations",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "organization_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Pending invitations of an organization",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/reject-invitation": {
+      "post": {
+        "operationId": "reject_invitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Reject an invitation sent to your email",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/remove-member": {
+      "post": {
+        "operationId": "remove_member",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveMemberIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove a member",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/set-active": {
+      "post": {
+        "operationId": "set_active_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetActiveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetActiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set the organization this session acts in",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/update": {
+      "post": {
+        "operationId": "update_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update an organization",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/organization/update-member-role": {
+      "post": {
+        "operationId": "update_member_role",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberRoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Change a member's role",
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/api/auth/passkey/register/options": {
+      "post": {
+        "operationId": "get_passkey_registration_options",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreationOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Options for navigator.credentials.create()",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/auth/passkey/register/verify": {
+      "post": {
+        "operationId": "verify_passkey_registration",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Add a passkey to your account",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/auth/passkey/sign-in/options": {
+      "post": {
+        "operationId": "get_passkey_sign_in_options",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Options for navigator.credentials.get() (usernameless)",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/auth/passkey/sign-in/verify": {
+      "post": {
+        "operationId": "sign_in_passkey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign in with a passkey",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/auth/passkeys": {
+      "get": {
+        "operationId": "list_passkeys",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List your passkeys",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/auth/passkeys/{id}": {
+      "delete": {
+        "operationId": "delete_passkey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remove a passkey",
+        "tags": [
+          "passkeys"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_passkey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Rename a passkey",
+        "tags": [
+          "passkeys"
+        ]
+      }
+    },
+    "/api/auth/request-password-reset": {
+      "post": {
+        "operationId": "request_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Email a password reset link",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "operationId": "reset_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Set a new password with a reset token",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/send-verification-email": {
+      "post": {
+        "operationId": "send_verification_email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendVerificationEmailIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Send the email verification link again",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "operationId": "get_session",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionWithUserOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Session"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get the current session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "operationId": "list_sessions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List your sessions",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/auth/sessions/revoke": {
+      "post": {
+        "operationId": "revoke_session",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeSessionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke one of your sessions",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/auth/sessions/revoke-others": {
+      "post": {
+        "operationId": "revoke_other_sessions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Revoke all your other sessions",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/auth/sign-in/email": {
+      "post": {
+        "operationId": "sign_in_email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInEmailIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign in with email and password",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/sign-in/social": {
+      "post": {
+        "operationId": "sign_in_social",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInSocialIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Start a social sign-in",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/auth/sign-out": {
+      "post": {
+        "operationId": "sign_out",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign out",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/sign-up/email": {
+      "post": {
+        "operationId": "sign_up_email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUpEmailIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Sign up with email and password",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/two-factor/disable": {
+      "post": {
+        "operationId": "disable_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Turn two-factor authentication off",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/two-factor/enable": {
+      "post": {
+        "operationId": "enable_two_factor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Start two-factor setup: an authenticator URI and backup codes",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/two-factor/regenerate-backup-codes": {
+      "post": {
+        "operationId": "regenerate_backup_codes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupCodesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Replace the backup codes (shown once)",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/two-factor/send-otp": {
+      "post": {
+        "operationId": "send_two_factor_otp",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Email a one-time code for the sign-in challenge",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/two-factor/verify-backup-code": {
+      "post": {
+        "operationId": "verify_backup_code",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Answer the sign-in challenge with a backup code",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/two-factor/verify-otp": {
+      "post": {
+        "operationId": "verify_two_factor_otp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Answer the sign-in challenge with the emailed code",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/two-factor/verify-totp": {
+      "post": {
+        "operationId": "verify_totp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "302": {
+            "description": "Redirect"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Confirm setup, or answer the sign-in challenge, with a TOTP code",
+        "tags": [
+          "two-factor"
+        ]
+      }
+    },
+    "/api/auth/unlink-account": {
+      "post": {
+        "operationId": "unlink_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlinkAccountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Unlink an account",
+        "tags": [
+          "social"
+        ]
+      }
+    },
+    "/api/auth/user": {
+      "delete": {
+        "operationId": "delete_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Delete your account",
+        "tags": [
+          "email_password"
+        ]
+      },
+      "patch": {
+        "operationId": "update_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Update your profile",
+        "tags": [
+          "email_password"
+        ]
+      }
+    },
+    "/api/auth/verify-email": {
+      "get": {
+        "operationId": "verify_email",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "callback_url",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Callback Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Verify an email address from a link",
+        "tags": [
+          "email_password"
+        ]
+      }
+    }
+  }
+}
