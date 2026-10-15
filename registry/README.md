@@ -43,10 +43,12 @@ Wrap the app in `<GotAuthProvider baseURL="/api/auth">` and use the components i
 `emailOtp`, `organization` and `oauth2`. Admin and agent endpoints are not in the client
 yet.
 
-**An OAuth consent page** in your app calls `client.oauth2.oauthAuthorize(query)` with
-the query it was opened with. The result is either consent details for `ConsentScreen`
-(`isConsent(result)`), or `{ url }`: the user must sign in first, or has already
-consented, so the page navigates there with `window.location.assign(url)`.
+**An OAuth consent page** of your own: set `oauth_provider(consent_page="/consent")`.
+GotAuth sends the browser there with `?consent_id=...`; the page calls
+`client.oauth2.getOauthConsent({ consent_id })` and renders `ConsentScreen` with the
+result. Allow and Deny post the form to GotAuth, which redirects back to the app.
+Serve that page with `Content-Security-Policy: frame-ancestors 'none'`, as GotAuth's
+built-in consent page does, so no other site can frame it and trick a click on Allow.
 
 ## Client rules
 

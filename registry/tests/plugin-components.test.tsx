@@ -36,12 +36,19 @@ function bodies() {
 }
 
 describe("TwoFactorSetup", () => {
-  it("shows a local QR code, confirms a code and shows backup codes once", async () => {
+  it("shows a local QR code and the backup codes, then confirms a code", async () => {
     const { seen, record } = bodies()
+    let enabled = false
     server.use(
-      signedIn(),
+      http.get(`${BASE}/session`, () =>
+        HttpResponse.json({ user: { ...USER, two_factor_enabled: enabled }, session: SESSION }),
+      ),
       record("/two-factor/enable", { totp_uri: TOTP_URI, backup_codes: CODES }),
-      record("/two-factor/verify-totp", { status: "enabled" }),
+      http.post(`${BASE}/two-factor/verify-totp`, async ({ request }) => {
+        seen["/two-factor/verify-totp"] = await request.json()
+        enabled = true
+        return HttpResponse.json({ status: "enabled" })
+      }),
     )
     const onChange = vi.fn()
     const { container } = renderWith(<TwoFactorSetup onChange={onChange} />)
@@ -51,17 +58,18 @@ describe("TwoFactorSetup", () => {
     await user.click(screen.getByRole("button", { name: "Set up" }))
     expect(await screen.findByRole("img", { name: /authenticator app/ })).toBeTruthy()
     expect(screen.getByTestId("totp-secret").textContent).toBe("JBSWY3DPEHPK3PXP")
+    expect(screen.getByTestId("backup-codes").textContent).toContain("aaaa-bbbb")
     expect(seen["/two-factor/enable"]).toEqual({ password: "correct horse" })
     await expectAccessible(container)
-    const code = screen.getByLabelText("Code from the app")
+    const code = screen.getByLabelText(/code from the app/)
     expect(code).toHaveProperty("autocomplete", "one-time-code")
     await user.type(code, "123456")
+    expect(screen.getByLabelText("I saved my backup codes")).toHaveProperty("required", true)
+    await user.click(screen.getByLabelText("I saved my backup codes"))
     await user.click(screen.getByRole("button", { name: "Turn on" }))
-    const list = await screen.findByTestId("backup-codes")
-    expect(list.textContent).toContain("aaaa-bbbb")
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(true))
     expect(seen["/two-factor/verify-totp"]).toEqual({ code: "123456" })
-    expect(onChange).toHaveBeenCalledWith(true)
-    await user.click(screen.getByRole("button", { name: "Done" }))
+    expect(await screen.findByRole("button", { name: "Turn off two-factor" })).toBeTruthy()
     expect(screen.queryByTestId("backup-codes")).toBeNull()
     expect(container.textContent).not.toContain("aaaa-bbbb")
   })
@@ -105,10 +113,14 @@ describe("TwoFactorSetup", () => {
     expect(screen.queryByLabelText("Password")).toBeNull()
     const user = userEvent.setup()
     await user.click(screen.getByRole("button", { name: "Set up" }))
-    await user.type(await screen.findByLabelText("Code from the app"), "123456")
+    // The codes are on screen before the sign-in can finish.
+    expect(await screen.findByTestId("backup-codes")).toBeTruthy()
+    await user.type(screen.getByLabelText(/code from the app/), "123456")
+    await user.click(screen.getByLabelText("I saved my backup codes"))
     await user.click(screen.getByRole("button", { name: "Turn on" }))
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
-    expect(await screen.findByTestId("backup-codes")).toBeTruthy()
+    expect(await screen.findByText("Two-factor authentication is on.")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Set up" })).toBeNull()
   })
 })
 
@@ -176,6 +188,29 @@ describe("TwoFactorChallenge", () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
     expect(sent).toBe(1)
     expect(seen["/two-factor/verify-otp"]).toEqual({ code: "111222", trust_device: false })
+  })
+
+  it("can send a new email code and go back to sign in", async () => {
+    let sent = 0
+    server.use(
+      http.post(`${BASE}/two-factor/send-otp`, () => {
+        sent += 1
+        return HttpResponse.json({ status: "sent" })
+      }),
+    )
+    const onCancel = vi.fn()
+    renderWith(
+      <TwoFactorChallenge
+        challenge={{ type: "two_factor", methods: ["email_otp"] }}
+        onCancel={onCancel}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: "Send code" }))
+    await user.click(await screen.findByRole("button", { name: "Send a new code" }))
+    await waitFor(() => expect(sent).toBe(2))
+    await user.click(screen.getByRole("button", { name: "Sign in again" }))
+    expect(onCancel).toHaveBeenCalledOnce()
   })
 })
 
@@ -321,6 +356,29 @@ describe("OrgSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "Organization: Personal account" }))
     await user.click(await screen.findByRole("menuitem", { name: "Create organization" }))
     expect(onCreate).toHaveBeenCalledOnce()
+  })
+
+  it("reloads the list when an organization is created", async () => {
+    let orgs = [
+      { id: "org_1", name: "Acme", slug: "acme", logo: null, metadata: {}, role: "owner", created_at: "2026-10-01T10:00:00Z" },
+    ]
+    server.use(
+      signedIn(),
+      http.get(`${BASE}/organization/list`, () => HttpResponse.json({ organizations: orgs })),
+      http.post(`${BASE}/organization/create`, () => {
+        const created = { id: "org_9", name: "Initech", slug: "initech", logo: null, metadata: {}, created_at: "2026-10-01T10:00:00Z" }
+        orgs = [...orgs, { ...created, role: "owner" }]
+        return HttpResponse.json(created)
+      }),
+    )
+    const { client } = renderWith(<OrgSwitcher />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole("button", { name: "Organization: Personal account" }))
+    expect(await screen.findByRole("menuitemradio", { name: "Acme" })).toBeTruthy()
+    await user.keyboard("{Escape}")
+    await client.organization.createOrganization({ name: "Initech", slug: "initech" })
+    await user.click(screen.getByRole("button", { name: "Organization: Personal account" }))
+    expect(await screen.findByRole("menuitemradio", { name: "Initech" })).toBeTruthy()
   })
 
   it("renders nothing when signed out", async () => {

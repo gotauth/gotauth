@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { createGotAuthClient, isChallenge, isConsent } from "@/lib/gotauth-client"
+import { createGotAuthClient, isChallenge } from "@/lib/gotauth-client"
 
 type Call = { url: string; init: RequestInit }
 
@@ -74,7 +74,7 @@ const CASES: [string, (c: ReturnType<typeof createGotAuthClient>) => Promise<unk
   ["updateMemberRole", (c) => c.organization.updateMemberRole({ user_id: "usr_2", role: "admin" }), "POST", "/organization/update-member-role"],
   ["leaveOrganization", (c) => c.organization.leaveOrganization(), "POST", "/organization/leave"],
   ["hasPermission", (c) => c.organization.hasPermission({ permissions: { project: ["read"] } }), "POST", "/organization/has-permission"],
-  ["oauthAuthorize", (c) => c.oauth2.oauthAuthorize({ client_id: "cli_1", scope: "openid" }), "GET", "/oauth2/authorize?client_id=cli_1&scope=openid"],
+  ["getOauthConsent", (c) => c.oauth2.getOauthConsent({ consent_id: "c1" }), "GET", "/oauth2/consent?consent_id=c1"],
   ["listOauthGrants", (c) => c.oauth2.listOauthGrants(), "GET", "/oauth2/grants"],
   ["revokeOauthGrant", (c) => c.oauth2.revokeOauthGrant({ client_id: "cli_1" }), "POST", "/oauth2/grants/revoke"],
 ]
@@ -162,39 +162,9 @@ describe("createGotAuthClient", () => {
     local.mockRestore()
   })
 
-  it("returns the authorize URL to navigate to when authorize redirects", async () => {
-    const fetchSpy = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
-      expect(init?.redirect).toBe("manual")
-      return new Response(null, { status: 302, headers: { Location: "https://client.test/cb?code=x" } })
-    })
-    const client = createGotAuthClient({ baseURL: "https://api.test/api/auth", fetch: fetchSpy })
-    const result = await client.oauth2.oauthAuthorize({ client_id: "cli_1", state: "s" })
-    expect(result).toEqual({
-      data: { url: "https://api.test/api/auth/oauth2/authorize?client_id=cli_1&state=s" },
-      error: null,
-    })
-    expect(result.data && isConsent(result.data)).toBe(false)
-  })
-
-  it("returns consent details from authorize in JSON mode", async () => {
-    const consent = {
-      consent_id: "c1",
-      client: { client_id: "cli_1", name: "Claude", host: null },
-      scopes: ["openid"],
-      resource: null,
-      redirect_host: "claude.ai",
-      loopback_only: false,
-    }
-    const { client } = recorder(200, consent)
-    const result = await client.oauth2.oauthAuthorize({ client_id: "cli_1" })
-    expect(result.data && isConsent(result.data)).toBe(true)
+  it("names the consent form target", () => {
+    const { client } = recorder()
     expect(client.oauth2.consentURL).toBe("https://api.test/api/auth/oauth2/consent")
-  })
-
-  it("only treats redirects specially for authorize", async () => {
-    const { client } = recorder(302, null)
-    const result = await client.getSession()
-    expect(result.error?.code).toBe("HTTP_302")
   })
 
   it("tells challenges apart from sign-ins", () => {

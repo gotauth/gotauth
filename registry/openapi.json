@@ -729,6 +729,37 @@
         "title": "CodeIn",
         "type": "object"
       },
+      "ConsentClientOut": {
+        "description": "The app asking for access. ``host`` is set for a CIMD client (its URL's host).",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "name",
+          "host"
+        ],
+        "title": "ConsentClientOut",
+        "type": "object"
+      },
       "ConsentIn": {
         "description": "``oauth_consent`` form.",
         "properties": {
@@ -1525,6 +1556,54 @@
           "created_at"
         ],
         "title": "MemberOut",
+        "type": "object"
+      },
+      "OAuthConsentOut": {
+        "description": "What a consent screen shows (``get_oauth_consent``, and ``oauth_authorize`` in\nJSON mode). ``redirect_host`` must be on screen (MCP authorization 2026-07-28);\n``loopback_only`` means every redirect URI of the client is a loopback address.",
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/ConsentClientOut"
+          },
+          "consent_id": {
+            "title": "Consent Id",
+            "type": "string"
+          },
+          "loopback_only": {
+            "title": "Loopback Only",
+            "type": "boolean"
+          },
+          "redirect_host": {
+            "title": "Redirect Host",
+            "type": "string"
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "consent_id",
+          "client",
+          "scopes",
+          "resource",
+          "redirect_host",
+          "loopback_only"
+        ],
+        "title": "OAuthConsentOut",
         "type": "object"
       },
       "OAuthErrorOut": {
@@ -5007,6 +5086,46 @@
       }
     },
     "/api/auth/oauth2/consent": {
+      "get": {
+        "operationId": "get_oauth_consent",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "consent_id",
+            "required": true,
+            "schema": {
+              "title": "Consent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "What a consent request asks for (for your own consent page)",
+        "tags": [
+          "oauth"
+        ]
+      },
       "post": {
         "operationId": "oauth_consent",
         "requestBody": {

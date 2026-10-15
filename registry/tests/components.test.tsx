@@ -94,6 +94,18 @@ describe("SignInForm", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }))
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
   })
+
+  it("goes back from the two-factor step to the form", async () => {
+    server.use(
+      http.post(`${BASE}/sign-in/email`, () =>
+        HttpResponse.json({ challenge: { type: "two_factor", methods: ["totp"] } }),
+      ),
+    )
+    renderWith(<SignInForm />)
+    const user = await fillSignIn()
+    await user.click(await screen.findByRole("button", { name: "Sign in again" }))
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy()
+  })
 })
 
 describe("SignUpForm", () => {
