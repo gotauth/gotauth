@@ -1,11 +1,11 @@
-# GotAuth contracts (version 12)
+# GotAuth contracts (version 13)
 
 This file defines the **shared interfaces every work package builds against**. Work package F2 turns it into code in `src/gotauth/contracts/`, one module per section. That code is the source of truth when the two differ. After milestone **M0** the contracts are **frozen**: any change needs a contract change request (see [AGENT-RULES.md](AGENT-RULES.md)).
 
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 12
+CONTRACT_VERSION = 13
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -48,6 +48,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 11 (2026-10-14, [CCR 011](../ccr/011-delete-user-context.md)):** `delete_user(None, ...)` (13) runs the user delete hooks with a server context in one transaction and emits `user.deleted`, so a plugin can revoke what the user owns in the same transaction.
 
 **Version 12 (2026-10-14, [CCR 012](../ccr/012-on-failure.md)):** `EndpointContext.on_failure(work)` (section 5) runs work after a failed request's rollback, in its own transaction, so attempt counters outlast the error they record.
+
+**Version 13 (2026-10-15, [CCR 013](../ccr/013-sort-ties-admin-cookie.md)):** `find_many` breaks `sort_by` ties by `id` in the same direction (section 3), so paging is stable. The `admin_session` cookie and purpose string (P6) join the registries in sections 7 and 8.
 
 ---
 
@@ -241,6 +243,7 @@ Rules every adapter follows (checked by the conformance suite):
 - **IDs** are always supplied by the caller (`ctx.ids`); the adapter never generates them.
 - **`update` changes at most one row.** It returns the updated row, or `None` if nothing matched. Callers use it as **compare-and-set** by putting the expected current state in `where`. This includes version counters, e.g. P2's `two_factor.version`.
 - **`delete` returns the number of rows removed.** Single-use consumption is `delete(where=[id, value_hash, expires_at > now]) == 1`. That is atomic in SQL and in the memory adapter.
+- **`sort_by` ties break by `id`**, in the same direction, so `limit` and `offset` paging never repeats or skips a row.
 - `string_list` and `json` round-trip as Python lists and objects; `datetime` round-trips as aware UTC.
 - `transaction()` gives an adapter whose operations commit or roll back together. Nested calls reuse the outer transaction.
 - Unique violations (including `unique_together`) raise `UniqueViolation(model, fields)`. The failed write has no effect and the surrounding transaction stays usable, so a caller can catch the error and carry on (SQL adapters run writes in a savepoint).
@@ -474,6 +477,7 @@ Plugins add codes through `Plugin.error_codes`, prefixed with their area, e.g. `
   | `oauth_state` | C4 |
   | `two_factor_trust` | P2 |
   | `passkey_challenge` | P3 |
+  | `admin_session` | P6 |
 - **`SessionConfig`:**
 
   | Field | Default | Meaning |
@@ -558,6 +562,7 @@ class CryptoKit(Protocol):
   - `"account_token"` (C4, I1)
   - `"two_factor_secret"` and `"trusted_device"` (P2)
   - `"passkey_challenge"` (P3)
+  - `"admin_session"` (P6)
   - `"jwk_private"` and `"oauth_consent"` (O1)
 
 **Spec vectors** (F3 owns them; every language port must pass them byte for byte):

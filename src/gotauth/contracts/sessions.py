@@ -55,6 +55,7 @@ COOKIE_NAMES: Mapping[str, str] = MappingProxyType(
         "oauth_state": "C4",
         "two_factor_trust": "P2",
         "passkey_challenge": "P3",
+        "admin_session": "P6",
     }
 )
 """Cookie base name -> owning work package. A new cookie needs a CCR."""
