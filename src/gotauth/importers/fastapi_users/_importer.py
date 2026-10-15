@@ -13,6 +13,7 @@ from gotauth.contracts.errors import UniqueViolation
 
 from ._mapping import (
     argon2_available,
+    bcrypt_available,
     canonical_id,
     convert_hash,
     expires_at,
@@ -107,9 +108,12 @@ class _Run:
     report: ImportReport
     update: bool
     has_admin: bool
-    argon2_ok: bool
+    extras_ok: dict[str, bool]
     now: datetime
     seen_emails: dict[str, str] = field(default_factory=dict[str, str])
+    seen_accounts: dict[tuple[str, str], str] = field(
+        default_factory=dict[tuple[str, str], str]
+    )
     unknown_providers: set[str] = field(default_factory=set[str])
 
 
@@ -190,7 +194,7 @@ async def import_fastapi_users(
             report=report,
             update=update,
             has_admin="admin" in auth.plugin_ids,
-            argon2_ok=argon2_available(),
+            extras_ok={"bcrypt": bcrypt_available(), "argon2id": argon2_available()},
             now=auth.clock.now(),
         )
         await _copy(run, engine, users, oauth, batch_size, dry_run)
@@ -277,8 +281,10 @@ async def _copy(
             rows = [dict(row) for row in (await conn.execute(query)).mappings()]
             accounts: dict[Any, list[dict[str, Any]]] = defaultdict(list)
             if rows and oauth is not None:
-                linked = select(oauth).where(
-                    oauth.c.user_id.in_([row["id"] for row in rows])
+                linked = (
+                    select(oauth)
+                    .where(oauth.c.user_id.in_([row["id"] for row in rows]))
+                    .order_by(oauth.c.id)
                 )
                 for account in (await conn.execute(linked)).mappings():
                     accounts[account["user_id"]].append(dict(account))
@@ -292,6 +298,55 @@ async def _copy(
                 await _batch(run, tx, rows, accounts, write=True)
 
 
+@dataclass
+class _Known:
+    """What GotAuth already holds for one batch, read with one query per model."""
+
+    by_id: dict[str, dict[str, Any]]
+    by_email: dict[str, dict[str, Any]]
+    credentials: dict[str, dict[str, Any]]
+    oauth: dict[tuple[str, str], dict[str, Any]]
+
+
+async def _known(
+    db: Adapter,
+    rows: Sequence[Mapping[str, Any]],
+    accounts: Mapping[Any, list[dict[str, Any]]],
+) -> _Known:
+    ids = [canonical_id(row["id"]) for row in rows]
+    emails = [normalize_email(str(row["email"])) for row in rows]
+    by_id = {
+        row["id"]: row for row in await db.find_many("user", [Where("id", ids, "in")])
+    }
+    by_email = {
+        row["email"]: row
+        for row in await db.find_many("user", [Where("email", emails, "in")])
+    }
+    credentials = {
+        row["user_id"]: row
+        for row in await db.find_many(
+            "account",
+            [Where("provider_id", CREDENTIAL_PROVIDER), Where("user_id", ids, "in")],
+        )
+    }
+    wanted: dict[str, set[str]] = defaultdict(set)
+    for linked in accounts.values():
+        for account in linked:
+            wanted[str(account["oauth_name"])].add(str(account["account_id"]))
+    oauth: dict[tuple[str, str], dict[str, Any]] = {}
+    for provider_id, account_ids in wanted.items():
+        found = await db.find_many(
+            "account",
+            [
+                Where("provider_id", provider_id),
+                Where("account_id", sorted(account_ids), "in"),
+            ],
+        )
+        for row in found:
+            oauth[(provider_id, row["account_id"])] = row
+    return _Known(by_id, by_email, credentials, oauth)
+
+
 async def _batch(
     run: _Run,
     db: Adapter,
@@ -301,25 +356,31 @@ async def _batch(
     write: bool,
 ) -> None:
     report = run.report
+    known = await _known(db, rows, accounts)
     for row in rows:
         report.source_users += 1
         linked = accounts.get(row["id"], [])
-        user_id = await _user(run, db, row, write=write)
+        user_id = await _user(run, db, known, row, write=write)
         if user_id is None:
             report.users_skipped += 1
             report.oauth_skipped += len(linked)
             for account in linked:
                 report.oauth_accounts[str(account["oauth_name"])] += 1
             continue
-        has_password = await _credential(run, db, user_id, row, write=write)
+        has_password = await _credential(run, db, known, user_id, row, write=write)
         if linked and has_password:
             report.oauth_users_with_password += 1
         for account in linked:
-            await _oauth_account(run, db, user_id, row, account, write=write)
+            await _oauth_account(run, db, known, user_id, row, account, write=write)
 
 
 async def _user(
-    run: _Run, db: Adapter, row: Mapping[str, Any], *, write: bool
+    run: _Run,
+    db: Adapter,
+    known: _Known,
+    row: Mapping[str, Any],
+    *,
+    write: bool,
 ) -> str | None:
     """Create or update the user; its GotAuth id, or None when it is skipped."""
     report = run.report
@@ -339,7 +400,7 @@ async def _user(
             f"same email as {first} apart from case; skipped (merge them by hand)",
         )
         return None
-    run.seen_emails[email] = user_id
+    existing = known.by_id.get(user_id)
     values: dict[str, Any] = {  # Any: field values
         "email": email,
         "email_verified": bool(row["is_verified"]),
@@ -357,14 +418,22 @@ async def _user(
                 "import superusers as admins",
             )
         if not active:
-            report.problem(
-                "inactive_skipped",
-                user_id,
-                "inactive user skipped: add the admin plugin to import inactive "
-                "users as banned",
-            )
+            if existing is not None:
+                report.problem(
+                    "inactive_already_imported",
+                    user_id,
+                    "deactivated in fastapi-users after an earlier import, and "
+                    "still active in GotAuth: add the admin plugin and run with "
+                    "--update, or delete the user in GotAuth",
+                )
+            else:
+                report.problem(
+                    "inactive_skipped",
+                    user_id,
+                    "inactive user skipped: add the admin plugin to import "
+                    "inactive users as banned",
+                )
             return None
-    existing = await db.find_one("user", [Where("id", user_id)])
     if existing is not None:
         if existing["email"] != email:
             report.problem(
@@ -373,18 +442,23 @@ async def _user(
                 "a GotAuth user has this id with another email; skipped",
             )
             return None
-        if run.update:
-            if write:
-                await db.update(
-                    "user",
-                    [Where("id", user_id)],
-                    {**values, "updated_at": run.now},
-                )
-            report.users_updated += 1
-        else:
+        run.seen_emails[email] = user_id
+        if not run.update:
             report.users_existing += 1
+        elif existing["created_at"] != existing["updated_at"]:
+            # GotAuth moves updated_at on every change; imports never do.
+            report.problem(
+                "changed_in_gotauth",
+                user_id,
+                "the user was changed in GotAuth since the import; its fields are kept",
+            )
+            report.users_existing += 1
+        else:
+            if write:
+                await db.update("user", [Where("id", user_id)], values)
+            report.users_updated += 1
         return user_id
-    if await db.find_one("user", [Where("email", email)]) is not None:
+    if email in known.by_email:
         report.problem(
             "email_taken",
             user_id,
@@ -409,12 +483,19 @@ async def _user(
                 "email_taken", user_id, "the email was taken during the import"
             )
             return None
+    run.seen_emails[email] = user_id
     report.users_imported += 1
     return user_id
 
 
 async def _credential(
-    run: _Run, db: Adapter, user_id: str, row: Mapping[str, Any], *, write: bool
+    run: _Run,
+    db: Adapter,
+    known: _Known,
+    user_id: str,
+    row: Mapping[str, Any],
+    *,
+    write: bool,
 ) -> bool:
     """Carry the password hash over; whether the user has one GotAuth can verify."""
     report = run.report
@@ -422,7 +503,7 @@ async def _credential(
     kind = hash_kind(hashed if isinstance(hashed, str) else None)
     report.password_hashes[kind] += 1
     tagged = convert_hash(hashed) if isinstance(hashed, str) else None
-    if kind == "unknown":
+    if kind == "unknown" or tagged is None:
         report.problem(
             "unknown_hash",
             user_id,
@@ -430,19 +511,15 @@ async def _credential(
             "password or sign in another way",
         )
         return False
-    if kind == "argon2id" and not run.argon2_ok:
+    if not run.extras_ok[kind]:
+        extra = kind.removesuffix("id")
         report.problem(
-            "argon2_extra_missing",
+            f"{extra}_extra_missing",
             user_id,
-            'argon2id hash not imported: install "gotauth[argon2]" and run again',
+            f'{kind} hash not imported: install "gotauth[{extra}]" and run again',
         )
         return False
-    if tagged is None:  # a known kind always converts
-        return False
-    found = await db.find_one(
-        "account",
-        [Where("provider_id", CREDENTIAL_PROVIDER), Where("user_id", user_id)],
-    )
+    found = known.credentials.get(user_id)
     if found is None:
         if write:
             await db.create(
@@ -486,6 +563,7 @@ def _untouched(run: _Run, account: Mapping[str, Any]) -> bool:
 async def _oauth_account(
     run: _Run,
     db: Adapter,
+    known: _Known,
     user_id: str,
     row: Mapping[str, Any],
     account: Mapping[str, Any],
@@ -514,61 +592,73 @@ async def _oauth_account(
             f"no social provider {provider_id!r} is configured; its accounts are "
             "imported, but sign-in with it needs the provider",
         )
-    tokens: dict[str, Any] = {}  # Any: field values
-    if provider is not None and provider.store_provider_tokens:
-        crypto = run.auth.crypto
-        access = account.get("access_token")
-        refresh = account.get("refresh_token")
-        tokens = {
-            "access_token_enc": (
-                crypto.encrypt(str(access), purpose="account_token")
-                if access and write
-                else None
-            ),
-            "refresh_token_enc": (
-                crypto.encrypt(str(refresh), purpose="account_token")
-                if refresh and write
-                else None
-            ),
-            "access_token_expires_at": expires_at(account.get("expires_at")),
-        }
-        report.tokens_stored += 1
-    elif account.get("access_token") or account.get("refresh_token"):
-        report.tokens_dropped += 1
-    found = await db.find_one(
-        "account",
-        [Where("provider_id", provider_id), Where("account_id", account_id)],
-    )
-    if found is not None:
-        if found["user_id"] != user_id:
-            report.problem(
-                "account_owned_by_other_user",
-                user_id,
-                f"this {provider_id} account belongs to another GotAuth user; skipped",
-            )
-            report.oauth_skipped += 1
-        elif run.update:
-            if write and tokens:
-                await db.update(
-                    "account",
-                    [Where("id", found["id"])],
-                    {**tokens, "updated_at": run.now},
-                )
-            report.oauth_updated += 1
-        else:
-            report.oauth_existing += 1
-        return
-    if write:
-        await db.create(
-            "account",
-            {
-                "id": run.auth.ids.new("acc"),
-                "user_id": user_id,
-                "provider_id": provider_id,
-                "account_id": account_id,
-                **tokens,
-                "created_at": run.now,
-                "updated_at": run.now,
-            },
+    pair = (provider_id, account_id)
+    owner = run.seen_accounts.get(pair)
+    found = known.oauth.get(pair)
+    if owner is None and found is not None:
+        owner = found["user_id"]
+    if owner is not None and owner != user_id:
+        report.problem(
+            "account_owned_by_other_user",
+            user_id,
+            f"this {provider_id} account belongs to another user; skipped",
         )
-    report.oauth_imported += 1
+        report.oauth_skipped += 1
+        return
+    first_in_run = pair not in run.seen_accounts
+    run.seen_accounts[pair] = user_id
+    if not first_in_run:
+        report.oauth_existing += 1  # the same link twice in the source
+        return
+    store = provider is not None and provider.store_provider_tokens
+    has_tokens = bool(account.get("access_token") or account.get("refresh_token"))
+    if found is not None and not run.update:
+        report.oauth_existing += 1
+        return
+    tokens = _tokens(run, account, write=write) if store and has_tokens else {}
+    if found is not None:
+        if write and tokens:
+            await db.update(
+                "account",
+                [Where("id", found["id"])],
+                {**tokens, "updated_at": run.now},
+            )
+        report.oauth_updated += 1
+    else:
+        if write:
+            await db.create(
+                "account",
+                {
+                    "id": run.auth.ids.new("acc"),
+                    "user_id": user_id,
+                    "provider_id": provider_id,
+                    "account_id": account_id,
+                    **tokens,
+                    "created_at": run.now,
+                    "updated_at": run.now,
+                },
+            )
+        report.oauth_imported += 1
+    if tokens:
+        report.tokens_stored += 1
+    elif has_tokens:
+        report.tokens_dropped += 1
+
+
+def _tokens(
+    run: _Run, account: Mapping[str, Any], *, write: bool
+) -> dict[str, Any]:  # Any: field values
+    """Provider tokens sealed as C4 seals them (purpose ``"account_token"``)."""
+
+    def seal(value: object) -> str | None:
+        if not value:
+            return None
+        if not write:
+            return "<sealed>"  # a dry run never encrypts
+        return run.auth.crypto.encrypt(str(value), purpose="account_token")
+
+    return {
+        "access_token_enc": seal(account.get("access_token")),
+        "refresh_token_enc": seal(account.get("refresh_token")),
+        "access_token_expires_at": expires_at(account.get("expires_at")),
+    }

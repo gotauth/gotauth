@@ -14,6 +14,7 @@ from typing import Literal
 __all__ = [
     "HashKind",
     "argon2_available",
+    "bcrypt_available",
     "canonical_id",
     "convert_hash",
     "expires_at",
@@ -72,6 +73,11 @@ def convert_hash(hashed: str) -> str | None:
 def argon2_available() -> bool:
     """Whether the ``argon2`` extra is installed, so argon2id hashes can be verified."""
     return importlib.util.find_spec("argon2") is not None
+
+
+def bcrypt_available() -> bool:
+    """Whether the ``bcrypt`` extra is installed, so bcrypt hashes can be verified."""
+    return importlib.util.find_spec("bcrypt") is not None
 
 
 def expires_at(epoch: object) -> datetime | None:

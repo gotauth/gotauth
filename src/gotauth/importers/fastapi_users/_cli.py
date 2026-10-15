@@ -51,13 +51,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             means ``sys.argv[1:]``.
 
     Returns:
-        0 on success (problems are reported, not fatal), 1 when a batch failed, 2 when
-        the import could not start.
+        0 on success (problems are reported, not fatal), 1 when a batch failed or the
+        report could not be written, 2 when the import could not start.
     """
     try:
         args = _parser().parse_args(list(sys.argv[1:] if argv is None else argv))
     except SystemExit as exc:
         return int(exc.code or 0)
+    if args.report is not None and not args.report.parent.is_dir():
+        sys.stderr.write(f"error: no directory for the report: {args.report.parent}\n")
+        return 2
+    # The same --auth loading (and .env) as every other gotauth command.
     from gotauth.cli._commands import CliError, load_auth
 
     try:
@@ -80,7 +84,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     sys.stdout.write(summary(report))
     if args.report is not None:
-        args.report.write_text(json.dumps(report.to_dict(), indent=2) + "\n")
+        try:
+            args.report.write_text(json.dumps(report.to_dict(), indent=2) + "\n")
+        except OSError as exc:
+            sys.stderr.write(
+                "error: the import is done, but the report could not be written "
+                f"({exc.strerror or type(exc).__name__}); the counts are above\n"
+            )
+            return 1
         sys.stdout.write(f"report written to {args.report}\n")
     return 0
 

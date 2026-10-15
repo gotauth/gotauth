@@ -54,7 +54,9 @@ Built against fastapi-users 15.0.5 and fastapi-users-db-sqlalchemy 7.0.0 (pwdlib
 
 From Python: `await import_fastapi_users(auth, dry_run=True)` returns the same
 report. Exit codes: 0 done (problems are reported, not fatal), 1 a batch failed
-(earlier batches are committed; run again), 2 the import could not start.
+(earlier batches are committed; run again) or the report could not be written, 2
+the import could not start. Each batch reads what GotAuth already holds with one
+query per model.
 
 ## What is copied
 
@@ -81,9 +83,13 @@ nobody knows. They are imported as they are and counted in the report ("OAuth us
 with a password hash").
 
 **`--update`** copies the user fields (email verified, role, ban) and provider
-tokens again, and a password only while GotAuth has not changed it: once the user
-has signed in to GotAuth (which rehashes) or changed the password, the GotAuth one
-stays. A user whose GotAuth id holds another email is reported and left alone.
+tokens again, but only what GotAuth has not changed since:
+- a user row changed in GotAuth (a ban, a role, a verified email) is kept and
+  reported as `changed_in_gotauth`;
+- a password is kept once the user has signed in to GotAuth (which rehashes) or
+  changed it.
+
+A user whose GotAuth id holds another email is reported and left alone.
 
 ## Problems in the report
 
@@ -93,9 +99,12 @@ stays. A user whose GotAuth id holds another email is reported and left alone.
 | `email_taken` | A GotAuth user with another id has this email; skipped |
 | `id_email_mismatch` | A GotAuth user has this id with another email; skipped |
 | `unknown_hash` | Password hash format GotAuth cannot verify |
+| `bcrypt_extra_missing` | bcrypt hash not imported; install `gotauth[bcrypt]` and run again |
 | `argon2_extra_missing` | argon2id hash not imported; install `gotauth[argon2]` and run again |
 | `superuser_not_admin` | Imported as an ordinary user (no admin plugin) |
 | `inactive_skipped` | Skipped (no admin plugin to ban it) |
+| `inactive_already_imported` | Deactivated after an earlier import and still active in GotAuth (no admin plugin) |
+| `changed_in_gotauth` | `--update` kept the GotAuth user fields |
 | `account_email_differs` | The OAuth account's email is not the user's |
 | `unknown_provider` | No social provider with this name; the accounts are imported anyway |
 | `account_owned_by_other_user` | The OAuth account belongs to another GotAuth user; skipped |

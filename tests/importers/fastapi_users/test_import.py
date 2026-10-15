@@ -552,3 +552,138 @@ async def _in_thread(argv: list[str]) -> int:
     import asyncio
 
     return await asyncio.to_thread(main, argv)
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+async def _source_rows(engine: AsyncEngine, sql: str, **params: Any) -> None:
+    async with engine.begin() as conn:
+        await conn.execute(text(sql), params)
+
+
+async def test_bcrypt_hashes_need_the_extra(
+    sqlite_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_importer, "bcrypt_available", lambda: False)
+    auth, _ = await ready(sqlite_engine)
+    report = await import_fastapi_users(auth)
+    missing = [
+        str(p.user_id) for p in report.problems if p.kind == "bcrypt_extra_missing"
+    ]
+    assert sorted(missing) == [ADA, CY, DUP_1]
+    assert report.credential_accounts == 2
+
+
+async def test_a_skipped_user_does_not_block_its_case_duplicate(
+    sqlite_engine: AsyncEngine,
+) -> None:
+    auth, _ = await ready(sqlite_engine, plugins=[])
+    insert = 'INSERT INTO "user" VALUES (:id, :email, :hash, :active, 0, 1, NULL)'
+    await _source_rows(
+        sqlite_engine,
+        insert,
+        id="2a000000-0000-4000-8000-000000000001",
+        email="Zed@example.com",
+        hash=_bcrypt("zed"),
+        active=False,
+    )
+    await _source_rows(
+        sqlite_engine,
+        insert,
+        id="2b000000-0000-4000-8000-000000000002",
+        email="zed@example.com",
+        hash=_bcrypt("zed"),
+        active=True,
+    )
+    await import_fastapi_users(auth)
+    zed = await auth.database.find_one("user", [Where("email", "zed@example.com")])
+    assert zed is not None and zed["id"].startswith("2b")
+
+
+async def test_a_user_deactivated_after_the_import_is_reported(
+    sqlite_engine: AsyncEngine,
+) -> None:
+    auth, _ = await ready(sqlite_engine, plugins=[])
+    await import_fastapi_users(auth)
+    await _source_rows(
+        sqlite_engine, 'UPDATE "user" SET is_active = 0 WHERE id = :id', id=BOB
+    )
+    report = await import_fastapi_users(auth, update=True)
+    kinds = {(p.kind, p.user_id) for p in report.problems}
+    assert ("inactive_already_imported", BOB) in kinds
+
+
+async def test_update_keeps_users_changed_in_gotauth(
+    sqlite_engine: AsyncEngine,
+) -> None:
+    auth, _ = await ready(sqlite_engine)
+    await import_fastapi_users(auth)
+    clock = auth.clock
+    clock.advance("1h")
+    await auth.database.update(
+        "user",
+        [Where("id", BOB)],
+        {"banned": True, "ban_reason": "spam", "updated_at": clock.now()},
+    )
+    report = await import_fastapi_users(auth, update=True)
+    assert ("changed_in_gotauth", BOB) in {(p.kind, p.user_id) for p in report.problems}
+    bob = await auth.database.find_one("user", [Where("id", BOB)])
+    assert bob is not None and (bob["banned"], bob["ban_reason"]) == (True, "spam")
+    assert report.users_updated == 5
+
+
+async def test_one_provider_account_linked_to_two_users(
+    sqlite_engine: AsyncEngine,
+) -> None:
+    auth, _ = await ready(sqlite_engine)
+    await _source_rows(
+        sqlite_engine,
+        "INSERT INTO oauth_account VALUES (:id, 'github', 'x', NULL, NULL, '4242', "
+        "'bob@example.com', :user)",
+        id="1d000000-0000-4000-8000-000000000004",
+        user=BOB,
+    )
+    dry = await import_fastapi_users(auth, dry_run=True)
+    real = await import_fastapi_users(auth)
+    for report in (dry, real):
+        owned = [p for p in report.problems if p.kind == "account_owned_by_other_user"]
+        assert len(owned) == 1
+        assert report.oauth_imported == 3
+    row = await auth.database.find_one(
+        "account", [Where("provider_id", "github"), Where("account_id", "4242")]
+    )
+    assert row is not None and row["user_id"] == BOB  # the first by id keeps it
+
+
+async def test_token_counts_follow_what_is_written(
+    sqlite_engine: AsyncEngine,
+) -> None:
+    auth, _ = await ready(sqlite_engine, store_provider_tokens=True)
+    first = await import_fastapi_users(auth)
+    assert (first.tokens_stored, first.tokens_dropped) == (2, 1)
+    again = await import_fastapi_users(auth)
+    assert (again.tokens_stored, again.tokens_dropped) == (0, 0)
+
+
+async def test_cli_checks_the_report_directory_first(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    await _cli_app(tmp_path, "auth_", "dir_app")
+    monkeypatch.chdir(tmp_path)
+    code = await _in_thread(
+        ["fastapi-users", "--auth", "dir_app:auth", "--report", "missing/r.json"]
+    )
+    assert code == 2
+    assert "no directory" in capsys.readouterr().err
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'dir_app.db'}")
+    try:
+        async with engine.connect() as conn:
+            count = (
+                await conn.execute(text("SELECT COUNT(*) FROM auth_user"))
+            ).scalar()
+        assert count == 0
+    finally:
+        await engine.dispose()
