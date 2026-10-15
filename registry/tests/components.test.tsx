@@ -77,15 +77,22 @@ describe("SignInForm", () => {
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
-  it("explains a challenge without onChallenge", async () => {
+  it("shows the two-factor step itself without onChallenge", async () => {
     server.use(
       http.post(`${BASE}/sign-in/email`, () =>
         HttpResponse.json({ challenge: { type: "two_factor", methods: ["totp"] } }),
       ),
+      http.post(`${BASE}/two-factor/verify-totp`, () =>
+        HttpResponse.json({ user: USER, session: SESSION }),
+      ),
+      http.get(`${BASE}/session`, () => HttpResponse.json({ user: USER, session: SESSION })),
     )
-    renderWith(<SignInForm />)
-    await fillSignIn()
-    expect(await screen.findByText(/second factor/)).toBeTruthy()
+    const onSuccess = vi.fn()
+    renderWith(<SignInForm onSuccess={onSuccess} />)
+    const user = await fillSignIn()
+    await user.type(await screen.findByLabelText(/authenticator app/), "123456")
+    await user.click(screen.getByRole("button", { name: "Continue" }))
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
   })
 })
 

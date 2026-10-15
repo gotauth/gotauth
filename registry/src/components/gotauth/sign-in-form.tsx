@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { useGotAuthClient } from "@/components/gotauth/gotauth-provider"
 import { FormMessage } from "@/components/gotauth/form-message"
 import { SocialButtons, type SocialProvider } from "@/components/gotauth/social-buttons"
+import { TwoFactorChallenge } from "@/components/gotauth/two-factor-challenge"
 import {
   isChallenge,
   type GotAuthError,
@@ -25,7 +26,8 @@ export function SignInForm({
   forgotPasswordHref,
 }: {
   onSuccess?: (result: SignInOut) => void
-  /** Called when the sign-in needs another step, for example two-factor. */
+  /** Called when the sign-in needs another step, for example two-factor. Without
+   * it, the form shows TwoFactorChallenge itself. */
   onChallenge?: (challenge: SignInChallenge) => void
   socialProviders?: SocialProvider[]
   callbackURL?: string
@@ -35,14 +37,13 @@ export function SignInForm({
   const id = useId()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<GotAuthError | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [challenge, setChallenge] = useState<SignInChallenge | null>(null)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     setPending(true)
     setError(null)
-    setNotice(null)
     const result = await client.signInEmail({
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
@@ -55,11 +56,13 @@ export function SignInForm({
     }
     if (isChallenge(result.data)) {
       if (onChallenge) onChallenge(result.data.challenge)
-      else setNotice("One more step: confirm it's you with your second factor.")
+      else setChallenge(result.data.challenge)
       return
     }
     onSuccess?.(result.data)
   }
+
+  if (challenge) return <TwoFactorChallenge challenge={challenge} onSuccess={onSuccess} />
 
   return (
     <Card className="w-full max-w-sm">
@@ -100,7 +103,7 @@ export function SignInForm({
             />
             <Label htmlFor={`${id}-remember`}>Keep me signed in</Label>
           </div>
-          <FormMessage error={error} message={notice} />
+          <FormMessage error={error} />
           <Button type="submit" disabled={pending}>
             {pending ? "Signing in..." : "Sign in"}
           </Button>

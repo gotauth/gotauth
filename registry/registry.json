@@ -100,7 +100,7 @@
       "name": "sign-in-form",
       "type": "registry:component",
       "title": "Sign-in form",
-      "description": "Email and password sign-in with social buttons.",
+      "description": "Email and password sign-in with social buttons and the two-factor step.",
       "registryDependencies": [
         "button",
         "card",
@@ -109,6 +109,7 @@
         "@gotauth/gotauth-provider",
         "@gotauth/form-message",
         "@gotauth/social-buttons",
+        "@gotauth/two-factor-challenge",
         "@gotauth/gotauth-client"
       ],
       "files": [
@@ -203,6 +204,152 @@
           "path": "src/components/gotauth/api-key-manager.tsx",
           "type": "registry:component",
           "target": "components/gotauth/api-key-manager.tsx"
+        }
+      ]
+    },
+    {
+      "name": "qr-code",
+      "type": "registry:component",
+      "title": "QR code",
+      "description": "A QR code drawn locally as SVG, for authenticator setup.",
+      "dependencies": [
+        "uqr@0.1.3"
+      ],
+      "registryDependencies": [],
+      "files": [
+        {
+          "path": "src/components/gotauth/qr-code.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/qr-code.tsx"
+        }
+      ]
+    },
+    {
+      "name": "two-factor-setup",
+      "type": "registry:component",
+      "title": "Two-factor setup",
+      "description": "Turn on an authenticator app (QR code, backup codes shown once) or turn it off.",
+      "registryDependencies": [
+        "alert",
+        "button",
+        "card",
+        "input",
+        "label",
+        "@gotauth/qr-code",
+        "@gotauth/use-session",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/two-factor-setup.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/two-factor-setup.tsx"
+        }
+      ]
+    },
+    {
+      "name": "two-factor-challenge",
+      "type": "registry:component",
+      "title": "Two-factor challenge",
+      "description": "The second sign-in step: authenticator code, backup code or emailed code.",
+      "registryDependencies": [
+        "button",
+        "card",
+        "input",
+        "label",
+        "@gotauth/two-factor-setup",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/two-factor-challenge.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/two-factor-challenge.tsx"
+        }
+      ]
+    },
+    {
+      "name": "passkey-button",
+      "type": "registry:component",
+      "title": "Passkey button",
+      "description": "Sign in with a passkey, or add one to the account.",
+      "registryDependencies": [
+        "button",
+        "@gotauth/webauthn",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/passkey-button.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/passkey-button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "org-switcher",
+      "type": "registry:component",
+      "title": "Organization switcher",
+      "description": "Choose the organization the session acts in.",
+      "registryDependencies": [
+        "button",
+        "dropdown-menu",
+        "@gotauth/use-session",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/org-switcher.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/org-switcher.tsx"
+        }
+      ]
+    },
+    {
+      "name": "consent-screen",
+      "type": "registry:component",
+      "title": "OAuth consent screen",
+      "description": "Allow or deny an app's access, with its redirect host and scopes; a native form post.",
+      "registryDependencies": [
+        "alert",
+        "button",
+        "card",
+        "@gotauth/gotauth-provider",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/consent-screen.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/consent-screen.tsx"
+        }
+      ]
+    },
+    {
+      "name": "connected-apps",
+      "type": "registry:component",
+      "title": "Connected apps",
+      "description": "Apps with OAuth access to the account, each with a revoke button.",
+      "registryDependencies": [
+        "button",
+        "table",
+        "@gotauth/gotauth-provider",
+        "@gotauth/form-message",
+        "@gotauth/gotauth-client"
+      ],
+      "files": [
+        {
+          "path": "src/components/gotauth/connected-apps.tsx",
+          "type": "registry:component",
+          "target": "components/gotauth/connected-apps.tsx"
         }
       ]
     }

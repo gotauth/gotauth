@@ -19,7 +19,7 @@ npx shadcn@latest add @gotauth/sign-in-form @gotauth/user-button @gotauth/use-se
 
 Wrap the app in `<GotAuthProvider baseURL="/api/auth">` and use the components inside it.
 
-## Items (part 1)
+## Items
 
 | Item | What it is |
 |---|---|
@@ -27,13 +27,26 @@ Wrap the app in `<GotAuthProvider baseURL="/api/auth">` and use the components i
 | `gotauth-provider` | `GotAuthProvider` and `useGotAuthClient()` |
 | `use-session` | `useSession()`: `{ data: SessionWithUserOut \| null, error, isPending, refetch }`, shared, refetched after sign-in and sign-out |
 | `webauthn` | base64url and ArrayBuffer helpers for passkeys |
-| `sign-in-form`, `sign-up-form`, `social-buttons` | Email and password forms with social buttons |
+| `sign-in-form`, `sign-up-form`, `social-buttons` | Email and password forms with social buttons; the sign-in form shows the two-factor step itself unless you pass `onChallenge` |
 | `user-button` | Avatar with a sign-out menu |
 | `session-list` | Signed-in devices, sign out one or all others |
 | `api-key-manager` | Create, list and delete API keys; a new key is shown once |
+| `two-factor-setup` | Turn on an authenticator app (QR code, then a code to confirm, then backup codes shown once), get new backup codes, or turn it off. With `duringSignIn` it is the enforced setup step of a sign-in |
+| `two-factor-challenge` | The second sign-in step: authenticator code, backup code or emailed code, with "don't ask again on this device" |
+| `qr-code` | A QR code drawn in the page as SVG (with [uqr](https://github.com/unjs/uqr) 0.1.3), so the TOTP secret never leaves the browser |
+| `passkey-button` | `mode="sign-in"` (no email needed) or `mode="register"` (add a passkey to the account) |
+| `org-switcher` | Choose the organization the session acts in, or the personal account |
+| `consent-screen` | The OAuth consent screen: app name, where the browser goes next (`redirect_host`), a warning for local-only apps, scopes; Allow and Deny post a native form |
+| `connected-apps` | Apps with OAuth access (for example MCP clients), each with a Revoke button |
 
-Part 2 (two-factor, passkeys, organizations, OAuth consent and the OpenAPI drift check)
-follows once those plugins are built.
+**Plugin namespaces of the client:** `apiKeys`, `twoFactor`, `passkey`, `magicLink`,
+`emailOtp`, `organization` and `oauth2`. Admin and agent endpoints are not in the client
+yet.
+
+**An OAuth consent page** in your app calls `client.oauth2.oauthAuthorize(query)` with
+the query it was opened with. The result is either consent details for `ConsentScreen`
+(`isConsent(result)`), or `{ url }`: the user must sign in first, or has already
+consented, so the page navigates there with `window.location.assign(url)`.
 
 ## Client rules
 
@@ -43,6 +56,21 @@ follows once those plugins are built.
   (GotAuth answers 415 otherwise); GET inputs go in the query string.
 - Errors come back as `{ code, message, status }` from GotAuth's error body; network
   failures are `NETWORK_ERROR`.
+
+## Contract check against the backend
+
+`openapi.json` is the HTTP API of GotAuth with every plugin, written by
+`scripts/export_openapi.py`. `pnpm typecheck` turns its schemas into TypeScript types
+(`scripts/openapi-types.mjs`, into the ignored `tests/generated/`) and `tests/contract.ts`
+checks that the client's request and response types match them field by field. On the
+Python side, `tests/registry/test_openapi.py` fails when `openapi.json` is out of date.
+A change on either side therefore fails a check instead of breaking at runtime. After
+changing an endpoint:
+
+```bash
+./dev.sh uv run python registry/scripts/export_openapi.py
+./dev.sh pnpm --dir registry run typecheck
+```
 
 ## Layout
 
