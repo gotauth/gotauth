@@ -55,7 +55,9 @@ real owner:
 - An account that was never verified, has no other sign-in method and is older than
   `verify_token_expires_in` is treated as abandoned: a new sign-up with that email
   deletes it (through `auth.delete_user`) and starts fresh. The reply is the same as
-  for any sign-up.
+  for any sign-up. This applies only while verification is required. Without it, an
+  unverified account can sign in and may hold data, so it is never released, and a
+  sign-up with its email gets `USER_ALREADY_EXISTS`.
 
 One case remains: if the owner clicks a verification link they did not ask for within
 that window, the account is verified with the other person's password. A password reset

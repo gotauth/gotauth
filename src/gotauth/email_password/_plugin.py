@@ -200,8 +200,12 @@ async def _release_abandoned(ctx: EndpointContext, row: dict[str, Any]) -> bool:
     Someone else may have signed up with this address and a password they know
     (pre-account hijacking). Once the verification window has passed, the account is
     abandoned: it has never been verified and has no other sign-in method.
+
+    Only when verification is required: then the account could never sign in, so
+    nothing is lost. Without it, an unverified account is a live account, and nothing
+    proves that the new sign-up owns the email.
     """
-    if row["email_verified"]:
+    if not _settings(ctx).require_email_verification or row["email_verified"]:
         return False
     window = to_timedelta(_settings(ctx).verify_token_expires_in)
     if ctx.clock.now() - row["created_at"] < window:

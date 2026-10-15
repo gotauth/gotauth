@@ -749,3 +749,21 @@ async def test_social_only_users_cannot_be_verified_by_link() -> None:
     assert error.value.code == "TOKEN_INVALID"
     row = await ctx.adapter.find_one("user", [Where("id", user.id)])
     assert row is not None and not row["email_verified"]
+
+
+async def test_unverified_accounts_are_kept_when_verification_is_off() -> None:
+    # Issue #49: without required verification, an unverified account is a live
+    # account; a later sign-up with its email must not take it over.
+    ctx = ep_ctx(require_email_verification=False)
+    owner = await add_user(ctx, verified=False)
+    ctx.clock.advance("2d")
+    with pytest.raises(AuthError) as taken:
+        await call(
+            ctx,
+            "sign_up_email",
+            {"email": "ada@example.com", "password": "attacker password"},
+        )
+    assert taken.value.code == "USER_ALREADY_EXISTS"
+    assert ctx.auth.deleted_users == []
+    row = await ctx.adapter.find_one("user", [Where("email", "ada@example.com")])
+    assert row is not None and row["id"] == owner
