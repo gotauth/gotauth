@@ -11,7 +11,7 @@ Instructions for coding agents working on this example app.
 - no `python-jose`
 - no tokens in `localStorage`
 
-GotAuth already provides sign-up, sign-in, sessions, email verification, password reset, GitHub login and API keys.
+GotAuth already provides sign-up, sign-in, sessions, email verification, password reset, GitHub login, API keys, two-factor authentication, passkeys and organizations with invitations.
 
 ## Where things are
 
@@ -52,7 +52,10 @@ GotAuth already provides sign-up, sign-in, sessions, email verification, passwor
 **Add a GotAuth plugin:**
 1. Add it to `plugins` in `auth.py`.
 2. Write a migration: `uv run gotauth generate --auth app.auth:auth -m "<plugin> tables"`.
-3. Apply it: `uv run alembic upgrade head`.
+3. Check the revision: a NOT NULL column added to an existing table needs a `server_default`, or upgrading a database with rows fails (issue #53).
+4. Apply it: `uv run alembic upgrade head`.
+
+**Organization-scoped data:** the session's active organization is `session.active_organization_id` (set with the switcher), and `auth.fastapi.require(permission={"project": ["read"]})` checks the caller's role in it.
 
 ## Run the checks
 
@@ -63,4 +66,4 @@ From the repository root (Docker only; nothing is installed on the host):
 ./dev.sh bash -c "cd examples/fastapi-nextjs/frontend && pnpm install --frozen-lockfile && pnpm run check"
 ```
 
-`backend/tests/test_m2_scenario.py` must keep passing. It is the walkthrough in README.md.
+`backend/tests/test_m2_scenario.py` and `backend/tests/test_part2_flows.py` must keep passing. They are the walkthroughs in README.md, and the browser tests (Q2) drive the same pages. Keep their labels and `data-testid`s stable.

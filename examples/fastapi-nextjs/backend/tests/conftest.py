@@ -43,14 +43,14 @@ GITHUB_USER = ProviderUser(
 )
 
 
-async def migrate(url: str) -> None:
-    """`alembic upgrade head`, as the app's container runs it."""
+async def migrate(url: str, revision: str = "head") -> None:
+    """`alembic upgrade head` (or to `revision`), as the app's container runs it."""
     previous = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = url
     try:
         # migrations/env.py starts its own event loop, so Alembic gets a thread.
         config = Config(str(BACKEND / "alembic.ini"))
-        await asyncio.to_thread(command.upgrade, config, "head")
+        await asyncio.to_thread(command.upgrade, config, revision)
     finally:
         if previous is None:
             del os.environ["DATABASE_URL"]

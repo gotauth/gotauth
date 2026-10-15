@@ -5,6 +5,9 @@ A FastAPI backend and a Next.js frontend with:
 - "Continue with GitHub"
 - a session cookie
 - API keys with scopes for scripts
+- two-factor authentication (authenticator app, backup codes)
+- passkeys
+- organizations, with invitations by email
 
 All of the auth setup is in [backend/app/auth.py](backend/app/auth.py).
 
@@ -59,6 +62,22 @@ On start, the backend runs `alembic upgrade head`. GotAuth's tables (`auth_user`
 
 [backend/tests/test_m2_scenario.py](backend/tests/test_m2_scenario.py) runs the same steps on SQLite and Postgres. A stub stands in for GitHub, and a capturing mailer stands in for the console.
 
+## Two-factor, passkeys and organizations
+
+Signed in, open these pages:
+- **Security** (`/security`):
+  - **Turn on two-factor:** confirm your password, scan the QR code with an authenticator app, save the backup codes, and enter the 6-digit code. From then on, signing in with the password asks for a code too. The sign-in form shows that step itself, and "Don't ask again on this device" skips it for 30 days.
+  - **Add a passkey.** The browser asks for your fingerprint, face or device PIN. Then "Sign in with a passkey" on the sign-in page works without an email or password, and without the two-factor step.
+- **Organizations** (`/organizations`):
+  - **Create an organization.** It becomes the one you act in, as the switcher at the top shows.
+  - **Invite someone by email.** The invitation is printed in the backend's output like any email. Its link opens `/invitations/accept`, where the invited person signs in with that address and joins.
+
+[backend/tests/test_part2_flows.py](backend/tests/test_part2_flows.py) runs these flows on SQLite and Postgres: two-factor setup and sign-in (a TOTP code, then a backup code that works once), passkey registration and sign-in with GotAuth's software authenticator, and an invitation from email to membership.
+
+**Upgrading from the first version of this example.** The revision for these plugins adds `auth_user.two_factor_enabled`. It sets a server default, so existing users get `false`. A test upgrades a database that already has a user.
+
+**Outside localhost** the organization plugin needs a real email sender for invitations. Set `email_sender=...` in `auth.py` (see the email docs). GotAuth refuses to start without one.
+
 ## Hero clip script (about 45 seconds)
 
 **Setup.**
@@ -104,8 +123,11 @@ From the repository root, in the dev container:
 `frontend/src/components/gotauth/`, `src/hooks/use-session.ts` and `src/lib/gotauth-client.ts` come from GotAuth's shadcn registry, added with:
 
 ```bash
-pnpm dlx shadcn@4.21.3 add @gotauth/sign-in-form @gotauth/sign-up-form @gotauth/social-buttons @gotauth/user-button @gotauth/api-key-manager @gotauth/use-session
+pnpm dlx shadcn@4.21.3 add @gotauth/sign-in-form @gotauth/sign-up-form @gotauth/social-buttons @gotauth/user-button @gotauth/api-key-manager @gotauth/use-session \
+  @gotauth/two-factor-setup @gotauth/two-factor-challenge @gotauth/passkey-button @gotauth/org-switcher
 ```
+
+The two-factor setup draws its QR code in the page with `uqr`, so the secret never leaves the browser; `shadcn add` installs it.
 
 They are your code now, so edit them freely. Until the registry is published at `gotauth.ablacky.com`, build it from this repository instead:
 1. Run `pnpm --dir registry build`.

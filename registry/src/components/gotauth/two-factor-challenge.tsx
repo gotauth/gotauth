@@ -114,7 +114,7 @@ export function TwoFactorChallenge({
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>Confirm it's you</CardTitle>
+        <CardTitle>{"Confirm it's you"}</CardTitle>
         <CardDescription>{LABELS[method].help}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -143,7 +143,7 @@ export function TwoFactorChallenge({
             </div>
             <div className="flex items-center gap-2">
               <input id={`${id}-trust`} name="trust_device" type="checkbox" className="size-4" />
-              <Label htmlFor={`${id}-trust`}>Don't ask again on this device</Label>
+              <Label htmlFor={`${id}-trust`}>{"Don't ask again on this device"}</Label>
             </div>
             <FormMessage error={error} message={notice} />
             <Button type="submit" disabled={pending}>
