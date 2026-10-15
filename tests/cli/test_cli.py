@@ -129,9 +129,11 @@ def test_check_delegates_to_g3(project: Path) -> None:
     assert main(["check", str(project)]) == 0
 
 
-def test_import_is_not_available_yet(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["import", "--help"]) == 2
-    assert "not available" in capsys.readouterr().err
+def test_import_runs_the_fastapi_users_importer(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["import", "fastapi-users", "--help"]) == 0
+    assert "--source-url" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------- errors
