@@ -62,7 +62,15 @@ export function SignInForm({
     onSuccess?.(result.data)
   }
 
-  if (challenge) return <TwoFactorChallenge challenge={challenge} onSuccess={onSuccess} />
+  if (challenge) {
+    return (
+      <TwoFactorChallenge
+        challenge={challenge}
+        onSuccess={onSuccess}
+        onCancel={() => setChallenge(null)}
+      />
+    )
+  }
 
   return (
     <Card className="w-full max-w-sm">

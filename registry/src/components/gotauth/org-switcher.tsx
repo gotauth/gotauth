@@ -42,13 +42,22 @@ export function OrgSwitcher({
   useEffect(() => {
     if (!signedIn) return
     let live = true
-    void client.organization.listOrganizations().then((result) => {
-      if (!live) return
-      if (result.error) setError(result.error)
-      else setOrgs(result.data.organizations)
-    })
+    let latest = 0
+    function load() {
+      // Only the newest answer counts when changes come quickly.
+      const call = ++latest
+      void client.organization.listOrganizations().then((result) => {
+        if (!live || call !== latest) return
+        if (result.error) setError(result.error)
+        else setOrgs(result.data.organizations)
+      })
+    }
+    load()
+    // Creating, deleting, leaving or joining an organization notifies the client.
+    const stop = client.subscribe(load)
     return () => {
       live = false
+      stop()
     }
   }, [client, signedIn])
 

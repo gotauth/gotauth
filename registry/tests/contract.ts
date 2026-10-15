@@ -1,9 +1,13 @@
 // Type-level check of the typed client against the backend's OpenAPI document.
 // `pnpm typecheck` first regenerates ./generated/openapi.ts from ../openapi.json
 // (written by scripts/export_openapi.py), so a field added, removed or retyped on
-// either side fails `tsc`. Nothing here runs.
+// either side of a listed model fails `tsc`. Nothing here runs. Not covered: GET query
+// inputs (OpenAPI parameters, not schemas) and outputs the server does not declare
+// (ChallengeOut, and the union answers of the two-factor and passkey verify routes).
 import type { components } from "./generated/openapi"
 import type {
+  AccountListOut,
+  AccountOut,
   ApiKeyListOut,
   ApiKeyOut,
   BackupCodesOut,
@@ -16,6 +20,7 @@ import type {
   InvitationOut,
   IssueApiKeyOut,
   MemberOut,
+  OAuthConsentOut,
   OAuthGrantListOut,
   OAuthGrantOut,
   OAuthGrantRevokedOut,
@@ -24,10 +29,15 @@ import type {
   OrganizationWithRoleOut,
   PasskeyListOut,
   PasskeyOut,
+  RedirectOut,
   RequestOptionsOut,
+  Session,
   SessionListOut,
+  SessionWithUserOut,
   SetActiveOut,
+  SignInOut,
   StatusOut,
+  User,
 } from "@/lib/gotauth-client"
 
 type S = components["schemas"]
@@ -49,14 +59,21 @@ type C = GotAuthClient
 
 export type ResponseChecks = [
   Expect<Agree<StatusOut, S["StatusOut"]>>,
-  Expect<Agree<SessionListOut["current_session_id"], S["SessionListOut"]["current_session_id"]>>,
+  Expect<Agree<RedirectOut, S["RedirectOut"]>>,
+  Expect<Agree<User, S["User"]>>,
+  Expect<Agree<Session, S["Session"]>>,
+  Expect<Agree<SessionWithUserOut, S["SessionWithUserOut"]>>,
+  Expect<Agree<SignInOut, S["SignInOut"]>>,
+  Expect<Agree<SessionListOut, S["SessionListOut"]>>,
+  Expect<Agree<AccountOut, S["AccountOut"]>>,
+  Expect<Agree<AccountListOut, S["AccountListOut"]>>,
   Expect<Agree<ApiKeyOut, S["ApiKeyOut"]>>,
-  Expect<Agree<IssueApiKeyOut["key"], S["IssueApiKeyOut"]["key"]>>,
-  Expect<Agree<ApiKeyListOut["api_keys"], S["ApiKeyListOut"]["api_keys"]>>,
+  Expect<Agree<IssueApiKeyOut, S["IssueApiKeyOut"]>>,
+  Expect<Agree<ApiKeyListOut, S["ApiKeyListOut"]>>,
   Expect<Agree<EnableOut, S["EnableOut"]>>,
   Expect<Agree<BackupCodesOut, S["BackupCodesOut"]>>,
-  Expect<Agree<CreationOptionsOut["challenge"], S["CreationOptionsOut"]["challenge"]>>,
-  Expect<Agree<RequestOptionsOut["rpId"], S["RequestOptionsOut"]["rpId"]>>,
+  Expect<Agree<CreationOptionsOut, S["CreationOptionsOut"]>>,
+  Expect<Agree<RequestOptionsOut, S["RequestOptionsOut"]>>,
   Expect<Agree<PasskeyOut, S["PasskeyOut"]>>,
   Expect<Agree<PasskeyListOut, S["PasskeyListOut"]>>,
   Expect<Agree<OrganizationOut, S["OrganizationOut"]>>,
@@ -71,6 +88,7 @@ export type ResponseChecks = [
   Expect<Agree<OAuthGrantOut, S["OAuthGrantOut"]>>,
   Expect<Agree<OAuthGrantListOut, S["OAuthGrantListOut"]>>,
   Expect<Agree<OAuthGrantRevokedOut, S["gotauth__contracts__http_models__RevokedOut"]>>,
+  Expect<Agree<OAuthConsentOut, S["OAuthConsentOut"]>>,
 ]
 
 export type RequestChecks = [

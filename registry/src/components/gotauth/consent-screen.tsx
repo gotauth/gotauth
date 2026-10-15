@@ -15,9 +15,10 @@ import type { OAuthConsentOut } from "@/lib/gotauth-client"
 
 /** The OAuth consent screen for an app (for example an MCP client) asking for access.
  *
- * Get `consent` from `client.oauth2.oauthAuthorize(query)` (see `isConsent`). The
- * buttons submit a native form POST, so the browser follows GotAuth's redirect back
- * to the app; no fetch is involved. */
+ * Your consent page (the oauth_provider `consent_page`) is opened with
+ * `?consent_id=...`; get `consent` with `client.oauth2.getOauthConsent({ consent_id })`.
+ * The buttons submit a native form POST, so the browser follows GotAuth's redirect
+ * back to the app; no fetch is involved. */
 export function ConsentScreen({
   consent,
   scopeDescriptions = {},

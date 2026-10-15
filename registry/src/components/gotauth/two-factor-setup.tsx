@@ -17,6 +17,7 @@ type Step =
   | { name: "start" }
   | { name: "scan"; totpURI: string; backupCodes: string[] }
   | { name: "codes"; backupCodes: string[] }
+  | { name: "done" }
 
 function secretOf(totpURI: string): string {
   try {
@@ -24,6 +25,40 @@ function secretOf(totpURI: string): string {
   } catch {
     return ""
   }
+}
+
+function BackupCodes({ codes }: { codes: string[] }) {
+  const [copied, setCopied] = useState<"yes" | "failed" | null>(null)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(codes.join("\n"))
+      setCopied("yes")
+    } catch {
+      setCopied("failed")
+    }
+  }
+  return (
+    <div className="grid gap-2">
+      <Alert>
+        <AlertTitle>Your backup codes</AlertTitle>
+        <AlertDescription>
+          Each code signs you in once if you lose your phone. They are shown only now: save
+          them somewhere safe.
+        </AlertDescription>
+      </Alert>
+      <ul className="grid grid-cols-2 gap-1 font-mono text-sm" data-testid="backup-codes">
+        {codes.map((code) => (
+          <li key={code}>{code}</li>
+        ))}
+      </ul>
+      <Button type="button" variant="outline" onClick={() => void copy()}>
+        {copied === "yes" ? "Copied" : "Copy codes"}
+      </Button>
+      <FormMessage
+        message={copied === "failed" ? "Copying didn't work. Select the codes and copy them yourself." : null}
+      />
+    </div>
+  )
 }
 
 /** Turn two-factor authentication on (authenticator app + backup codes) or off.
@@ -51,7 +86,6 @@ export function TwoFactorSetup({
   const [error, setError] = useState<GotAuthError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-  const [copied, setCopied] = useState(false)
   const enabled = !duringSignIn && session.data?.user.two_factor_enabled === true
 
   function password(form: FormData): { password?: string } {
@@ -64,6 +98,7 @@ export function TwoFactorSetup({
     const form = new FormData(event.currentTarget)
     setPending(true)
     setError(null)
+    setNotice(null)
     const result = await client.twoFactor.enableTwoFactor(duringSignIn ? {} : password(form))
     setPending(false)
     if (result.error) {
@@ -73,7 +108,7 @@ export function TwoFactorSetup({
     setStep({ name: "scan", totpURI: result.data.totp_uri, backupCodes: result.data.backup_codes })
   }
 
-  async function confirm(event: FormEvent<HTMLFormElement>, backupCodes: string[]) {
+  async function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     setPending(true)
@@ -84,9 +119,15 @@ export function TwoFactorSetup({
       setError(result.error)
       return
     }
-    setStep({ name: "codes", backupCodes })
-    if ("session" in result.data) onSignIn?.(result.data)
-    else onChange?.(true)
+    // The backup codes were shown (and saved) before this point, so they are dropped.
+    if ("session" in result.data) {
+      setStep({ name: "done" })
+      onSignIn?.(result.data)
+    } else {
+      setStep({ name: "start" })
+      setNotice("Two-factor authentication is on.")
+      onChange?.(true)
+    }
   }
 
   async function turnOff(event: FormEvent<HTMLFormElement>) {
@@ -107,26 +148,11 @@ export function TwoFactorSetup({
   async function newCodes() {
     setPending(true)
     setError(null)
+    setNotice(null)
     const result = await client.twoFactor.regenerateBackupCodes()
     setPending(false)
     if (result.error) setError(result.error)
     else setStep({ name: "codes", backupCodes: result.data.backup_codes })
-  }
-
-  async function copy(codes: string[]) {
-    try {
-      await navigator.clipboard.writeText(codes.join("\n"))
-      setCopied(true)
-    } catch {
-      setNotice("Copying didn't work. Select the codes and copy them yourself.")
-    }
-  }
-
-  function done() {
-    // The codes are dropped here: they are shown once.
-    setStep({ name: "start" })
-    setCopied(false)
-    setNotice(null)
   }
 
   const passwordField =
@@ -147,9 +173,9 @@ export function TwoFactorSetup({
   if (step.name === "scan") {
     const secret = secretOf(step.totpURI)
     content = (
-      <form className="grid gap-4" onSubmit={(event) => void confirm(event, step.backupCodes)}>
+      <form className="grid gap-4" onSubmit={(event) => void confirm(event)}>
         <p className="text-sm">
-          Scan this code with your authenticator app, then enter the 6-digit code it shows.
+          1. Scan this code with your authenticator app.
         </p>
         <div className="flex justify-center">
           <QrCode value={step.totpURI} label="QR code for your authenticator app" />
@@ -162,8 +188,14 @@ export function TwoFactorSetup({
             </code>
           </p>
         ) : null}
+        <p className="text-sm">2. Save your backup codes.</p>
+        <BackupCodes codes={step.backupCodes} />
+        <div className="flex items-center gap-2">
+          <input id={`${id}-saved`} name="saved" type="checkbox" required className="size-4" />
+          <Label htmlFor={`${id}-saved`}>I saved my backup codes</Label>
+        </div>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-code`}>Code from the app</Label>
+          <Label htmlFor={`${id}-code`}>3. Enter the code from the app</Label>
           <Input
             id={`${id}-code`}
             name="code"
@@ -183,26 +215,12 @@ export function TwoFactorSetup({
   } else if (step.name === "codes") {
     content = (
       <div className="grid gap-4">
-        <Alert>
-          <AlertTitle>Save your backup codes</AlertTitle>
-          <AlertDescription>
-            Each code signs you in once if you lose your phone. They are shown only now.
-          </AlertDescription>
-        </Alert>
-        <ul className="grid grid-cols-2 gap-1 font-mono text-sm" data-testid="backup-codes">
-          {step.backupCodes.map((code) => (
-            <li key={code}>{code}</li>
-          ))}
-        </ul>
-        <FormMessage message={notice} />
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => void copy(step.backupCodes)}>
-            {copied ? "Copied" : "Copy codes"}
-          </Button>
-          <Button onClick={done}>Done</Button>
-        </div>
+        <BackupCodes codes={step.backupCodes} />
+        <Button onClick={() => setStep({ name: "start" })}>Done</Button>
       </div>
     )
+  } else if (step.name === "done") {
+    content = <p className="text-sm">Two-factor authentication is on.</p>
   } else if (enabled) {
     content = (
       <div className="grid gap-4">

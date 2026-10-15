@@ -141,7 +141,7 @@ export type OAuthGrantOut = {
 export type OAuthGrantListOut = { grants: OAuthGrantOut[] }
 export type OAuthGrantRevokedOut = { revoked: number }
 
-/** What a consent screen shows (oauth_authorize in JSON mode, O1). */
+/** What a consent screen shows (get_oauth_consent, O1). */
 export type OAuthConsentOut = {
   consent_id: string
   client: { client_id: string; name: string; host: string | null }
@@ -152,24 +152,6 @@ export type OAuthConsentOut = {
   /** Every redirect URI of the client is a loopback address: a local app. */
   loopback_only: boolean
 }
-export type OAuthAuthorizeQuery = {
-  response_type?: string
-  client_id?: string
-  redirect_uri?: string
-  scope?: string
-  state?: string
-  code_challenge?: string
-  code_challenge_method?: string
-  nonce?: string
-  prompt?: string
-  resource?: string
-}
-
-/** True when oauthAuthorize needs a consent screen; otherwise navigate to `url`. */
-export function isConsent(value: OAuthConsentOut | RedirectOut): value is OAuthConsentOut {
-  return "consent_id" in value
-}
-
 export type ErrorOut = {
   error: { code: string; message: string; details?: Record<string, unknown> | null }
 }
@@ -215,12 +197,11 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
   async function request<T>(
     method: Method,
     path: string,
-    input: { body?: unknown; query?: Query; redirect?: RequestRedirect } = {},
+    input: { body?: unknown; query?: Query } = {},
   ): Promise<Result<T>> {
     const url = withQuery(path, input.query)
     const headers: Record<string, string> = { Accept: "application/json" }
     const init: RequestInit = { method, credentials: "include", headers }
-    if (input.redirect) init.redirect = input.redirect
     if (method !== "GET") {
       // GotAuth answers 415 to JSON endpoints called without this header.
       headers["Content-Type"] = "application/json"
@@ -232,13 +213,6 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Network error"
       return { data: null, error: { code: "NETWORK_ERROR", message, status: 0 } }
-    }
-    if (
-      input.redirect === "manual" &&
-      (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400))
-    ) {
-      // Browsers hide where a redirect goes; the page navigates to the same URL itself.
-      return { data: { url } as T, error: null }
     }
     let payload: unknown = null
     let text: string
@@ -493,7 +467,7 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
         logo?: string | null
         metadata?: Record<string, unknown> | null
       }) {
-        return request<OrganizationOut>("POST", "/organization/create", { body })
+        return changing(request<OrganizationOut>("POST", "/organization/create", { body }))
       },
       listOrganizations() {
         return request<OrganizationListOut>("GET", "/organization/list")
@@ -509,7 +483,7 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
         logo?: string | null
         metadata?: Record<string, unknown> | null
       }) {
-        return request<OrganizationOut>("POST", "/organization/update", { body })
+        return changing(request<OrganizationOut>("POST", "/organization/update", { body }))
       },
       deleteOrganization(body: { organization_id?: string | null } = {}) {
         return changing(request<StatusOut>("POST", "/organization/delete", { body }))
@@ -552,14 +526,11 @@ export function createGotAuthClient(options: GotAuthClientOptions = {}) {
 
     // ------------------------------------------------------------ OAuth server (O1)
     oauth2: {
-      /** The authorization request in JSON mode. Returns what a consent screen shows,
-       * or `{ url }`: sign in first, or consent is already given, so navigate there
-       * with `window.location.assign(url)`. */
-      oauthAuthorize(query: OAuthAuthorizeQuery) {
-        return request<OAuthConsentOut | RedirectOut>("GET", "/oauth2/authorize", {
-          query,
-          redirect: "manual",
-        })
+      /** What a consent request asks for. Your consent page (the oauth_provider
+       * `consent_page`) is opened with `?consent_id=...`; pass it here, then show
+       * ConsentScreen. */
+      getOauthConsent(query: { consent_id: string }) {
+        return request<OAuthConsentOut>("GET", "/oauth2/consent", { query })
       },
       /** Where a consent form posts (form-encoded; see ConsentScreen). */
       consentURL: `${baseURL}/oauth2/consent`,

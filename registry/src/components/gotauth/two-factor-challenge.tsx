@@ -35,9 +35,12 @@ const LABELS: Record<Method, { field: string; switchTo: string; help: string }> 
 export function TwoFactorChallenge({
   challenge,
   onSuccess,
+  onCancel,
 }: {
   challenge: SignInChallenge
   onSuccess?: (result: SignInOut) => void
+  /** Adds "Sign in again", for example when the step has expired (10 minutes). */
+  onCancel?: () => void
 }) {
   const client = useGotAuthClient()
   const id = useId()
@@ -48,8 +51,19 @@ export function TwoFactorChallenge({
   const [error, setError] = useState<GotAuthError | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
+  const back = onCancel ? (
+    <Button variant="link" type="button" onClick={onCancel}>
+      Sign in again
+    </Button>
+  ) : null
+
   if (challenge.type === "two_factor_setup") {
-    return <TwoFactorSetup duringSignIn onSignIn={onSuccess} />
+    return (
+      <div className="grid gap-2">
+        <TwoFactorSetup duringSignIn onSignIn={onSuccess} />
+        {back}
+      </div>
+    )
   }
 
   async function send() {
@@ -62,7 +76,7 @@ export function TwoFactorChallenge({
       return
     }
     setSent(true)
-    setNotice("We sent a code to your email.")
+    setNotice("We sent a code to your email. It works for 5 minutes.")
   }
 
   async function verify(event: FormEvent<HTMLFormElement>) {
@@ -135,6 +149,11 @@ export function TwoFactorChallenge({
             <Button type="submit" disabled={pending}>
               {pending ? "Checking..." : "Continue"}
             </Button>
+            {method === "email_otp" ? (
+              <Button variant="link" type="button" disabled={pending} onClick={() => void send()}>
+                Send a new code
+              </Button>
+            ) : null}
           </form>
         )}
         {methods.length > 1 ? (
@@ -148,6 +167,7 @@ export function TwoFactorChallenge({
               ))}
           </div>
         ) : null}
+        {back}
       </CardContent>
     </Card>
   )
