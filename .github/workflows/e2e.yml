@@ -1,0 +1,40 @@
+# End-to-end tests (tests/e2e, work package Q2): Chromium against the example apps, in
+# Docker. On pull requests that touch the library, the examples or the UI registry.
+# Actions are pinned by commit SHA; the comment names the release.
+name: E2E
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "examples/fastapi-nextjs/**"
+      - "examples/fastmcp-server/**"
+      - "registry/src/**"
+      - "tests/e2e/**"
+      - "tests/conftest.py"
+      - "conftest.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    name: Browser and MCP flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run the end-to-end tests
+        run: bash tests/e2e/run.sh

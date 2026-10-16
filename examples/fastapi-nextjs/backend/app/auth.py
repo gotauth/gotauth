@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from gotauth import GotAuth
-from gotauth.contracts import Adapter, EmailSender, OAuthProvider
+from gotauth.contracts import Adapter, EmailSender, OAuthProvider, is_localhost
 from gotauth.plugins.api_key import api_key
 from gotauth.plugins.organization import organization
 from gotauth.plugins.passkey import passkey
@@ -49,6 +49,11 @@ def build_auth(
         if social_providers is None
         else social_providers,
         email_sender=email_sender,  # None: printed to the console on localhost
+        # Only the automated browser tests turn rate limits off (tests/e2e): every test
+        # browser signs in from the same address. Ignored unless on localhost.
+        rate_limit=not (
+            env.get("GOTAUTH_RATE_LIMIT") == "off" and is_localhost(base_url)
+        ),
         plugins=[
             api_key(allowed_scopes=SCOPES),
             two_factor(),

@@ -1,0 +1,11 @@
+# Build context: the repository root. Only what the e2e image copies matters.
+**/node_modules
+**/.venv
+**/.next
+**/__pycache__
+**/*.db
+.git
+apps
+registry
+examples/fastapi-nextjs
+docs
