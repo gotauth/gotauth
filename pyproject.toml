@@ -152,7 +152,14 @@ target-version = "py311"
 include = ["*.py", "*.pyi", "*.ipynb", "**/pyproject.toml"]
 # docs/plan is checked by its own script; the landing snippets are partial on purpose
 # and checked against the build plan by apps/landing/scripts/check-dist.mjs.
-extend-exclude = ["docs/plan", "apps/landing/src/snippets"]
+extend-exclude = [
+  "docs/plan",
+  "apps/landing/src/snippets",
+  # The agent-install test: an app scaffold for the agent, and seeded apps, one of them
+  # deliberately wrong.
+  "scripts/agent-install-test/template",
+  "scripts/agent-install-test/checker/fixtures",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S", "ASYNC", "DTZ", "T20", "RUF"]
@@ -166,6 +173,7 @@ required-imports = ["from __future__ import annotations"]
 "!src/**" = ["I002"]
 "tests/**" = ["S101", "S105", "S106", "S603"]
 "apps/docs/tests/**" = ["S101", "S603"]
+"scripts/agent-install-test/checker/tests/**" = ["S101"]
 "scripts/**" = ["T20"]
 
 [tool.pyright]
@@ -183,7 +191,7 @@ strict = ["src"]
 
 [tool.pytest]
 minversion = "9.0"
-testpaths = ["tests"]
+testpaths = ["tests", "scripts/agent-install-test/checker/tests"]
 addopts = ["--import-mode=importlib", "-ra"]
 strict = true
 asyncio_mode = "auto"
