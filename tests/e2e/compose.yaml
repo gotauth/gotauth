@@ -1,0 +1,53 @@
+# End-to-end tests (work package Q2). Run with tests/e2e/run.sh.
+#
+# backend and frontend are examples/fastapi-nextjs, built from its own Dockerfiles. The
+# test runner shares the frontend's network, so the browser reaches the app at
+# http://localhost:3000, the backend's BASE_URL: cookies, the Origin check, the console
+# email sender and passkeys (which need localhost on http) all see the real origin.
+# The backend's stderr (where the console sender prints emails) goes to a shared log.
+name: gotauth-e2e
+
+services:
+  backend:
+    build:
+      context: ../../examples/fastapi-nextjs/backend
+      additional_contexts:
+        gotauth: ../..
+    user: "0" # to write the shared log volume
+    environment:
+      GOTAUTH_SECRET: e2e-only-secret-not-for-anything-else-0123456789
+      BASE_URL: http://localhost:3000
+      DATABASE_URL: sqlite+aiosqlite:////tmp/app.db
+      # Every test browser signs in from the same address (the frontend's proxy).
+      GOTAUTH_RATE_LIMIT: "off"
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 2>> /logs/backend.log
+    volumes:
+      - logs:/logs
+
+  frontend:
+    build:
+      context: ../../examples/fastapi-nextjs/frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+
+  tests:
+    build:
+      context: ../..
+      dockerfile: tests/e2e/Dockerfile
+    network_mode: "service:frontend"
+    ipc: host # Chromium needs more shared memory than Docker's default
+    environment:
+      E2E_APP_URL: http://localhost:3000
+      E2E_BACKEND_LOG: /logs/backend.log
+    volumes:
+      - logs:/logs:ro
+    depends_on:
+      - frontend
+
+volumes:
+  logs:
