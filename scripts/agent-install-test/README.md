@@ -11,8 +11,10 @@ in the project. `checker/` then judges the result. Work package Q2.
 ## Run
 
 Needs Docker and your own Anthropic API key. The key is passed to the container at run
-time only (`docker run -e ANTHROPIC_API_KEY`): never in the image, and `run.sh` deletes a
-run's files if the key or anything that looks like one appears in them.
+time only (`docker run -e ANTHROPIC_API_KEY`), and only Claude Code sees it: it is unset
+before the agent's dependencies are installed and the app, the checker and the app's
+tests run. It is never in the image, and a run whose files contain the key, or anything
+that looks like one, is deleted and counts as failed.
 
 ```bash
 export ANTHROPIC_API_KEY=...                  # yours; never commit it
@@ -27,8 +29,9 @@ anywhere in this folder.
 
 ## What happens in a run
 
-1. A wheel is built from this checkout and mounted at `/wheels`. The template maps
-   `gotauth` to it (`[tool.uv.sources]`), standing in for a current release on PyPI.
+1. A wheel is built from this checkout and mounted at `/wheels`. With the skill,
+   `run.sh` maps `gotauth` to it in the app's `pyproject.toml` (`[tool.uv.sources]`),
+   standing in for a current release on PyPI. The baseline app has no such hint.
 2. The template is committed in a fresh git repository, so the agent's changes become
    `diff.patch`.
 3. Claude Code runs headless: `claude -p "<prompt>" --output-format stream-json --verbose
@@ -49,16 +52,17 @@ ignored by git. Scan transcripts for secrets before attaching them anywhere.
 | Check | How |
 |---|---|
 | `gotauth` is a dependency | `pyproject.toml` |
-| No hand-written auth code | No `passlib`, `jose`, `jwt`, `bcrypt`, `argon2` or `itsdangerous` import and no `hashlib.pbkdf2_hmac` or `hashlib.scrypt` call in the app's code (tests excluded) |
+| No hand-written auth code | No `passlib`, `pwdlib`, `jose`, `jwt`, `joserfc`, `jwcrypto`, `authlib`, `bcrypt`, `argon2` or `itsdangerous` import, and no `hashlib.pbkdf2_hmac` or `hashlib.scrypt` however imported, in the app's code (tests excluded; relative imports of the app's own modules are fine) |
 | `gotauth check` finds nothing of high severity | The scanner from `gotauth.checkup` |
 | The app starts | `probe.py` imports the first FastAPI app in `app/main.py`, `main.py` or `app/__init__.py`, and finds the `GotAuth` object; `gotauth migrate` creates its tables when it uses SQLAlchemy |
 | Sign-up, verification and sign-in work | Over ASGI; the verification link comes from the console email |
 | GitHub sign-in starts | `POST .../sign-in/social` gives a `github.com` authorize URL with `state` and `code_challenge` |
-| An API key gets through a protected route | A key from `POST .../api-keys` gets a 200 from a GET route that refuses anonymous callers (with the scopes the route asks for) |
+| An API key gets through a protected route | A key from `POST .../api-keys` gets a 200 from a GET route that refuses anonymous callers (with the scopes the route asks for), and a made-up key is refused there |
 | The app's own tests pass | `pytest` in the app |
 
-The probe sets `GOTAUTH_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
-`DATABASE_URL` and `BASE_URL` when the app hasn't. `checker/tests/` runs the checker on
+The probe runs the app's lifespan, and sets `GOTAUTH_SECRET`, `GITHUB_CLIENT_ID`,
+`GITHUB_CLIENT_SECRET`, `DATABASE_URL` and `BASE_URL` when neither the environment nor
+the app's `.env` does. A command that runs over 10 minutes counts as a failed check. `checker/tests/` runs the checker on
 two seeded apps: a hand-written passlib and python-jose app fails, and a correct GotAuth
 app passes. Run it with `./dev.sh uv run pytest scripts/agent-install-test/checker/tests`.
 

@@ -14,6 +14,7 @@ import io
 import json
 import os
 import re
+import secrets
 import sys
 import tempfile
 from pathlib import Path
@@ -31,9 +32,24 @@ def record(name: str, passed: bool, detail: str = "") -> bool:
     return passed
 
 
+def dotenv_keys() -> set[str]:
+    """Keys the app's own .env sets: the probe leaves those to the app."""
+    path = HERE / ".env"
+    if not path.is_file():
+        return set()
+    keys = set()
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        name, sep, _ = line.strip().removeprefix("export ").partition("=")
+        if sep and name and not name.startswith("#"):
+            keys.add(name.strip())
+    return keys
+
+
 def environment() -> None:
-    """The settings an app usually reads; set only when the app has not set them."""
+    """The settings an app usually reads; set only when neither the environment nor
+    the app's .env sets them."""
     work = tempfile.mkdtemp(prefix="checker-")
+    own = dotenv_keys()
     defaults = {
         "GOTAUTH_SECRET": "checker-secret-" + "x" * 40,
         "SECRET_KEY": "checker-secret-" + "y" * 40,
@@ -43,7 +59,8 @@ def environment() -> None:
         "BASE_URL": "http://localhost:8000",
     }
     for key, value in defaults.items():
-        os.environ.setdefault(key, value)
+        if key not in own:
+            os.environ.setdefault(key, value)
 
 
 def find_app() -> tuple[Any, Any, str]:
@@ -57,8 +74,10 @@ def find_app() -> tuple[Any, Any, str]:
     for name in ("app.main", "main", "app"):
         try:
             module = importlib.import_module(name)
-        except ModuleNotFoundError:
-            continue
+        except ModuleNotFoundError as exc:
+            if exc.name in (name, name.split(".")[0]):
+                continue  # no such module: try the next place
+            raise  # the app imports something that is not installed
         app = next((v for v in vars(module).values() if isinstance(v, FastAPI)), None)
         if app is not None:
             break
@@ -101,9 +120,13 @@ async def probe() -> None:
     base = auth.config.base_path
     origin = auth.config.base_url.rstrip("/")
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url=origin, headers={"origin": origin}
-    ) as client:
+    # The app's startup and shutdown, as a server runs them.
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=transport, base_url=origin, headers={"origin": origin}
+        ) as client,
+    ):
         await sign_up_and_in(client, base)
         await github(client, base)
         await api_key(client, base, app)
@@ -203,6 +226,18 @@ async def api_key(
                         path, headers={"x-api-key": scoped.json()["key"]}
                     )
             if keyed.status_code == 200:
+                # A made-up key must not get in: the route checks the key itself, not
+                # only that a header is there.
+                bogus = await script.get(
+                    path, headers={"x-api-key": "gak_" + secrets.token_urlsafe(32)}
+                )
+                if bogus.status_code not in (401, 403):
+                    record(
+                        "an API key gets through a protected route",
+                        False,
+                        f"{path} also accepted a made-up key ({bogus.status_code})",
+                    )
+                    return
                 record("an API key gets through a protected route", True, path)
                 return
         record(

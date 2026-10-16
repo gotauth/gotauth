@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+# The default prompt of run.sh.
 PROMPT = "Add email + password and GitHub login and API keys to this FastAPI app."
 
 
@@ -69,7 +70,7 @@ def read_run(path: Path) -> Run:
     return run
 
 
-def render(runs: list[Run], mode: str, cli_version: str) -> str:
+def render(runs: list[Run], mode: str, cli_version: str, prompt: str = PROMPT) -> str:
     date = datetime.now(UTC).strftime("%Y-%m-%d")
     passed = sum(run.passed for run in runs)
     baseline = mode == "baseline"
@@ -84,7 +85,7 @@ def render(runs: list[Run], mode: str, cli_version: str) -> str:
         f"# Agent-install {'baseline' if baseline else 'test'} ({date})",
         "",
         f"Measured by `scripts/agent-install-test/{command}` on {date}: Claude Code "
-        f"{cli_version}, model {model}, the prompt {PROMPT!r} {with_skill}.",
+        f"{cli_version}, model {model}, the prompt {prompt!r} {with_skill}.",
         "",
         f"**{passed} of {len(runs)} runs passed the checker.**",
         "",
@@ -114,11 +115,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cli-version", default="unknown")
     parser.add_argument("--mode", choices=["skill", "baseline"], default="skill")
     parser.add_argument("--write", type=Path)
+    parser.add_argument("--prompt", default=PROMPT, help="the prompt run.sh used")
     args = parser.parse_args(argv)
     runs = [
         read_run(path) for path in sorted(args.results.glob("run-*")) if path.is_dir()
     ]
-    text = render(runs, args.mode, args.cli_version)
+    text = render(runs, args.mode, args.cli_version, args.prompt)
     sys.stdout.write(text)
     (args.results / "summary.md").write_text(text)
     if args.write:

@@ -42,3 +42,32 @@ def test_a_hand_rolled_app_fails() -> None:
     assert "passlib" in detail and "jose" in detail
     assert not results["gotauth check: no high findings"].passed
     assert not results["the app starts"].passed
+
+
+def test_static_checks_see_through_aliases_and_ignore_relative_imports() -> None:
+    import ast
+
+    from check import forbidden_in, requirement_name
+
+    code = """
+import hashlib as h
+from hashlib import pbkdf2_hmac
+from pwdlib import PasswordHash
+from authlib.jose import jwt
+from .jwt import decode  # the app's own module: fine
+h.scrypt(b"pw", salt=b"s", n=2, r=8, p=1)
+"""
+    found = [what for _line, what in forbidden_in(ast.parse(code))]
+    assert "imports hashlib.pbkdf2_hmac" in found
+    assert "imports pwdlib" in found
+    assert "imports authlib.jose" in found
+    assert "uses hashlib.scrypt" in found
+    assert not any("jwt" in what and "authlib" not in what for what in found)
+    for requirement in (
+        "gotauth~=0.0.1",
+        "gotauth<1",
+        "GotAuth[fastapi]>=0.0.1",
+        "gotauth @ file:///wheels/gotauth-0.0.1-py3-none-any.whl",
+        "gotauth; python_version>='3.12'",
+    ):
+        assert requirement_name(requirement) == "gotauth", requirement

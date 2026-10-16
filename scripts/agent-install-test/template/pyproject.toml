@@ -17,11 +17,6 @@ dev = [
 [tool.uv]
 package = false
 
-[tool.uv.sources]
-# The agent-install test: GotAuth comes from the wheel built from this checkout
-# (mounted at /wheels), standing in for a current release on PyPI.
-gotauth = { path = "/wheels/gotauth-0.0.1-py3-none-any.whl" }
-
 [tool.pytest]
 testpaths = ["tests"]
 pythonpath = ["."]
