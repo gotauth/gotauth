@@ -49,8 +49,8 @@ asyncio.run(check())
 
 - Events are delivered after the transaction commits, so a rolled-back request sends
   none. The exception is `sign_in.failed`, which is delivered even on failure.
-- Off `localhost`, delivery runs in the background so responses don't wait. In tests,
-  `await auth.drain()` waits for it.
+- Delivery always runs in the background, so responses don't wait for your callback.
+  In tests and scripts, `await auth.drain()` before checking what was delivered.
 - An error in `on_event` is logged and never fails the request.
 
 ## Types

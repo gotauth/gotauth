@@ -23,9 +23,9 @@ The versions are pinned by `uv.lock` (the `docs` dependency group).
 | `hooks.py` | Pages built from the module READMEs (`src/gotauth/**/README.md`) and `docs/launch/comparison.md`, with links rewritten; the API reference pages; a Markdown copy of every page; `llms.txt` and `llms-full.txt` |
 | `docs/js/copy-markdown.js` | The "Copy page as Markdown" button |
 | `tests/test_samples.py` | Runs every code sample of the hand-written pages and the skill (see below) |
-| `tests/test_build.py` | Builds the site and checks `llms.txt`, the Markdown copies, `robots.txt`, `sitemap.xml` and the skill's front matter |
+| `tests/test_build.py` | Builds the site (or uses the one in `DOCS_SITE_DIR`, as CI does) and checks `llms.txt`, the Markdown copies, `robots.txt`, `sitemap.xml` and the skill's front matter |
 | `scripts/count_tokens.py` | Fails when the quickstart reaches 15,000 tokens |
-| `scripts/check_links.py` | Checks the external links of the built site, with retries |
+| `scripts/check_links.py` | Checks the external links of the built site, with retries. Links into this repository on GitHub are skipped: they come from files in the checkout, and a file added in the same pull request is not on main yet. In CI it is a separate job, so a third-party site that is down never blocks a deploy |
 | `CONTEXT7.md` | How to list GotAuth on Context7 |
 | `../../skills/gotauth/SKILL.md` | The agent skill (Agent Skills format) |
 

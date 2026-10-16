@@ -17,7 +17,7 @@ OAuth endpoints answer in the RFC 6749 shape instead (`{"error", "error_descript
 | `EMAIL_NOT_VERIFIED` | 403 | Sign-in before the email was verified |
 | `ORIGIN_NOT_ALLOWED` | 403 | A cookie-authenticated change from an origin that is not `base_url` or in `trusted_origins` |
 | `USER_ALREADY_EXISTS` | 409 | Only with email verification off |
-| `TOKEN_INVALID`, `TOKEN_EXPIRED` | 400 | A verification, reset or invitation link that was used, changed or is too old |
+| `TOKEN_INVALID`, `TOKEN_EXPIRED` | 400 | A verification or reset link (or a sign-in step) that was used, changed or is too old. Invitations answer `ORG_INVITATION_INVALID` instead |
 | `RATE_LIMITED` | 429 | Too many attempts; `Retry-After` says when to retry |
 | `INTERNAL_ERROR` | 500 | An unexpected error; the server log has it |
 
@@ -55,8 +55,8 @@ origin (`examples/fastapi-nextjs` does this with a Next.js rewrite).
   [Email delivery](modules/email.md).
 - **In tests**, use `email_sender=fake_mailer()` (or `make_auth(mailer=...)`) and read
   `mailer.last(kind, to)`.
-- **Off localhost,** emails and events are sent in the background so responses don't
-  wait. In tests and scripts, `await auth.drain()` before checking them.
+- **Events are always delivered in the background,** and emails too off localhost, so
+  responses don't wait. In tests and scripts, `await auth.drain()` before checking them.
 
 ## `ConfigError` at start
 

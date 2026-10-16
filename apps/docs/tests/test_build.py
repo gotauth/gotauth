@@ -4,6 +4,7 @@ valid. Builds the site once into a temporary directory (needs the ``docs`` group
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -18,6 +19,10 @@ SITE_URL = "https://gotauth.ablacky.com/docs/"
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    # CI has just built the site: reuse it instead of a second mkdocstrings run.
+    built = os.environ.get("DOCS_SITE_DIR")
+    if built:
+        return Path(built)
     pytest.importorskip("mkdocs", reason="the docs dependency group is not installed")
     out = tmp_path_factory.mktemp("site")
     subprocess.run(
@@ -88,3 +93,10 @@ def test_skill_front_matter() -> None:
     # Agent Skills: lower-case letters, digits and hyphens; the folder's name.
     assert re.fullmatch(r"[a-z0-9-]{1,64}", meta["name"]) and meta["name"] == "gotauth"
     assert 0 < len(meta["description"]) <= 1024
+
+
+def test_pages_outside_the_navigation_have_copies_too(site: Path) -> None:
+    # The copy button is on every page, the API reference included.
+    copy = site / "reference" / "gotauth.plugins.api_key.md"
+    assert copy.is_file()
+    assert "reference/gotauth.plugins.api_key/" in copy.read_text(encoding="utf-8")

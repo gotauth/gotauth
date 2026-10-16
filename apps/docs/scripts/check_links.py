@@ -18,12 +18,16 @@ from pathlib import Path
 import httpx
 
 SITE = Path(__file__).resolve().parents[1] / "site"
-# Our own site is checked by the build; it may not be deployed yet.
+# Our own site is checked by the build and may not be deployed yet. Links into this
+# repository on GitHub point to files that exist here (hooks.py builds them from the
+# checkout), and a file added in the same pull request is not on main yet.
 SKIP = (
     "https://gotauth.ablacky.com",
     "http://localhost",
     "https://localhost",
     "http://127.0.0.1",
+    "https://github.com/gotauth/gotauth/blob/main/",
+    "https://github.com/gotauth/gotauth/tree/main/",
 )
 REFUSED = {401, 403, 429}
 RETRIES = 3

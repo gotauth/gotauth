@@ -43,6 +43,7 @@ Run `gotauth generate` again for a revision with the plugin's tables and columns
     or the upgrade fails. Until `gotauth generate` adds it for you
     ([#53](https://github.com/gotauth/gotauth/issues/53)), add it to the revision:
 
+    <!-- sample: skip: a line of an Alembic revision -->
     ```python
     batch_op.add_column(
         sa.Column("two_factor_enabled", sa.Boolean(), nullable=False, server_default=sa.false())

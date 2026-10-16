@@ -16,9 +16,9 @@ are fragments of a larger app on purpose.
 
 from __future__ import annotations
 
-import os
 import re
 import sys
+import textwrap
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,8 +29,11 @@ DOCS = Path(__file__).resolve().parents[1] / "docs"
 ROOT = Path(__file__).resolve().parents[3]
 SOURCES = [*sorted(DOCS.rglob("*.md")), ROOT / "skills" / "gotauth" / "SKILL.md"]
 
+# Fences may be indented (inside admonitions and tabs); the marker sits on the line
+# before, with any indent.
 _BLOCK = re.compile(
-    r"(?:^<!-- sample: (?P<marker>.*?) -->\n)?^```(?P<lang>[a-z]*)\n(?P<code>.*?)^```$",
+    r"(?:^[ \t]*<!-- sample: (?P<marker>.*?) -->\n)?"
+    r"^(?P<indent>[ \t]*)```(?P<lang>[a-z]*)\n(?P<code>.*?)^(?P=indent)```[ \t]*$",
     re.MULTILINE | re.DOTALL,
 )
 
@@ -49,7 +52,7 @@ def blocks(path: Path) -> Iterator[Block]:
         yield Block(
             lang=match.group("lang"),
             marker=(match.group("marker") or "").strip(),
-            code=match.group("code"),
+            code=textwrap.dedent(match.group("code")),
             line=text.count("\n", 0, match.start()) + 1,
         )
 
@@ -67,6 +70,9 @@ def test_samples_run(
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setenv("GOTAUTH_SECRET", "docs-samples-secret-" + "x" * 32)
+    # The samples' defaults (a SQLite file here, localhost), whatever the caller set.
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("BASE_URL", raising=False)
     written: list[str] = []
     namespace: dict[str, object] = {"__name__": "__docs_sample__"}
     try:
@@ -94,7 +100,6 @@ def test_samples_run(
         # The next page writes its own auth.py and main.py.
         for module in written:
             sys.modules.pop(module, None)
-        os.environ.pop("DATABASE_URL", None)
 
 
 def test_every_page_has_a_sample_rule() -> None:

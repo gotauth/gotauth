@@ -93,8 +93,9 @@ or `API_KEY_EXPIRED`.
 
 - Give each script or machine its own key, with the fewest scopes and an expiry
   (`expires_in`, capped by `max_expires_in`).
-- Rate-limit keys with `api_key(rate_limit=(1000, 3600))` or per key; with several
-  processes, configure `secondary_storage` so the limit is shared.
+- Rate-limit keys with `api_key(rate_limit=(1000, 3600))` or per key. Per-key limits
+  use `secondary_storage` when it is configured, so with several processes the limit is
+  shared; without it each process counts on its own.
 - Keys for an organization act for the organization, not a user: create them with
   `organization_id` (needs the [organization plugin](../plugins/organizations.md)).
 - Keys for an AI agent belong to the agent, so revoking the agent revokes them: see

@@ -55,5 +55,14 @@ With `sessions={"cookie_cache": {"enabled": True}}`, GotAuth also sets a signed
 ## Secondary storage
 
 `secondary_storage=redis_secondary_storage(...)` (from `gotauth.sessions`, with the `redis`
-extra) keeps session lookups and rate-limit counters in
-Redis. Sessions stay in the database; Redis is a cache in front of it.
+extra) caches session lookups in Redis. Sessions stay in the database; Redis is a cache
+in front of it.
+
+Rate limits count in each process's memory by default, so with several workers each
+one counts on its own. To share the counters, also set
+`rate_limit={"storage": "secondary"}` (or `"database"` without Redis):
+
+<!-- sample: skip: a configuration fragment -->
+```python
+auth = GotAuth(..., secondary_storage=redis_secondary_storage(url), rate_limit={"storage": "secondary"})
+```

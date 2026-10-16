@@ -25,14 +25,24 @@
     status.setAttribute("role", "status")
     status.setAttribute("aria-live", "polite")
     button.addEventListener("click", function () {
-      fetch(markdownURL())
-        .then(function (response) {
-          if (!response.ok) throw new Error("HTTP " + response.status)
-          return response.text()
+      var text = fetch(markdownURL()).then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status)
+        return response.text()
+      })
+      var copied
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        // The write starts inside the click and gets the text as a promise: Safari
+        // refuses a clipboard write that only starts after the fetch.
+        var blob = text.then(function (value) {
+          return new Blob([value], { type: "text/plain" })
         })
-        .then(function (text) {
-          return navigator.clipboard.writeText(text)
+        copied = navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })])
+      } else {
+        copied = text.then(function (value) {
+          return navigator.clipboard.writeText(value)
         })
+      }
+      copied
         .then(function () {
           status.textContent = "Copied."
         })

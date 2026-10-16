@@ -174,13 +174,30 @@ def on_files(files: Files, config: MkDocsConfig) -> Files:
     return files
 
 
-_SAMPLE_MARK = re.compile(r"^<!-- sample:.*-->\n", re.MULTILINE)
+_SAMPLE_MARK = re.compile(r"^[ \t]*<!-- sample:.*-->\n", re.MULTILINE)
+_page_urls: dict[str, str] = {}  # src_uri -> url, for pages outside the navigation
 
 
 def on_page_markdown(markdown: str, page: Page, **_: Any) -> str:
     # The copies leave out the markers for tests/test_samples.py.
     _markdown[page.file.src_uri] = (page.title or "", _SAMPLE_MARK.sub("", markdown))
+    _page_urls[page.file.src_uri] = page.url
     return markdown
+
+
+def _write_copy(site: Path, src_uri: str, url: str, site_url: str) -> str:
+    """Write the page's Markdown copy; return the copy's path."""
+    title, markdown = _markdown.get(src_uri, ("", ""))
+    md_path = _md_path(url)
+    if src_uri.startswith("reference/") and src_uri != "reference/index.md":
+        # The rendered reference lives in the HTML; the copy points there.
+        copy = f"# {title}\n\nSee {site_url}{url} for the API reference.\n"
+    else:
+        copy = markdown
+    target = site / md_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(copy, encoding="utf-8")
+    return md_path
 
 
 def _md_path(url: str) -> str:
@@ -212,18 +229,16 @@ def on_post_build(config: MkDocsConfig, **_: Any) -> None:
     site_url = config.site_url or ""
     entries: list[tuple[str, str, str, str]] = []  # (section, title, url, summary)
     full: list[str] = []
+    in_nav = {src_uri for _order, src_uri, _url, _section in _nav_pages}
+    # Every page gets a copy, so "Copy page as Markdown" works everywhere.
+    for src_uri, url in _page_urls.items():
+        if src_uri not in in_nav:
+            _write_copy(site, src_uri, url, site_url)
     for _order, src_uri, url, section in sorted(_nav_pages):
         title, markdown = _markdown.get(src_uri, ("", ""))
-        md_path = _md_path(url)
-        if src_uri.startswith("reference/"):
-            # The rendered reference lives in the HTML; the copy points there.
-            copy = f"# {title}\n\nSee {site_url}{url} for the API reference.\n"
-        else:
-            copy = markdown
+        md_path = _write_copy(site, src_uri, url, site_url)
+        if not src_uri.startswith("reference/"):
             full.append(f"<!-- {site_url}{md_path} -->\n{markdown.strip()}\n")
-        target = site / md_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(copy, encoding="utf-8")
         entries.append((section, title, f"{site_url}{md_path}", _summary(markdown)))
     lines = [
         "# GotAuth",
