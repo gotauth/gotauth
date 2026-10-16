@@ -1,0 +1,5 @@
+# Search engines and AI crawlers are welcome: these docs are meant to be read by both.
+User-agent: *
+Allow: /
+
+Sitemap: https://gotauth.ablacky.com/docs/sitemap.xml

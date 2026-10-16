@@ -65,7 +65,8 @@ jobs:
           # TLS is required and the certificate must be valid: use the server's own
           # hostname (cPanel shows it under "FTP Accounts", "Configure FTP Client").
           # --delete removes files that are no longer built; .well-known/ (AutoSSL
-          # certificate checks) and cgi-bin/ are left alone.
+          # certificate checks), cgi-bin/ and docs/ (the docs site, deployed by
+          # docs.yml) are left alone.
           lftp -c "
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
@@ -73,5 +74,5 @@ jobs:
             set net:max-retries 2;
             open -u \"$FTP_USER\" --env-password \"$FTP_HOST\";
             mirror --reverse --delete --verbose=1 \
-              --exclude-glob .well-known/ --exclude-glob cgi-bin/ \
+              --exclude-glob .well-known/ --exclude-glob cgi-bin/ --exclude-glob docs/ \
               dist \"$FTP_DIR\""

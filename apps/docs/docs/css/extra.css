@@ -1,0 +1,16 @@
+.gotauth-copy-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -0.5rem 0 1.25rem;
+}
+
+.gotauth-copy-bar .md-button {
+  font-size: 0.7rem;
+  padding: 0.3em 0.9em;
+}
+
+.gotauth-copy-status {
+  font-size: 0.7rem;
+  color: var(--md-default-fg-color--light);
+}

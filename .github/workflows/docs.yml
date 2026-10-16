@@ -1,0 +1,99 @@
+# Builds and tests the docs site (apps/docs) on pull requests, and uploads it to the
+# landing page's cPanel account under docs/ when main changes. The upload is off until
+# the repository variable DOCS_DEPLOY is "true". Setup: apps/docs/README.md, "Deploy".
+# Actions are pinned by commit SHA; the comment names the release.
+name: Docs
+
+on:
+  pull_request:
+    paths:
+      - "apps/docs/**"
+      - "skills/**"
+      - "docs/launch/**"
+      - "src/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/docs/**"
+      - "skills/**"
+      - "docs/launch/**"
+      - "src/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Keep equal to the uv image tag in docker/dev.Dockerfile.
+  UV_VERSION: "0.12.22"
+
+jobs:
+  build:
+    name: Build and check the docs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.14"
+      - name: Install (fails if uv.lock is out of date)
+        run: uv sync --locked --all-extras --group docs
+      - name: Strict build (warnings fail)
+        run: uv run --group docs mkdocs build -f apps/docs/mkdocs.yml
+      - name: Code samples, llms.txt, Markdown copies, robots.txt, sitemap, skill
+        run: uv run --group docs pytest apps/docs/tests
+      - name: Quickstart under 15,000 tokens
+        run: uv run --group docs python apps/docs/scripts/count_tokens.py
+      - name: External links
+        run: uv run --group docs python apps/docs/scripts/check_links.py
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-site
+          path: apps/docs/site
+          retention-days: 7
+
+  deploy:
+    name: Upload to cPanel
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DOCS_DEPLOY == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: docs
+      url: https://gotauth.ablacky.com/docs/
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: docs-site
+          path: site
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - name: Upload over FTPS
+        env:
+          FTP_HOST: ${{ secrets.CPANEL_FTP_HOST }}
+          FTP_USER: ${{ secrets.CPANEL_FTP_USER }}
+          LFTP_PASSWORD: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.CPANEL_FTP_DIR || '/' }}
+        run: |
+          # TLS required, with a valid certificate (the same settings as the landing
+          # page). --delete removes pages that are no longer built, inside docs/ only.
+          lftp -c "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate true;
+            set net:max-retries 2;
+            open -u \"$FTP_USER\" --env-password \"$FTP_HOST\";
+            mkdir -p -f \"${FTP_DIR%/}/docs\";
+            mirror --reverse --delete --verbose=1 site \"${FTP_DIR%/}/docs\""
