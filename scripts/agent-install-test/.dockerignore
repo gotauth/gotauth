@@ -1,0 +1,4 @@
+# Only the Dockerfile matters for the image.
+results/
+template/
+checker/
