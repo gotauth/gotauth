@@ -724,8 +724,12 @@ class GotAuth:
             raise AuthError("UNAUTHENTICATED", 401)
         return principal
 
+    async def check_principal(self, ctx: EndpointContext, principal: Principal) -> None:
+        """Run every plugin's ``principal_checks``; raises ``AuthError`` to refuse."""
+        await self._run_principal_checks(ctx, principal)
+
     async def _run_principal_checks(
-        self, ctx: RequestContext, principal: Principal
+        self, ctx: EndpointContext, principal: Principal
     ) -> None:
         for plugin in self._plugins:
             for check in plugin.principal_checks:

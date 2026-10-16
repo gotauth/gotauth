@@ -417,6 +417,15 @@ class GotAuthInstance(Protocol):
         """Resolve a principal from request headers and cookies."""
         ...
 
+    async def check_principal(self, ctx: EndpointContext, principal: Principal) -> None:
+        """Run every plugin's ``principal_checks`` on ``principal``.
+
+        For code that accepts a credential outside the request pipeline, such as the
+        server calls that verify API keys and OAuth tokens. Raises ``AuthError`` when a
+        check refuses the principal.
+        """
+        ...
+
     async def drain(self) -> None:
         """Wait for background tasks (email, events)."""
         ...

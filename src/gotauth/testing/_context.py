@@ -901,6 +901,10 @@ class FakeAuth:
             await run_principal_checks(ctx, principal)
         return principal
 
+    async def check_principal(self, ctx: EndpointContext, principal: Principal) -> None:
+        """Run every plugin's ``principal_checks``, like the real GotAuth."""
+        await run_principal_checks(cast(FakeContext, ctx), principal)
+
 
 # ----------------------------------------------------------------- pipeline
 

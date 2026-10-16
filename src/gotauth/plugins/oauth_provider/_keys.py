@@ -27,6 +27,14 @@ class TokenRejected(Exception):
     """A JWT failed verification; the message is safe to log, never the token."""
 
 
+class PrincipalRefused(TokenRejected):
+    """A principal check (CCR 015) refused the token; ``code`` is its error code."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(f"refused by a principal check: {code}")
+        self.code = code
+
+
 def _generate(alg: str) -> Any:  # Any: a private key object
     if alg == "ES256":
         return ec.generate_private_key(ec.SECP256R1())

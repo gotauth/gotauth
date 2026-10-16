@@ -405,7 +405,11 @@ def api_key(
     async def verify(ctx: EndpointContext, body: VerifyApiKeyIn) -> VerifyOut:
         try:
             principal = await resolve_key(ctx, settings, body.key)
+            # The checks a request would run (CCR 015): a banned owner, for example.
+            await ctx.auth.check_principal(ctx, principal)
         except AuthError as error:
+            if error.status >= 500:
+                raise
             return VerifyOut(valid=False, code=error.code)
         if body.scopes and not principal.has_scopes(*body.scopes):
             return VerifyOut(valid=False, code="INSUFFICIENT_SCOPE")

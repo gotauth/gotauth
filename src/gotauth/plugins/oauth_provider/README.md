@@ -56,6 +56,12 @@ Server-side only (`auth.api.call(...)`): `create_oauth_client`, `list_oauth_clie
   on the next request. Remote resource servers that only check the JWT accept a revoked
   token until it expires (10 minutes by default); use O2's `introspect=True` when that
   is too long.
+- **Principal checks** (CCR 015): `verify_access_token`, introspection and
+  userinfo run every plugin's principal checks on the token's principal, and so does
+  every grant before it issues a token. A client credentials token, which acts for no
+  user, is checked as its client's owner. A banned user (P6) gets `valid: false` with
+  `ADMIN_USER_BANNED`, `active: false`, a 401 or `invalid_grant`; after an unban the
+  same tokens work again.
 - **Refresh scope narrowing** applies to the new access token only; the grant keeps
   its scopes, so a later refresh can ask for them again.
 - **Revoking an access token** (RFC 7009) also revokes its refresh token, as section

@@ -8,6 +8,7 @@ import logging
 import re
 from collections.abc import Iterable, Mapping
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -99,6 +100,28 @@ async def test_full_scenario_leaves_no_secret_behind(
             "/request-password-reset",
             json={"email": "ada@example.com", "redirect_to": "/reset"},
         )
+        # The plugins' secrets: two-factor, a magic link and an invitation.
+        two_factor = (
+            await http.post("/two-factor/enable", json={"password": PASSWORD})
+        ).json()
+        totp_secret = parse_qs(urlsplit(two_factor["totp_uri"]).query)["secret"][0]
+        await http.post("/magic-link/send", json={"email": "ada@example.com"})
+        org = await http.post(
+            "/organization/create", json={"name": "Acme", "slug": "acme"}
+        )
+        await http.post(
+            "/organization/invite-member",
+            json={"organization_id": org.json()["id"], "email": "bob@example.com"},
+        )
+        await app.auth.drain()
+        emailed = [
+            parse_qs(urlsplit(app.mailer.last(kind, to).data["url"]).query)["token"][0]
+            for kind, to in (
+                ("magic_link", "ada@example.com"),
+                ("invitation", "bob@example.com"),
+            )
+        ]
+        seen += [totp_secret, *two_factor["backup_codes"], *emailed]
         seen += [
             verify,
             signed_in.json()["token"],
@@ -112,6 +135,7 @@ async def test_full_scenario_leaves_no_secret_behind(
         ]
     tables = {name: await app.auth.database.find_many(name) for name in app.auth.schema}
     assert tables["session"] and tables["api_key"] and tables["oauth_token"]
+    assert tables["two_factor"] and tables["invitation"]
     # GotAuth's own log lines; the test client (httpx) logs the URLs it requests.
     logs = "\n".join(
         r.getMessage() for r in caplog.records if not r.name.startswith("http")

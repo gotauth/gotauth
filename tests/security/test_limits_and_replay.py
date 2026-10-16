@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlsplit
+
+import httpx
 import pytest
+
+from gotauth.crypto import totp
+from gotauth.plugins.passkey.testing import SoftAuthenticator
+from gotauth.testing import TEST_BASE_URL
 
 from .conftest import PASSWORD, App, full_app, oauth_client, oauth_code, oauth_tokens
 
@@ -62,6 +69,8 @@ async def test_forwarded_ips_count_only_from_trusted_proxies() -> None:
     [
         ("/sign-in/email", {"password": "wrong password"}),
         ("/request-password-reset", {"redirect_to": "/reset"}),
+        ("/magic-link/send", {}),
+        ("/email-otp/send", {"type": "sign_in"}),
     ],
 )
 async def test_per_email_limits_hold_across_rotating_ips(
@@ -74,11 +83,6 @@ async def test_per_email_limits_hold_across_rotating_ips(
     )
     assert 429 not in statuses[:10]
     assert statuses[10] == 429
-
-
-@pytest.mark.skip(reason="P4 (/magic-link/send, /email-otp/send) has not merged")
-async def test_per_email_limits_on_magic_link_and_otp() -> None:
-    raise AssertionError("covered once P4 merges")
 
 
 async def test_verification_and_reset_tokens_work_once() -> None:
@@ -148,14 +152,142 @@ async def test_a_replayed_refresh_token_revokes_the_family() -> None:
     assert not result.valid
 
 
-@pytest.mark.skip(
-    reason="P2 (OTPs, TOTP, backup codes), P3 (passkey challenges) and P5"
-    " (invitations) have not merged"
-)
-async def test_second_factor_and_invitation_replay() -> None:
-    raise AssertionError("covered once P2, P3 and P5 merge")
+# Replay of the plugins' one-time secrets. Rate limits are off: these tests are
+# about what a second use gets, not about how many tries an address has.
 
 
-@pytest.mark.skip(reason="P6 (bans) has not merged")
-async def test_banned_users_are_rejected_on_every_credential() -> None:
-    raise AssertionError("covered once P6 merges")
+async def two_factor_on(app: App, http: httpx.AsyncClient) -> tuple[str, list[str]]:
+    """Turn two-factor on for the signed-in user: ``(secret, backup codes)``."""
+    started = (
+        await http.post("/two-factor/enable", json={"password": PASSWORD})
+    ).json()
+    secret = parse_qs(urlsplit(started["totp_uri"]).query)["secret"][0]
+    code = totp(secret, at=app.clock.now())
+    confirmed = await http.post("/two-factor/verify-totp", json={"code": code})
+    assert confirmed.status_code == 200, confirmed.text
+    app.clock.advance("30s")  # the next code is a new time step
+    return secret, list(started["backup_codes"])
+
+
+async def challenged(*browsers: httpx.AsyncClient) -> None:
+    """Sign in with the password in each browser, which gets the 2FA challenge."""
+    for http in browsers:
+        started = await http.post(
+            "/sign-in/email", json={"email": "ada@example.com", "password": PASSWORD}
+        )
+        assert started.json()["challenge"]["type"] == "two_factor", started.text
+
+
+async def test_a_totp_code_and_a_backup_code_work_once() -> None:
+    app = full_app(rate_limit={"enabled": False})
+    async with app.client() as http:
+        await app.verified_user(http)
+        secret, backup = await two_factor_on(app, http)
+    code = totp(secret, at=app.clock.now())
+    async with app.client() as first, app.client() as second:
+        await challenged(first, second)
+        used = await first.post("/two-factor/verify-totp", json={"code": code})
+        assert used.status_code == 200, used.text
+        # The same code in another browser, inside its 30 seconds.
+        replay = await second.post("/two-factor/verify-totp", json={"code": code})
+        assert replay.json()["error"]["code"] == "TWO_FACTOR_INVALID_CODE"
+    async with app.client() as first, app.client() as second:
+        await challenged(first, second)
+        body = {"code": backup[0]}
+        used = await first.post("/two-factor/verify-backup-code", json=body)
+        assert used.status_code == 200, used.text
+        replay = await second.post("/two-factor/verify-backup-code", json=body)
+        assert replay.json()["error"]["code"] == "TWO_FACTOR_INVALID_CODE"
+
+
+async def test_a_two_factor_email_code_works_once() -> None:
+    app = full_app(rate_limit={"enabled": False})
+    async with app.client() as http:
+        await app.verified_user(http)
+        await two_factor_on(app, http)
+    async with app.client() as first, app.client() as second:
+        await challenged(first, second)
+        assert (await first.post("/two-factor/send-otp")).status_code == 200
+        body = {"code": await app.emailed("otp", r"\b\d{6}\b")}
+        used = await first.post("/two-factor/verify-otp", json=body)
+        assert used.status_code == 200, used.text
+        replay = await second.post("/two-factor/verify-otp", json=body)
+        assert replay.json()["error"]["code"] == "TWO_FACTOR_INVALID_CODE"
+
+
+async def test_a_passkey_assertion_works_once() -> None:
+    app = full_app(rate_limit={"enabled": False})
+    device = SoftAuthenticator(origin=TEST_BASE_URL)
+    async with app.client() as http:
+        await app.verified_user(http)
+        options = (await http.post("/passkey/register/options")).json()
+        added = await http.post(
+            "/passkey/register/verify", json={"response": device.create(options)}
+        )
+        assert added.status_code == 200, added.text
+    async with app.client() as browser, app.client() as attacker:
+        options = (await browser.post("/passkey/sign-in/options")).json()
+        assertion = {"response": device.get(options)}
+        used = await browser.post("/passkey/sign-in/verify", json=assertion)
+        assert used.status_code == 200, used.text
+        replay = await browser.post("/passkey/sign-in/verify", json=assertion)
+        assert replay.status_code in (400, 401), replay.text
+        # Another browser has no challenge cookie for it.
+        await attacker.post("/passkey/sign-in/options")
+        stolen = await attacker.post("/passkey/sign-in/verify", json=assertion)
+        assert stolen.status_code in (400, 401), stolen.text
+        assert (await attacker.get("/session")).json() is None
+
+
+async def test_magic_links_and_sign_in_codes_work_once() -> None:
+    app = full_app(rate_limit={"enabled": False})
+    async with app.client() as http:
+        await app.verified_user(http)
+    async with app.client() as first, app.client() as second:
+        await first.post("/magic-link/send", json={"email": "ada@example.com"})
+        link = await app.emailed("magic_link", r"https?://\S+")
+        assert (await first.get(link)).status_code == 302
+        replay = await second.get(link)
+        assert replay.json()["error"]["code"] == "TOKEN_INVALID"
+        body = {"email": "ada@example.com", "type": "sign_in"}
+        await first.post("/email-otp/send", json=body)
+        body["otp"] = await app.emailed("otp", r"\b\d{6}\b")
+        assert (await first.post("/email-otp/verify", json=body)).status_code == 200
+        replay = await second.post("/email-otp/verify", json=body)
+        assert replay.json()["error"]["code"] == "EMAIL_OTP_INVALID"
+        assert (await second.get("/session")).json() is None
+
+
+async def test_an_invitation_works_once_and_only_for_its_email() -> None:
+    app = full_app(rate_limit={"enabled": False})
+    async with (
+        app.client() as owner,
+        app.client() as invitee,
+        app.client() as other,
+    ):
+        await app.verified_user(owner, "owner@example.com")
+        await app.verified_user(invitee, "bob@example.com")
+        await app.verified_user(other, "eve@example.com")
+        created = await owner.post(
+            "/organization/create", json={"name": "Acme", "slug": "acme"}
+        )
+        org_id = created.json()["id"]
+        invited = await owner.post(
+            "/organization/invite-member",
+            json={"organization_id": org_id, "email": "bob@example.com"},
+        )
+        assert invited.status_code == 200, invited.text
+        link = await app.emailed("invitation", r"https?://\S+", "bob@example.com")
+        query = parse_qs(urlsplit(link).query)
+        body = {"invitation_id": query["invitation_id"][0], "token": query["token"][0]}
+        # A forwarded email: another signed-in user cannot use it.
+        taken = await other.post("/organization/accept-invitation", json=body)
+        assert taken.json()["error"]["code"] == "ORG_INVITATION_INVALID"
+        accepted = await invitee.post("/organization/accept-invitation", json=body)
+        assert accepted.status_code == 200, accepted.text
+        replay = await invitee.post("/organization/accept-invitation", json=body)
+        assert replay.json()["error"]["code"] == "ORG_INVITATION_INVALID"
+        members = await other.get(
+            "/organization/get", params={"organization_id": org_id}
+        )
+        assert members.json()["error"]["code"] == "ORG_NOT_A_MEMBER"

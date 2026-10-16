@@ -224,6 +224,46 @@ async def test_principal_check_rejects_with_its_code() -> None:
     assert response.json()["error"]["code"] == "ADMIN_USER_BANNED"
 
 
+async def test_check_principal_runs_the_checks_outside_the_pipeline() -> None:
+    # CCR 015: a server call that accepts a credential itself runs the same checks.
+    from gotauth.contracts import AuthError, Endpoint, StatusOut
+
+    checked: list[str | None] = []
+
+    async def banned(ctx: Any, principal: Principal) -> None:
+        checked.append(principal.user_id)
+        if principal.user_id == "usr_banned":
+            raise AuthError("ADMIN_USER_BANNED", 403)
+
+    async def accept(ctx: EndpointContext, _: None) -> StatusOut:
+        for user_id in ("usr_ok", "usr_banned"):
+            principal = Principal(via="api_key", credential_id="key_1", user_id=user_id)
+            await ctx.auth.check_principal(ctx, principal)
+        return StatusOut(status="accepted")
+
+    auth = build(
+        Plugin(
+            id="admin",
+            endpoints=(
+                Endpoint(
+                    "accept",
+                    "POST",
+                    "/accept",
+                    accept,
+                    output=StatusOut,
+                    server_only=True,
+                ),
+            ),
+            principal_checks=(banned,),
+            error_codes={"ADMIN_USER_BANNED": (403, "Banned")},
+        )
+    )
+    with pytest.raises(AuthError) as refused:
+        await auth.api.call("accept")
+    assert refused.value.code == "ADMIN_USER_BANNED"
+    assert checked == ["usr_ok", "usr_banned"]
+
+
 async def test_get_principal(auth: Any) -> None:
     async with make_client(auth) as client:
         await sign_in(client)

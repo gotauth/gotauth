@@ -43,4 +43,6 @@ processes. Without it each process counts on its own, so the effective limit is
 ## Server-side calls
 
 `issue_api_key`, `verify_api_key` and `revoke_api_keys` (CONTRACTS 12.5) are callable
-through `auth.api.call(...)` only, never over HTTP.
+through `auth.api.call(...)` only, never over HTTP. `verify_api_key` runs every
+plugin's principal checks, as a request would (CCR 015): a key of a banned user (P6)
+answers `valid: false` with `ADMIN_USER_BANNED`.
