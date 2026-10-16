@@ -6,7 +6,8 @@ import base64
 import html
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import replace
 from datetime import timedelta
 from typing import Any, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -24,7 +25,7 @@ from gotauth.contracts.schema import returned_only
 from gotauth.contracts.sessions import TOKEN_PREFIXES
 
 from ._clients import ClientStore, authenticate_client, is_cimd_url, oauth_error
-from ._keys import KeyStore, TokenRejected
+from ._keys import KeyStore, PrincipalRefused, TokenRejected
 from ._rules import (
     Settings,
     is_loopback_redirect,
@@ -207,6 +208,21 @@ def _consent_details(
         resource=resource,
         redirect_host=urlsplit(redirect_uri).netloc,
         loopback_only=all(is_loopback_redirect(uri) for uri in client["redirect_uris"]),
+    )
+
+
+def _grant_principal(
+    row: Mapping[str, Any],  # Any: an oauth_token row
+    scopes: Iterable[str],
+) -> Principal:
+    """The principal of a token of this grant row, as the resolver builds it."""
+    return Principal(
+        via="oauth_token",
+        credential_id=row["id"],
+        user_id=row.get("user_id"),
+        agent_id=row.get("agent_id"),
+        client_id=row["client_id"],
+        scopes=frozenset(scopes),
     )
 
 
@@ -868,6 +884,10 @@ class OAuthServer:
                 "created_at": now,
             },
         )
+        try:
+            await self._check(ctx, _grant_principal(row, scopes), client)
+        except PrincipalRefused:
+            raise oauth_error("invalid_grant") from None  # the new row rolls back
         issuer = self.issuer(ctx)
         kid, alg, key = await self._signer(ctx)
         claims: dict[str, Any] = {  # Any: JSON
@@ -923,12 +943,20 @@ class OAuthServer:
     # ------------------------------------------------------------ verification
 
     async def verify(
-        self, ctx: EndpointContext, token: str, audiences: Sequence[str] | None
+        self,
+        ctx: EndpointContext,
+        token: str,
+        audiences: Sequence[str] | None,
+        *,
+        check: bool = True,
     ) -> Principal:
-        """Check an access token and its grant row.
+        """Check an access token, its grant row and, with ``check``, the principal
+        checks (CCR 015). The resolver passes False: the pipeline checks its result
+        and answers with the check's own error.
 
         Raises:
-            TokenRejected: When the token must not be accepted.
+            TokenRejected: When the token must not be accepted
+                (``PrincipalRefused`` when a principal check refused it).
         """
         claims = await self.keys.verify(
             ctx.adapter,
@@ -953,14 +981,35 @@ class OAuthServer:
             agent = await ctx.adapter.find_one("agent", [Where("id", agent_id)])
             if agent is None or agent.get("disabled_at") is not None:
                 raise TokenRejected("agent disabled")
-        return Principal(
-            via="oauth_token",
-            credential_id=row["id"],
-            user_id=row.get("user_id"),
-            agent_id=agent_id,
-            client_id=row["client_id"],
-            scopes=frozenset(str(claims.get("scope", "")).split()),
-        )
+        principal = _grant_principal(row, str(claims.get("scope", "")).split())
+        if check:
+            await self._check(ctx, principal, client)
+        return principal
+
+    @staticmethod
+    async def _check(
+        ctx: EndpointContext,
+        principal: Principal,
+        client: Mapping[str, Any],  # Any: row
+    ) -> None:
+        """Run every plugin's principal checks (CCR 015, a ban for example) on a
+        token's principal, and on the client's owner when the token acts for no user
+        or agent (client credentials).
+
+        Raises:
+            PrincipalRefused: When a check refuses. A failing check (500) propagates.
+        """
+        principals = [principal]
+        owner = client.get("owner_user_id")
+        if principal.user_id is None and principal.agent_id is None and owner:
+            principals.append(replace(principal, user_id=owner))
+        for each in principals:
+            try:
+                await ctx.auth.check_principal(ctx, each)
+            except AuthError as error:
+                if error.status >= 500:
+                    raise
+                raise PrincipalRefused(error.code) from None
 
     def local_audiences(self, ctx: EndpointContext) -> list[str]:
         """Audiences this app accepts as a resource server: the issuer and base_url."""
@@ -1017,6 +1066,10 @@ class OAuthServer:
                 or row.get("revoked_at") is not None
                 or row["expires_at"] <= ctx.clock.now()
             ):
+                return inactive
+            try:  # refresh tokens come from the code grant: they act for a user
+                await self._check(ctx, _grant_principal(row, row["scopes"]), {})
+            except PrincipalRefused:
                 return inactive
             return {
                 "active": True,

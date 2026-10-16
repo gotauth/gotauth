@@ -70,7 +70,12 @@ A banned user:
   `ADMIN_USER_BANNED`.
 - **loses every session** when the ban is set.
 - **can't use API keys or OAuth tokens:** a principal check rejects any credential
-  whose user is banned with `ADMIN_USER_BANNED`. Keys and agents owned by an
+  whose user is banned with `ADMIN_USER_BANNED`. It also runs where other code accepts
+  a credential (CCR 015): `verify_api_key` and `verify_access_token` answer
+  `valid: false`, introspection answers `active: false`, and the refresh grant answers
+  `invalid_grant`, so MCP servers refuse the user too. Remote resource servers that
+  only check the JWT accept an access token until it expires (10 minutes by default).
+  Keys and agents owned by an
   organization have no user and are not affected. The flag is cached per user for up
   to 5 seconds in each process; a ban or unban through this process takes effect at
   once.

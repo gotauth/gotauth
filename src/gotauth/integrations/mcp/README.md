@@ -75,7 +75,7 @@ no per-tool scopes, so `tool_scopes` names them.
 
 | | `auth=` (same process) | `issuer=` (another process) |
 |---|---|---|
-| Checks | O1's `verify_access_token`: signature, `typ`, `iss`, `exp`, `aud`, revocation, disabled clients and agents | Discovery and JWKS from the issuer. Each key is used only with its own `alg`; `none` and `HS*` never verify. An unknown `kid` refetches the JWKS at most once per 30 seconds |
+| Checks | O1's `verify_access_token`: signature, `typ`, `iss`, `exp`, `aud`, revocation, disabled clients and agents, and the principal checks (a banned user, CCR 015) | Discovery and JWKS from the issuer. Each key is used only with its own `alg`; `none` and `HS*` never verify. An unknown `kid` refetches the JWKS at most once per 30 seconds |
 | Revocation | Seen on the next call | Seen when the token expires (10 minutes by default). With `introspect=True` and `introspection_client=(client_id, client_secret)`, seen within 5 seconds |
 | Issuer down | Not applicable | 503, never a 401 |
 

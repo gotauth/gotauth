@@ -380,3 +380,14 @@ async def test_fake_delete_user_without_a_context_gives_hooks_one() -> None:
     user = await new_user(ctx)
     await ctx.auth.delete_user(None, user.id)
     assert len(seen) == 1 and seen[0] is not None
+
+
+async def test_fake_check_principal_runs_plugin_checks() -> None:
+    async def banned(ctx: EndpointContext, principal: Principal) -> None:
+        raise AuthError("ADMIN_USER_BANNED", 403)
+
+    ctx = make_context(plugins=[Plugin(id="admin", principal_checks=(banned,))])
+    principal = Principal(via="api_key", credential_id="key_1", user_id="usr_1")
+    with pytest.raises(AuthError) as refused:
+        await ctx.auth.check_principal(ctx, principal)
+    assert refused.value.code == "ADMIN_USER_BANNED"

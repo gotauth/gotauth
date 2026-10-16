@@ -209,7 +209,7 @@ from gotauth.contracts.social import (
     ProviderUser,
 )
 
-CONTRACT_VERSION = 14
+CONTRACT_VERSION = 15
 """Bumped by the integrator for every accepted contract change request after M0."""
 
 __all__ = [

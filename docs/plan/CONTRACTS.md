@@ -5,7 +5,7 @@ This file defines the **shared interfaces every work package builds against**. W
 Agents can work in parallel because each module implements one interface and depends only on the *other* modules' interfaces, never on their code.
 
 ```python
-CONTRACT_VERSION = 14
+CONTRACT_VERSION = 15
 ```
 
 **Revision note (pre-M0):** this version settles the gaps the three brief-writing passes reported. The topics:
@@ -52,6 +52,8 @@ No 12.5 cross-plugin shape changed. `CONTRACT_VERSION` stays 0 because M0 has no
 **Version 13 (2026-10-15, [CCR 013](../ccr/013-sort-ties-admin-cookie.md)):** `find_many` breaks `sort_by` ties by `id` in the same direction (section 3), so paging is stable. The `admin_session` cookie and purpose string (P6) join the registries in sections 7 and 8.
 
 **Version 14 (2026-10-15, [CCR 014](../ccr/014-oauth-consent-details.md)):** O1 adds `get_oauth_consent` (12.3), so an app's own consent page can show what a consent request asks for.
+
+**Version 15 (2026-10-16, [CCR 015](../ccr/015-check-principal.md)):** `GotAuthInstance.check_principal` (section 13) runs every plugin's `principal_checks`. O1 and P1 call it where they accept or issue a credential outside the request pipeline, so a banned user's tokens and keys stop working everywhere.
 
 ---
 
@@ -1019,6 +1021,10 @@ A `before_*` hook may return modified data, or raise `AuthError` to abort. The c
     # and emits "user.deleted". With ctx=None it creates a server context: the hooks always
     # get a context in the delete's transaction, and the events follow the commit (CCR 011).
     def background(self, coro: Awaitable[None]) -> None: ...                 # C1; tracked task; errors logged
+    async def check_principal(self, ctx: EndpointContext, principal: Principal) -> None: ...
+    # Owned by C1 (CCR 015). Runs every plugin's principal_checks, as the pipeline does after it
+    # resolves a principal. Code that accepts or issues a credential outside the pipeline calls it:
+    # O1 when it verifies or mints an access token, P1's verify_api_key. Raises AuthError to refuse.
 ```
 **Permission checks:** when P5 is installed, it registers `has_permission` (section 12.3). A1's `require(permission=...)` calls it through `auth.api.call("has_permission", ...)`. Without P5, asking for a permission raises `ConfigError` at startup.
 

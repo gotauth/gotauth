@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
 import secrets
 from dataclasses import dataclass
 from typing import Any
@@ -12,8 +13,14 @@ from urllib.parse import parse_qs, urlsplit
 import httpx
 
 from gotauth.contracts import ProviderUser
+from gotauth.plugins.admin import admin
+from gotauth.plugins.agent import agent
 from gotauth.plugins.api_key import api_key
+from gotauth.plugins.magic_link import email_otp, magic_link
 from gotauth.plugins.oauth_provider import oauth_provider
+from gotauth.plugins.organization import organization
+from gotauth.plugins.passkey import passkey
+from gotauth.plugins.two_factor import two_factor
 from gotauth.testing import (
     fake_clock,
     fake_mailer,
@@ -32,6 +39,7 @@ class App:
     auth: Any  # Any: GotAuth
     mailer: Any  # Any: CapturingMailer
     clock: Any  # Any: ManualClock
+    social: Any  # Any: FakeOAuthProvider, id "fake"; code "c1" signs in ada
 
     def client(self, *, origin: bool = True) -> httpx.AsyncClient:
         """``make_client``, optionally without its ``Origin`` header."""
@@ -39,6 +47,16 @@ class App:
         if not origin:
             del http.headers["origin"]
         return http
+
+    async def emailed(
+        self, kind: str, pattern: str, email: str = "ada@example.com"
+    ) -> str:
+        """The first match of ``pattern`` in the newest email of a kind, once every
+        background send (P4 sends after the reply) has finished."""
+        await self.auth.drain()
+        found = re.search(pattern, self.mailer.last(kind, email).text)
+        assert found is not None
+        return found.group(0)
 
     def last_token(self, kind: str, email: str = "ada@example.com") -> str:
         """The ``token`` query value of the newest email of a kind."""
@@ -60,33 +78,39 @@ class App:
 
 
 def full_app(**overrides: Any) -> App:
-    """Every merged module: email + password, sessions, social, API keys, OAuth."""
+    """Every module: email + password, sessions, social and every plugin."""
     clock = overrides.pop("clock", None) or fake_clock()
     mailer = fake_mailer()
+    social = fake_oauth_provider(
+        users={
+            "c1": ProviderUser(
+                id="gh-1",
+                email="ada@example.com",
+                email_verified=True,
+                name="Ada",
+                image=None,
+                raw={},
+            )
+        }
+    )
     options: dict[str, Any] = {
         "clock": clock,
         "mailer": mailer,
-        "social_providers": [
-            fake_oauth_provider(
-                users={
-                    "c1": ProviderUser(
-                        id="gh-1",
-                        email="ada@example.com",
-                        email_verified=True,
-                        name="Ada",
-                        image=None,
-                        raw={},
-                    )
-                }
-            )
-        ],
+        "social_providers": [social],
         "plugins": [
             api_key(allowed_scopes=["projects:read"]),
             oauth_provider(resources=[RESOURCE]),
+            agent(),
+            two_factor(email_otp=True),
+            passkey(),
+            magic_link(),
+            email_otp(),
+            organization(),
+            admin(),
         ],
     }
     options.update(overrides)
-    return App(auth=make_auth(**options), mailer=mailer, clock=clock)
+    return App(auth=make_auth(**options), mailer=mailer, clock=clock, social=social)
 
 
 def pkce() -> tuple[str, str]:

@@ -36,7 +36,7 @@ from gotauth.contracts.principal import Principal
 from gotauth.contracts.schema import returned_only
 from gotauth.contracts.sessions import TOKEN_PREFIXES, is_localhost
 
-from ._keys import TokenRejected
+from ._keys import PrincipalRefused, TokenRejected
 from ._rules import (
     Settings,
     is_loopback_redirect,
@@ -153,7 +153,7 @@ class OAuthJwtResolver:
     async def __call__(self, ctx: EndpointContext, credential: str) -> Principal | None:
         try:
             return await self._server.verify(
-                ctx, credential, self._server.local_audiences(ctx)
+                ctx, credential, self._server.local_audiences(ctx), check=False
             )
         except TokenRejected:
             return None
@@ -482,6 +482,8 @@ def oauth_provider(
             audiences = [server.issuer(ctx)]
         try:
             principal = await server.verify(ctx, body.token, audiences)
+        except PrincipalRefused as refused:
+            return VerifyOut(valid=False, code=refused.code)
         except TokenRejected:
             return VerifyOut(valid=False, code="invalid_token")
         if body.scopes and not principal.has_scopes(*body.scopes):
