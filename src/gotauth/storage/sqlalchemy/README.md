@@ -61,5 +61,14 @@ migrations stay stable.
 - `gotauth generate` writes an Alembic revision for GotAuth's tables only (other tables
   in the database are ignored). Set up Alembic first with `alembic init -t async
   migrations`.
+- **Defaults in the database:** a required field with a constant default (a bool, int
+  or string, such as `two_factor()`'s `user.two_factor_enabled = False`) gets a matching
+  `server_default`, so a revision that adds it to a table with rows works on Postgres
+  and SQLite. Booleans use the SQL keywords `true` and `false`, so a revision generated
+  on SQLite also runs on Postgres. A field with a callable default (`default=list`) or a
+  unique one has none: a plugin that adds one to an existing table must make it
+  nullable. `gotauth migrate` uses the same defaults. `gotauth generate` does not
+  compare server defaults, so tables created before this change get no new revision
+  for them.
 - `gotauth generate --sql --dialect postgresql|sqlite` prints the DDL for an empty
   database.

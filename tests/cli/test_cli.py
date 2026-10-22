@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import os
+import re
 import sys
 import uuid
 from collections.abc import Iterator
@@ -25,6 +27,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
 from gotauth import GotAuth
+from gotauth.plugins.two_factor import two_factor
 from gotauth.storage.sqlalchemy import sqlalchemy_adapter
 
 engine = create_async_engine({url!r}, poolclass=NullPool)
@@ -33,6 +36,7 @@ auth = GotAuth(
     secret="s" * 64,
     base_url="http://localhost:8000",
     email_password={{"enabled": False}},
+    plugins={plugins},
 )
 """
 
@@ -58,10 +62,11 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     logging.root.setLevel(root_level)
 
 
-def write_auth(project: Path, url: str) -> str:
+def write_auth(project: Path, url: str, plugins: str = "[]") -> str:
     """Write a uniquely named auth module and return its --auth spec."""
     name = f"auth_{uuid.uuid4().hex[:8]}"
-    (project / f"{name}.py").write_text(AUTH_FILE.format(url=url), encoding="utf-8")
+    source = AUTH_FILE.format(url=url, plugins=plugins)
+    (project / f"{name}.py").write_text(source, encoding="utf-8")
     return f"{name}:auth"
 
 
@@ -183,7 +188,7 @@ def test_generate_needs_an_alembic_project(
     assert "alembic init" in capsys.readouterr().err
 
 
-def alembic_cycle(project: Path, url: str) -> None:
+def alembic_project(project: Path, url: str) -> Config:
     config_file = project / "alembic.ini"
     command.init(
         Config(str(config_file)), str(project / "migrations"), template="async"
@@ -194,6 +199,11 @@ def alembic_cycle(project: Path, url: str) -> None:
         f"sqlalchemy.url = {url}",
     )
     config_file.write_text(ini, encoding="utf-8")
+    return Config(str(config_file))
+
+
+def alembic_cycle(project: Path, url: str) -> None:
+    config = alembic_project(project, url)
     spec = write_auth(project, url)
     # Another app table must never show up in GotAuth's migrations.
     asyncio.run(_create_unrelated(url))
@@ -202,7 +212,6 @@ def alembic_cycle(project: Path, url: str) -> None:
     assert len(versions) == 1
     source = versions[0].read_text(encoding="utf-8")
     assert "app_orders" not in source
-    config = Config(str(config_file))
     command.upgrade(config, "head")
     assert {"auth_user", "auth_session", "app_orders"} <= table_names(url)
     assert main(["generate", "--auth", spec]) == 0  # nothing left to do
@@ -227,6 +236,58 @@ async def _create_unrelated(url: str) -> None:
 
 def test_alembic_sqlite(project: Path) -> None:
     alembic_cycle(project, f"sqlite+aiosqlite:///{project / 'app.db'}")
+
+
+def plugin_on_existing_rows(project: Path, url: str) -> None:
+    """Issue #53: adding a plugin whose fields join a table with rows."""
+    config = alembic_project(project, url)
+    spec = write_auth(project, url)
+    assert main(["generate", "--auth", spec, "-m", "gotauth"]) == 0
+    command.upgrade(config, "head")
+    auth = importlib.import_module(spec.split(":")[0]).auth
+    asyncio.run(auth.create_user_record(None, {"email": "ada@example.com"}))
+    spec = write_auth(project, url, plugins="[two_factor()]")
+    assert main(["generate", "--auth", spec, "-m", "two factor"]) == 0
+    added = next(
+        v.read_text(encoding="utf-8")
+        for v in (project / "migrations" / "versions").glob("*two_factor*.py")
+    )
+    assert "two_factor_enabled" in added
+    # The SQL keyword on every dialect, so a revision made on SQLite runs on Postgres.
+    assert re.search(r"server_default=sa\.text\('\(?false\)?'\)", added), added
+    command.upgrade(config, "head")  # failed before: NOT NULL without a default
+    assert asyncio.run(_scalar(url, "SELECT two_factor_enabled FROM auth_user")) in (
+        False,
+        0,
+    )
+
+
+async def _scalar(url: str, query: str) -> object:
+    from sqlalchemy import text
+
+    engine = create_async_engine(url, poolclass=NullPool)
+    try:
+        async with engine.connect() as conn:
+            return (await conn.execute(text(query))).scalar_one()
+    finally:
+        await engine.dispose()
+
+
+def test_plugin_fields_join_a_table_with_rows_sqlite(project: Path) -> None:
+    plugin_on_existing_rows(project, f"sqlite+aiosqlite:///{project / 'app.db'}")
+
+
+@pytest.mark.postgres
+def test_plugin_fields_join_a_table_with_rows_postgres(project: Path) -> None:
+    base = os.environ["GOTAUTH_TEST_POSTGRES_URL"].replace(
+        "postgresql://", "postgresql+asyncpg://", 1
+    )
+
+    async def run() -> None:
+        async for url in fresh_database_url(base):
+            await asyncio.to_thread(plugin_on_existing_rows, project, url)
+
+    asyncio.run(run())
 
 
 @pytest.mark.postgres

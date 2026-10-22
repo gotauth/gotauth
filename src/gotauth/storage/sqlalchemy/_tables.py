@@ -18,6 +18,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import TypeDecorator, TypeEngine
@@ -106,7 +107,35 @@ def _column(name: str, field: Field, schema: Schema, table_prefix: str) -> Colum
         nullable=not field.required,
         unique=field.unique or None,
         index=(field.index and not field.unique) or None,
+        server_default=_server_default(field),
     )
+
+
+def _server_default(field: Field) -> Any:  # Any: a SQLAlchemy default expression
+    """The database default for a NOT NULL column whose field has a constant default.
+
+    A plugin may add such a field to a table that already has rows (``two_factor()``
+    adds ``user.two_factor_enabled``); without a database default, the generated
+    ``add_column`` fails on those rows (issue #53). Callable defaults have none, and
+    neither have unique fields (every row would get the same value): such fields must
+    be nullable when they join an existing table.
+
+    Booleans are the SQL keywords ``true`` and ``false``, not SQLAlchemy's
+    ``true()``, which compiles to ``1`` on SQLite: a revision generated against SQLite
+    must also run on Postgres. SQLite reads the keywords since 3.23.
+    """
+    value = field.default
+    if not field.required or field.unique or value is None or callable(value):
+        return None
+    if isinstance(value, bool):
+        if field.type != "boolean":
+            return None
+        return text("true" if value else "false")
+    if isinstance(value, int) and field.type == "integer":
+        return text(str(value))
+    if isinstance(value, str) and field.type in ("string", "text"):
+        return value
+    return None
 
 
 def metadata_for(schema: Schema, *, table_prefix: str = "auth_") -> MetaData:

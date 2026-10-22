@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.schema import DefaultClause
 
 from gotauth.contracts import ReferenceViolation, UniqueViolation, Where
 from gotauth.contracts.core_schema import CORE_SCHEMA
@@ -227,7 +228,8 @@ async def test_migrate_is_additive_and_idempotent(
     plan = await create_missing(engine, extended, table_prefix=prefix)
     assert any("CREATE TABLE mig_widget" in s for s in plan.statements)
     assert any("ADD COLUMN nickname" in s for s in plan.statements)
-    assert any("ADD COLUMN level" in s and "DEFAULT 1" in s for s in plan.statements)
+    [level] = [s for s in plan.statements if "ADD COLUMN level" in s]
+    assert level.count("DEFAULT") == 1 and "DEFAULT 1" in level
     assert any("ADD COLUMN must_fill" in s for s in plan.manual)
     remaining = await missing_changes(engine, extended, table_prefix=prefix)
     assert remaining.statements == [] and remaining.manual == plan.manual
@@ -319,3 +321,45 @@ def test_references_to_missing_models_are_plain_columns() -> None:
     }
     table = metadata_for(schema).tables["auth_thing"]
     assert not table.c.agent_id.foreign_keys
+
+
+def test_constant_defaults_of_required_fields_become_database_defaults() -> None:
+    # Issue #53: a plugin's required field must be addable to a table with rows.
+    schema = {
+        "thing": ModelSchema(
+            name="thing",
+            fields={
+                "active": Field("boolean", default=True),
+                "hidden": Field("boolean", default=False),
+                "count": Field("integer", default=0),
+                "role": Field("string", default="member"),
+                "tags": Field("string_list", default=list),  # callable: no default
+                "note": Field("string", required=False, default="x"),  # NULL works
+                "slug": Field("string", unique=True, default="x"),  # rows would clash
+                "plain": Field("string"),
+            },
+        )
+    }
+    columns = metadata_for(schema).tables["auth_thing"].c
+    rendered = {
+        name: str(column.server_default.arg)
+        if isinstance(column.server_default, DefaultClause)
+        else None
+        for name, column in columns.items()
+        if name != "id"
+    }
+    assert rendered == {
+        "active": "true",
+        "hidden": "false",
+        "count": "0",
+        "role": "member",
+        "tags": None,
+        "note": None,
+        "slug": None,
+        "plain": None,
+    }
+    # The same DDL on both databases, so a revision made on one runs on the other.
+    for dialect in ("postgresql", "sqlite"):
+        ddl = schema_ddl(schema, dialect=dialect)
+        assert "active BOOLEAN DEFAULT true NOT NULL" in ddl, ddl
+        assert "hidden BOOLEAN DEFAULT false NOT NULL" in ddl, ddl
