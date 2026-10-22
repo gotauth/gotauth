@@ -566,3 +566,17 @@ async def test_removal_clears_the_active_organization_at_once() -> None:
     )
     await w.auth.drain()
     assert (await w.auth.get_principal({}, cookies)).organization_id is None
+
+
+async def test_an_unknown_role_is_refused_without_echoing_it() -> None:
+    # Found by the security fuzz suite: the error used to quote the role it was sent.
+    w = world()
+    org_id = await w.org("ada")
+    await w.user("bob")
+    answer = await (await w.user("ada")).post(
+        "/organization/update-member-role",
+        json={"organization_id": org_id, "user_id": w.ids["bob"], "role": "zqx<b>"},
+    )
+    assert answer.status_code == 400
+    assert "zqx" not in answer.text
+    assert answer.json()["error"]["details"]["roles"] == sorted(ACCESS.roles)

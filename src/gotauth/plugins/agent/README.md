@@ -48,7 +48,8 @@ The one exception is listing an agent's keys: P1 has no listing call, so O3 read
 ## Principals
 
 - **An agent's API key:** the `Principal` has `agent_id`, plus `user_id` for a user's agent or `organization_id` for an organization's.
-- **A linked client's token:** `agent_id` comes from the `act` claim.
+- **A linked client's token:** `agent_id` comes from the `act` claim. For an organization's agent it carries no `organization_id`: the agent acts for the organization through its API keys, which have the organization's limits (issue #42).
+- **The client's owner** holds its secret, so the principal checks (a ban) also run on them for every token of the client that acts for no user. Leaving or being removed from the organization does not unlink their client; revoke the agent or disable the client for that.
 - **A `client_credentials` token of a user's agent:** acts for that user.
 - **Never the agent:** `user_id` is never the agent id.
 

@@ -210,7 +210,13 @@ def organization(
 
     def check_role(role: str) -> None:
         if role not in control.roles:
-            raise AuthError("INVALID_REQUEST", 400, f"Unknown role {role!r}")
+            # The allowed roles, never the input: errors must not reflect it.
+            raise AuthError(
+                "INVALID_REQUEST",
+                400,
+                "Unknown role",
+                details={"roles": sorted(control.roles)},
+            )
 
     async def lock(ctx: EndpointContext, org_id: str) -> dict[str, Any]:  # Any: row
         """Write the organization row before counting owners: its row lock makes

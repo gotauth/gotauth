@@ -10,12 +10,13 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from gotauth.contracts import ConfigError
+from gotauth.contracts import AuthError, ConfigError, Plugin, Principal
 from gotauth.contracts.oauth import PLUGIN_ENDPOINTS
 from gotauth.plugins.agent import agent
 from gotauth.plugins.api_key import api_key
 from gotauth.plugins.oauth_provider import oauth_provider
-from gotauth.testing import make_auth, stub_plugin
+from gotauth.plugins.organization import organization
+from gotauth.testing import make_auth, make_client, stub_plugin
 
 from .conftest import REDIRECT, SCOPES, world
 
@@ -391,3 +392,74 @@ async def test_organization_agents_follow_the_organization_s_permissions() -> No
     granted["agent"] = set()
     assert (await w.ada.get(f"/agents/{agent_id}")).status_code == 404
     assert {"agent": ["update"], "api_key": ["create"]} in asked
+
+
+async def test_an_organization_agent_s_client_ends_with_its_owner_s_ban() -> None:
+    # The member who owns a client linked to an organization's agent holds its
+    # secret. Its tokens act for no user, so the owner is checked instead.
+    banned: set[str] = set()
+
+    async def ban_check(ctx: Any, principal: Principal) -> None:
+        if principal.user_id in banned:
+            raise AuthError("ADMIN_USER_BANNED", 403)
+
+    w = await world(
+        plugins=[
+            api_key(allowed_scopes=["projects:read"]),
+            oauth_provider(scopes=SCOPES),
+            agent(),
+            organization(),
+            Plugin(
+                id="bans",
+                principal_checks=(ban_check,),
+                error_codes={"ADMIN_USER_BANNED": (403, "Banned")},
+            ),
+        ]
+    )
+    org = await w.ada.post(
+        "/organization/create", json={"name": "Acme", "slug": "acme"}
+    )
+    body = {"name": "Team bot", "organization_id": org.json()["id"]}
+    agent_id = (await w.ada.post("/agents", json=body)).json()["id"]
+    created = await w.auth.api.call(
+        "create_oauth_client",
+        body={
+            "name": "Team worker",
+            "type": "confidential",
+            "redirect_uris": [REDIRECT],
+            "grant_types": ["client_credentials"],
+            "scopes": ["projects:read"],
+            "owner_user_id": w.ada_id,
+        },
+    )
+    client_id = created.client.client_id
+    linked = await w.ada.post(
+        f"/agents/{agent_id}/clients", json={"client_id": client_id}
+    )
+    assert linked.status_code == 200, linked.text
+    form = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": created.client_secret,
+        "scope": "projects:read",
+    }
+    access = (await w.ada.post("/oauth2/token", data=form)).json()["access_token"]
+    principal = await w.token_principal(access)
+    assert (principal.agent_id, principal.user_id) == (agent_id, None)
+    assert principal.organization_id is None  # issue #42: acts through its keys
+
+    ask = {"organization_id": body["organization_id"], "permissions": {"x": ["y"]}}
+    async with make_client(w.auth) as bot:
+        bot.headers["authorization"] = f"Bearer {access}"
+        before = await bot.post("/organization/has-permission", json=ask)
+        assert before.status_code == 200, before.text  # resolved, no rights
+        banned.add(w.ada_id)
+        assert await w.token_principal(access) is None
+        refused = await bot.post("/organization/has-permission", json=ask)
+        assert refused.status_code == 403
+        assert refused.json()["error"]["code"] == "ADMIN_USER_BANNED"
+        again = await w.ada.post("/oauth2/token", data=form)
+        assert again.json()["error"] == "invalid_grant"
+        banned.clear()
+        after = await bot.post("/organization/has-permission", json=ask)
+        assert after.status_code == 200, after.text

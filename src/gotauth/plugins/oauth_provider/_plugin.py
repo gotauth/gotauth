@@ -153,8 +153,12 @@ class OAuthJwtResolver:
     async def __call__(self, ctx: EndpointContext, credential: str) -> Principal | None:
         try:
             return await self._server.verify(
-                ctx, credential, self._server.local_audiences(ctx), check=False
+                ctx, credential, self._server.local_audiences(ctx), owner_only=True
             )
+        except PrincipalRefused as refused:
+            # The client's owner, whom the pipeline's own checks never see: the
+            # check's own error (ADMIN_USER_BANNED), not a plain 401.
+            raise refused.error from None
         except TokenRejected:
             return None
 
