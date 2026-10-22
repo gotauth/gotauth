@@ -948,11 +948,12 @@ class OAuthServer:
         token: str,
         audiences: Sequence[str] | None,
         *,
-        check: bool = True,
+        owner_only: bool = False,
     ) -> Principal:
-        """Check an access token, its grant row and, with ``check``, the principal
-        checks (CCR 015). The resolver passes False: the pipeline checks its result
-        and answers with the check's own error.
+        """Check an access token, its grant row and the principal checks (CCR 015).
+
+        The resolver passes ``owner_only``: the pipeline runs the checks on the
+        principal it returns, but never sees the client's owner.
 
         Raises:
             TokenRejected: When the token must not be accepted
@@ -982,8 +983,7 @@ class OAuthServer:
             if agent is None or agent.get("disabled_at") is not None:
                 raise TokenRejected("agent disabled")
         principal = _grant_principal(row, str(claims.get("scope", "")).split())
-        if check:
-            await self._check(ctx, principal, client)
+        await self._check(ctx, principal, client, owner_only=owner_only)
         return principal
 
     @staticmethod
@@ -991,25 +991,31 @@ class OAuthServer:
         ctx: EndpointContext,
         principal: Principal,
         client: Mapping[str, Any],  # Any: row
+        *,
+        owner_only: bool = False,
     ) -> None:
         """Run every plugin's principal checks (CCR 015, a ban for example) on a
         token's principal, and on the client's owner when the token acts for no user
-        or agent (client credentials).
+        (client credentials of a client, or of an organization's agent): the owner
+        holds the client secret, so a ban on them ends the client's tokens. The owner
+        is checked as a plain user principal of the client, without the agent.
 
         Raises:
             PrincipalRefused: When a check refuses. A failing check (500) propagates.
         """
-        principals = [principal]
+        principals = [] if owner_only else [principal]
         owner = client.get("owner_user_id")
-        if principal.user_id is None and principal.agent_id is None and owner:
-            principals.append(replace(principal, user_id=owner))
+        if principal.user_id is None and owner:
+            principals.append(
+                replace(principal, user_id=owner, agent_id=None, organization_id=None)
+            )
         for each in principals:
             try:
                 await ctx.auth.check_principal(ctx, each)
             except AuthError as error:
                 if error.status >= 500:
                     raise
-                raise PrincipalRefused(error.code) from None
+                raise PrincipalRefused(error) from None
 
     def local_audiences(self, ctx: EndpointContext) -> list[str]:
         """Audiences this app accepts as a resource server: the issuer and base_url."""

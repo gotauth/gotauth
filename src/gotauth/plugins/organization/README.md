@@ -79,7 +79,7 @@ defaults to the session's active organization.
 - **A key or token acting for a user:** the role, and the key's scopes must include every pair.
 - **An organization's own key or agent:** its scopes only, and only for its own organization.
 - **Any key or token tied to an organization** counts in that organization only, even when it also acts for a user.
-- **Not covered yet:** an organization agent's OAuth token carries no organization (issue #42), so it gets `success: false`.
+- **An organization agent's OAuth token** carries no organization, so it gets `success: false`; the agent acts for the organization through its API keys. A linked client acting for the organization would skip the limits on those keys (allowed scopes, expiry, rate limit, audit), so this stays closed until it can apply them (issue #42).
 - **A non-member, an unknown organization or an empty request:** `success: false`.
 
 ## Rules

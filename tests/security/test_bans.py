@@ -186,6 +186,10 @@ async def test_banned_users_are_rejected_on_every_credential() -> None:
         ]
         assert [r.json()["error"] for r in refused] == ["invalid_grant"] * 3
         assert not (await verify(app, service_token)).valid
+        # Presented to GotAuth's own API, the token of her client is refused too: the
+        # pipeline's checks see a principal with no user, the owner check does not.
+        service_bearer = {"authorization": f"Bearer {service_token}"}
+        assert await denied(app, service_bearer) == "ADMIN_USER_BANNED"
 
         # Unbanned, the refresh token works again: the refused grant changed nothing.
         unbanned = await boss.post(f"/admin/users/{ada['id']}/unban")
@@ -194,3 +198,4 @@ async def test_banned_users_are_rejected_on_every_credential() -> None:
             http, client, grant_type="refresh_token", refresh_token=mcp["refresh_token"]
         )
         assert again.status_code == 200, again.text
+        assert await denied(app, service_bearer) is None  # her client works again

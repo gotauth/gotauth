@@ -14,6 +14,7 @@ from jwt.algorithms import ECAlgorithm, RSAAlgorithm
 
 from gotauth.contracts.adapter import Adapter, SortBy, Where
 from gotauth.contracts.crypto import CryptoKit
+from gotauth.contracts.errors import AuthError
 from gotauth.contracts.primitives import Clock, IdGenerator, to_timedelta
 
 from ._rules import Settings
@@ -28,11 +29,12 @@ class TokenRejected(Exception):
 
 
 class PrincipalRefused(TokenRejected):
-    """A principal check (CCR 015) refused the token; ``code`` is its error code."""
+    """A principal check (CCR 015) refused the token; ``error`` is the check's own."""
 
-    def __init__(self, code: str) -> None:
-        super().__init__(f"refused by a principal check: {code}")
-        self.code = code
+    def __init__(self, error: AuthError) -> None:
+        super().__init__(f"refused by a principal check: {error.code}")
+        self.error = error
+        self.code = error.code
 
 
 def _generate(alg: str) -> Any:  # Any: a private key object

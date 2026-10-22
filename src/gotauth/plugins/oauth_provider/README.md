@@ -58,9 +58,11 @@ Server-side only (`auth.api.call(...)`): `create_oauth_client`, `list_oauth_clie
   is too long.
 - **Principal checks** (CCR 015): `verify_access_token`, introspection and
   userinfo run every plugin's principal checks on the token's principal, and so does
-  every grant before it issues a token. A client credentials token, which acts for no
-  user, is checked as its client's owner. A banned user (P6) gets `valid: false` with
-  `ADMIN_USER_BANNED`, `active: false`, a 401 or `invalid_grant`; after an unban the
+  every grant before it issues a token. A token that acts for no user (client
+  credentials of a client, or of an organization's agent) is checked as its client's
+  owner too, who holds the client secret, also on GotAuth's own API. A banned user (P6) gets `valid: false` with
+  `ADMIN_USER_BANNED`, `active: false`, a 401 from userinfo, a 403 `ADMIN_USER_BANNED`
+  on GotAuth's own API, or `invalid_grant`; after an unban the
   same tokens work again.
 - **Refresh scope narrowing** applies to the new access token only; the grant keeps
   its scopes, so a later refresh can ask for them again.
