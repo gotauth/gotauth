@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import Column, Connection, Dialect, MetaData, Table, inspect, text
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlalchemy.schema import CreateColumn, CreateIndex, CreateTable
+from sqlalchemy.schema import CreateColumn, CreateIndex, CreateTable, DefaultClause
 
 from gotauth.contracts.schema import Schema, table_name
 
@@ -74,34 +74,29 @@ class MigrationPlan:
         return not self.statements and not self.manual
 
 
-def _literal(value: object, dialect: Dialect) -> str | None:
-    if isinstance(value, bool):
-        if dialect.name == "postgresql":
-            return "true" if value else "false"
-        return "1" if value else "0"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, str):
-        return "'" + value.replace("'", "''") + "'"
-    return None
-
-
 def _add_column(
-    table: Table, column: Column[Any], dialect: Dialect, default: object
+    table: Table, column: Column[Any], dialect: Dialect
 ) -> tuple[list[str], bool]:
     """Return the statements to add a column and whether migrate may run them."""
-    spec = str(CreateColumn(column).compile(dialect=dialect)).strip()
-    # UNIQUE on ADD COLUMN is not portable: a unique index follows instead.
-    spec = spec.replace(" UNIQUE", "")
+    # A bare copy: UNIQUE on ADD COLUMN is not portable (a unique index follows), and
+    # the foreign key is added by hand below. The default comes from the column itself
+    # (metadata_for), the same one `gotauth generate` writes.
+    default = column.server_default
+    bare: Column[Any] = Column(
+        column.name,
+        column.type,
+        nullable=column.nullable,
+        server_default=DefaultClause(default.arg)
+        if isinstance(default, DefaultClause)
+        else None,
+    )
+    spec = str(CreateColumn(bare).compile(dialect=dialect)).strip()
     for key in column.foreign_keys:
         # SQLite allows REFERENCES on ADD COLUMN when the column may be NULL.
         target = key.column
         action = f" ON DELETE {key.ondelete}" if key.ondelete else ""
         spec += f" REFERENCES {target.table.name} ({target.name}){action}"
-    literal = _literal(default, dialect)
-    automatic = column.nullable or literal is not None
-    if not column.nullable and literal is not None:
-        spec += f" DEFAULT {literal}"
+    automatic = column.nullable or default is not None
     statements = [f"ALTER TABLE {table.name} ADD COLUMN {spec};"]
     if column.unique:
         statements.append(
@@ -131,13 +126,7 @@ def _plan(
         for column in table.columns:
             if column.name in present:
                 continue
-            spec = model.fields.get(column.name)
-            default = (
-                spec.default
-                if spec is not None and not callable(spec.default)
-                else None
-            )
-            statements, automatic = _add_column(table, column, conn.dialect, default)
+            statements, automatic = _add_column(table, column, conn.dialect)
             (plan.statements if automatic else plan.manual).extend(statements)
         plan.statements.extend(_missing_unique_groups(inspector, table, model))
     return plan
