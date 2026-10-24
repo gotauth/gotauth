@@ -87,6 +87,8 @@ The Markdown copies and `llms.txt` leave the markers out.
 `.github/workflows/docs.yml` builds and tests the site on pull requests, and on `main`
 uploads it to the same cPanel account as the landing page, into `docs/` under the
 document root. It is off until the repository variable `DOCS_DEPLOY` is `"true"`, and uses
-the landing page's FTPS secrets (`CPANEL_FTP_HOST`, `CPANEL_FTP_USER`,
-`CPANEL_FTP_PASSWORD`) and `CPANEL_FTP_DIR`. The landing page's deploy leaves `docs/`
-alone.
+the same FTPS secrets as the landing page (`CPANEL_FTP_HOST`, `CPANEL_FTP_USER`,
+`CPANEL_FTP_PASSWORD`) and `CPANEL_FTP_DIR`. The job runs in the GitHub environment
+`docs`, and environment secrets are not shared between environments: create `docs`
+(Settings -> Environments, deployment branches: `main` only) and add the same three
+secrets there too. The landing page's deploy leaves `docs/` alone.

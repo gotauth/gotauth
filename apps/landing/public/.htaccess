@@ -5,6 +5,11 @@
 Options -Indexes
 ErrorDocument 404 /404.html
 
+# The docs under /docs/ ship Markdown copies of every page and llms.txt for AI tools:
+# serve them as UTF-8 plain text, which every browser shows instead of downloading.
+AddType text/plain .md
+AddCharset utf-8 .md .txt
+
 # HTTPS only. Behind a proxy that ends TLS (for example Cloudflare), Apache sees
 # plain HTTP; then rely on the proxy's "Always use HTTPS" setting and remove this.
 <IfModule mod_rewrite.c>

@@ -1,5 +1,6 @@
 # The agent-install test (work package Q2): Claude Code, Python and uv, nothing else.
-# Credentials are never baked in: run.sh passes ANTHROPIC_API_KEY at run time.
+# Credentials are never baked in: run.sh passes CLAUDE_CODE_OAUTH_TOKEN or
+# ANTHROPIC_API_KEY at run time.
 FROM ghcr.io/astral-sh/uv:0.12.22 AS uv
 FROM node:24.21.0-trixie-slim AS node
 
