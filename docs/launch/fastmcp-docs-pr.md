@@ -49,7 +49,7 @@ Adds an integration page for GotAuth and its entry in `docs/docs.json`. Docs onl
 code changes. The page shows how to protect a FastMCP server with GotAuth, which runs
 the authorization server inside the app on the app's own user table. Its code is copied
 from GotAuth's `examples/fastmcp-server`, which is tested in GotAuth's CI against
-FastMCP 4.1.0.
+FastMCP 4.1.3.
 
 ## The page (docs snippet)
 

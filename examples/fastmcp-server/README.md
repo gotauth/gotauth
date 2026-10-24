@@ -9,7 +9,7 @@ An MCP server whose users sign in with GotAuth, in one FastAPI app:
 
 All of the auth setup is in [app/auth.py](app/auth.py); the pages and the MCP server are in [app/main.py](app/main.py).
 
-Built with FastMCP 4.1.0, FastAPI 0.143 and Python 3.14 (checked 2026-10-13), for MCP authorization revision 2026-07-28.
+Built with FastMCP 4.1.3, FastAPI 0.143 and Python 3.14 (checked 2026-10-24), for MCP authorization revision 2026-07-28.
 
 ## How it works
 1. **An MCP client calls `/mcp` without a token.** It gets a 401 whose `WWW-Authenticate` header points to `/.well-known/oauth-protected-resource/mcp`. That document names GotAuth (`/api/auth`) as the authorization server.

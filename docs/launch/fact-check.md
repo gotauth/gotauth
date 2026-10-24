@@ -63,7 +63,7 @@ Rules for the drafts (work package G5):
 | `gotauth check`: 13 rules, `ast` only, standard library only, no network, SARIF output | show-hn, reddit-fastapi, social-threads, python-bytes | `src/gotauth/checkup/README.md` |
 | `gotauth check` on the seeded hand-rolled app: 4 findings (3 high, 1 medium), score 49/100; on the seeded GotAuth app: no findings, 100/100 | hero-clip-scripts | Run on 2026-10-16 in this repository (`./dev.sh uv run gotauth check scripts/agent-install-test/checker/fixtures/bad_app`, then `good_app`). **Re-run** before recording |
 | Not done yet: OpenID conformance run, token exchange (RFC 8693), SAML and SCIM, a Flask adapter ("when users ask for them"); Django is out of scope; one maintainer; pre-1.0 | all | `docs/build-plan.md` (roadmap "Later" row, out of scope list), `docs/plan/README.md` (status), `SECURITY.md` |
-| Example versions: FastMCP 4.1.0, FastAPI 0.143, Python 3.14 | devto | `examples/fastmcp-server/README.md` |
+| Example versions: FastMCP 4.1.3, FastAPI 0.143, Python 3.14 | devto | `examples/fastmcp-server/README.md` |
 
 ## Code
 
