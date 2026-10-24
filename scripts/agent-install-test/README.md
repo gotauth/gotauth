@@ -10,22 +10,71 @@ in the project. `checker/` then judges the result. Work package Q2.
 
 ## Run
 
-Needs Docker and your own Anthropic API key. The key is passed to the container at run
-time only (`docker run -e ANTHROPIC_API_KEY`), and only Claude Code sees it: it is unset
-before the agent's dependencies are installed and the app, the checker and the app's
-tests run. It is never in the image, and a run whose files contain the key, or anything
-that looks like one, is deleted and counts as failed.
+Needs Docker and one credential of your own, either of:
+- **A Claude subscription token** (Pro, Max, Team or Enterprise). Run `claude setup-token`
+  on your machine, approve in the browser, and copy the token it prints (valid for a
+  year; it is not saved anywhere). Runs count against your subscription's usage.
+- **An Anthropic API key** (`ANTHROPIC_API_KEY`), billed per use.
+
+Set only one. `run.sh` refuses to start without a credential, with both set, with a
+value that does not look like one (`sk-ant-...`, no spaces or line breaks), or with a
+file that looks like a credential (`.env*`, `*.pem`, `*.key`, `.credentials.json`,
+`.claude.json`) anywhere in this folder.
+
+**On Windows**, run it from Git Bash, with Docker Desktop running. `read -rs` reads the
+token without showing it or saving it in the shell history:
 
 ```bash
-export ANTHROPIC_API_KEY=...                  # yours; never commit it
+read -rs CLAUDE_CODE_OAUTH_TOKEN && export CLAUDE_CODE_OAUTH_TOKEN   # paste, then Enter
+scripts/agent-install-test/run.sh --runs 1    # one run first, to see that it works
 scripts/agent-install-test/run.sh             # 3 runs with the skill
 scripts/agent-install-test/run.sh --baseline  # the same prompt without skill and llms.txt
-scripts/agent-install-test/run.sh --runs 1    # one run, while trying things
+unset CLAUDE_CODE_OAUTH_TOKEN                  # when you are done
 ```
 
-Each run costs model usage. `run.sh` refuses to start without a key, or with a file that
-looks like a credential (`.env*`, `*.pem`, `*.key`, `.credentials.json`, `.claude.json`)
-anywhere in this folder.
+From PowerShell, call Git Bash by its full path, so the variable reaches it (a plain
+`bash` may start WSL, which does not see it):
+
+```powershell
+# Masked as you paste, and kept out of the history and the screen.
+$secure = Read-Host "Token" -AsSecureString
+$env:CLAUDE_CODE_OAUTH_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
+  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+& "C:\Program Files\Git\bin\bash.exe" scripts/agent-install-test/run.sh --runs 1
+Remove-Item Env:CLAUDE_CODE_OAUTH_TOKEN
+```
+
+The `--baseline` run writes `docs/launch/agent-baseline.md`; commit it in a pull request.
+
+### Where the credential goes
+
+- **Never in the image, the container's environment or `docker inspect`:** `run.sh`
+  sends it on the container's standard input, and only the `claude` process gets it as
+  an environment variable.
+- **Gone before the checker runs:** after the agent's session, every process the agent
+  left running is ended and the credential is dropped, before `uv sync`, the checker,
+  the app and its tests run. During the session it is not gone: see "What the agent
+  can see" below.
+- **Never in the results:** the files are scanned twice with the same `scan.sh`, inside
+  the container (as their owner) and again on the host, for the credential itself and
+  for anything shaped like a key or token, in file contents and file names. A match deletes the run's files, fails the run and prints a warning. The scans fail
+  closed: a file that cannot be read counts as a match (this needs GNU or BSD grep, as
+  in Git Bash, Linux and macOS; BusyBox grep flags every run). Ctrl-C stops the
+  container and scans what was written.
+- **Not in the process list or traces:** the scans read the credential from standard
+  input, and `run.sh` turns off `set -x`.
+
+### What the agent can see
+
+During its session the agent runs `uv`, `python` and the like, and those commands
+inherit the credential from the `claude` process, as in any CI job that runs Claude
+Code. A package the agent installs could read it. Claude Code can scrub credentials
+from its commands (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`), but that needs bubblewrap, which
+cannot create namespaces in a default Docker container, and loosening the container to
+allow it would be the worse trade. So run this only on the template here, and if a run
+ever looks wrong, treat the credential as exposed: delete an API key in the Claude
+Console; for a subscription token, look in your Claude account settings for a way to
+revoke it, or ask Anthropic support.
 
 ## What happens in a run
 
