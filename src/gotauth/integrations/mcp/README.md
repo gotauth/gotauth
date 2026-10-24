@@ -1,8 +1,8 @@
 # gotauth.integrations.mcp
 
 Protect a Python MCP server with GotAuth access tokens. Work package O2, CONTRACTS
-12.4. Built against FastMCP 4.0.10 and the MCP Python SDK (`mcp`) 2.3.0, checked
-2026-10-13, for MCP authorization revision 2026-07-28. Needs
+12.4. Built against FastMCP 4.1.3 and the MCP Python SDK (`mcp`) 2.3.0, checked
+2026-10-24, for MCP authorization revision 2026-07-28. Needs
 `pip install "gotauth[mcp]"`; `import gotauth` imports neither framework.
 
 The MCP server:

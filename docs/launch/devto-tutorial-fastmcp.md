@@ -25,7 +25,7 @@ You will end up with:
 
 The finished app is
 [`examples/fastmcp-server`](https://github.com/gotauth/gotauth/tree/main/examples/fastmcp-server).
-Built with FastMCP 4.1.0, FastAPI 0.143 and Python 3.14, for the MCP authorization
+Built with FastMCP 4.1.3, FastAPI 0.143 and Python 3.14, for the MCP authorization
 revision 2026-07-28.
 
 ## 1. Get the example
